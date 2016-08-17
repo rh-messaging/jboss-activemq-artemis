@@ -194,6 +194,11 @@ public class AMQSession implements SessionCallback {
    @Override
    public boolean hasCredits(ServerConsumer consumerID) {
       AMQConsumer amqConsumer = consumers.get(consumerID.getID());
+      if (amqConsumer == null) {
+         // ServerConsumer could be initialized already,
+         // but AMQConsumer could be not added to consumers map yet
+         return false;
+      }
       return amqConsumer.hasCredits();
    }
 
