@@ -491,7 +491,7 @@ public class ActiveMQXAConnectionFactoryTest extends CombinationTestSupport {
 
    private void assertTransactionGoneFromFailoverState(ActiveMQXAConnection connection1, Xid tid) throws Exception {
 
-      FailoverTransport transport = (FailoverTransport) connection1.getTransport().narrow(FailoverTransport.class);
+      FailoverTransport transport = connection1.getTransport().narrow(FailoverTransport.class);
       TransactionInfo info = new TransactionInfo(connection1.getConnectionInfo().getConnectionId(), new XATransactionId(tid), TransactionInfo.COMMIT_ONE_PHASE);
       assertNull("transaction should not exist in the state tracker", transport.getStateTracker().processCommitTransactionOnePhase(info));
    }
@@ -582,14 +582,17 @@ public class ActiveMQXAConnectionFactoryTest extends CombinationTestSupport {
       final byte[] bs = baos.toByteArray();
 
       return new Xid() {
+         @Override
          public int getFormatId() {
             return 86;
          }
 
+         @Override
          public byte[] getGlobalTransactionId() {
             return bs;
          }
 
+         @Override
          public byte[] getBranchQualifier() {
             return bs;
          }

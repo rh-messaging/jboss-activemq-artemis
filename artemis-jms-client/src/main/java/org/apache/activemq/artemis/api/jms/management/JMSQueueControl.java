@@ -19,6 +19,7 @@ package org.apache.activemq.artemis.api.jms.management;
 import java.util.Map;
 
 import javax.management.MBeanOperationInfo;
+import javax.management.openmbean.CompositeData;
 
 import org.apache.activemq.artemis.api.core.management.Operation;
 import org.apache.activemq.artemis.api.core.management.Parameter;
@@ -124,6 +125,7 @@ public interface JMSQueueControl extends DestinationControl {
     *
     * @return the number of removed messages
     */
+   @Override
    @Operation(desc = "Remove the messages corresponding to the given filter (and returns the number of removed messages)", impact = MBeanOperationInfo.ACTION)
    int removeMessages(@Parameter(name = "filter", desc = "A message filter (can be empty)") String filter) throws Exception;
 
@@ -162,6 +164,69 @@ public interface JMSQueueControl extends DestinationControl {
     */
    @Operation(desc = "Send the messages corresponding to the given filter to this queue's Dead Letter Address", impact = MBeanOperationInfo.ACTION)
    int sendMessagesToDeadLetterAddress(@Parameter(name = "filter", desc = "A message filter (can be empty)") String filterStr) throws Exception;
+
+   /**
+    * Sends a TextMesage to the destination.
+    *
+    * @param body the text to send
+    * @return the message id of the message sent.
+    * @throws Exception
+    */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendTextMessage(@Parameter(name = "body") String body) throws Exception;
+
+   /**
+    * Sends a TextMessage to the destination.
+    *
+    * @param properties the message properties to set as a comma sep name=value list. Can only
+    *                contain Strings maped to primitive types or JMS properties. eg: body=hi,JMSReplyTo=Queue2
+    * @return the message id of the message sent.
+    * @throws Exception
+    */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendTextMessageWithProperties(String properties) throws Exception;
+
+   /**
+    * Sends a TextMesage to the destination.
+    *
+    * @param headers the message headers and properties to set. Can only
+    *                container Strings maped to primitive types.
+    * @param body the text to send
+    * @return the message id of the message sent.
+    * @throws Exception
+    */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendTextMessage(@Parameter(name = "headers") Map<String,String> headers,
+                          @Parameter(name = "body") String body) throws Exception;
+
+   /**
+    * Sends a TextMesage to the destination.
+    * @param body the text to send
+    * @param user
+    * @param password
+    * @return
+    * @throws Exception
+    */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendTextMessage(@Parameter(name = "body") String body,
+                          @Parameter(name = "user") String user,
+                          @Parameter(name = "password") String password) throws Exception;
+
+   /**
+   *
+   * @param headers the message headers and properties to set. Can only
+   *                container Strings maped to primitive types.
+   * @param body the text to send
+   * @param user
+   * @param password
+   * @return
+   * @throws Exception
+   */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendTextMessage(@Parameter(name = "headers") Map<String,String> headers,
+                         @Parameter(name = "body") String body,
+                         @Parameter(name = "user") String user,
+                         @Parameter(name = "password") String password) throws Exception;
 
    /**
     * Changes the message's priority corresponding to the specified message ID to the specified priority.
@@ -228,6 +293,27 @@ public interface JMSQueueControl extends DestinationControl {
                     @Parameter(name = "rejectDuplicates", desc = "Reject messages identified as duplicate by the duplicate message") boolean rejectDuplicates) throws Exception;
 
    /**
+    * Retries the message corresponding to the given messageID to the original queue.
+    * This is appropriate on dead messages on Dead letter queues only.
+    *
+    * @param messageID
+    * @return {@code true} if the message was retried, {@code false} else
+    * @throws Exception
+    */
+   @Operation(desc = "Retry the message corresponding to the given messageID to the original queue", impact = MBeanOperationInfo.ACTION)
+   boolean retryMessage(@Parameter(name = "messageID", desc = "A message ID") String messageID) throws Exception;
+
+   /**
+    * Retries all messages on a DLQ to their respective original queues.
+    * This is appropriate on dead messages on Dead letter queues only.
+    *
+    * @return the number of retried messages.
+    * @throws Exception
+    */
+   @Operation(desc = "Retry all messages on a DLQ to their respective original queues", impact = MBeanOperationInfo.ACTION)
+   int retryMessages() throws Exception;
+
+   /**
     * Lists the message counter for this queue.
     */
    @Operation(desc = "List the message counters", impact = MBeanOperationInfo.INFO)
@@ -274,6 +360,19 @@ public interface JMSQueueControl extends DestinationControl {
     */
    @Operation(desc = "Resume the queue.", impact = MBeanOperationInfo.ACTION)
    void resume() throws Exception;
+
+
+   /**
+    * Resumes the queue. Messages are again delivered to its consumers.
+    */
+   @Operation(desc = "Browse the queue.", impact = MBeanOperationInfo.ACTION)
+   CompositeData[] browse() throws Exception;
+
+   /**
+    * Resumes the queue. Messages are again delivered to its consumers.
+    */
+   @Operation(desc = "Browse the queue.", impact = MBeanOperationInfo.ACTION)
+   CompositeData[] browse(String filter) throws Exception;
 
    @Operation(desc = "List all the existent consumers on the Queue")
    String listConsumersAsJSON() throws Exception;

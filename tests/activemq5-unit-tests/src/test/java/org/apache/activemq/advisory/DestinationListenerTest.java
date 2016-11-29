@@ -45,7 +45,7 @@ public class DestinationListenerTest extends EmbeddedBrokerTestSupport implement
    protected ActiveMQConnection connection;
    protected ActiveMQQueue sampleQueue = new ActiveMQQueue("foo.bar");
    protected ActiveMQTopic sampleTopic = new ActiveMQTopic("cheese");
-   protected List<ActiveMQDestination> newDestinations = new ArrayList<ActiveMQDestination>();
+   protected List<ActiveMQDestination> newDestinations = new ArrayList<>();
 
    public void testDestiationSourceHasInitialDestinations() throws Exception {
       Thread.sleep(1000);
@@ -92,6 +92,7 @@ public class DestinationListenerTest extends EmbeddedBrokerTestSupport implement
       LOG.info("New destinations are: " + newDestinations);
    }
 
+   @Override
    public void onDestinationEvent(DestinationEvent event) {
       ActiveMQDestination destination = event.getDestination();
       if (event.isAddOperation()) {
@@ -104,6 +105,7 @@ public class DestinationListenerTest extends EmbeddedBrokerTestSupport implement
       }
    }
 
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
 
@@ -119,6 +121,7 @@ public class DestinationListenerTest extends EmbeddedBrokerTestSupport implement
       return broker;
    }
 
+   @Override
    protected void tearDown() throws Exception {
       if (connection != null) {
          connection.close();

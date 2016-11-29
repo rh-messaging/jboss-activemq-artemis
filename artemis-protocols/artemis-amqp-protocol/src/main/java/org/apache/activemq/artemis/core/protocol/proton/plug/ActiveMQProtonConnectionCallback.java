@@ -46,9 +46,12 @@ public class ActiveMQProtonConnectionCallback implements AMQPConnectionCallback 
 
    private final ReusableLatch latch = new ReusableLatch(0);
 
-   public ActiveMQProtonConnectionCallback(ProtonProtocolManager manager, Connection connection) {
+   private final Executor closeExecutor;
+
+   public ActiveMQProtonConnectionCallback(ProtonProtocolManager manager, Connection connection, Executor closeExecutor) {
       this.manager = manager;
       this.connection = connection;
+      this.closeExecutor = closeExecutor;
    }
 
    @Override
@@ -88,6 +91,7 @@ public class ActiveMQProtonConnectionCallback implements AMQPConnectionCallback 
       this.protonConnectionDelegate = protonConnectionDelegate;
    }
 
+   @Override
    public void onTransport(ByteBuf byteBuf, AMQPConnectionContext amqpConnection) {
       final int size = byteBuf.writerIndex();
 
@@ -113,7 +117,7 @@ public class ActiveMQProtonConnectionCallback implements AMQPConnectionCallback 
 
    @Override
    public AMQPSessionCallback createSessionCallback(AMQPConnectionContext connection) {
-      return new ProtonSessionIntegrationCallback(this, manager, connection);
+      return new ProtonSessionIntegrationCallback(this, manager, connection, this.connection, closeExecutor);
    }
 
 }

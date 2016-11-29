@@ -34,8 +34,8 @@ import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.management.ResourceNames;
 import org.apache.activemq.artemis.api.jms.ActiveMQJMSClient;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.core.protocol.stomp.Stomp;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -56,6 +56,7 @@ public class StompTest extends StompTestBase {
       final CountDownLatch latch = new CountDownLatch(count);
       consumer.setMessageListener(new MessageListener() {
 
+         @Override
          public void onMessage(Message arg0) {
             latch.countDown();
          }
@@ -1273,6 +1274,58 @@ public class StompTest extends StompTestBase {
       Assert.assertTrue(frame.startsWith("MESSAGE"));
       Assert.assertTrue(frame.indexOf("destination:") > 0);
       Assert.assertTrue(frame.indexOf(getName()) > 0);
+
+      frame = "DISCONNECT\n" + "\n\n" + Stomp.NULL;
+      sendFrame(frame);
+   }
+
+   @Test
+   public void testTopicExistsAfterNoUnsubscribeDisconnect() throws Exception {
+
+      String frame = "CONNECT\n" + "login: brianm\n" + "passcode: wombats\n\n" + Stomp.NULL;
+      sendFrame(frame);
+
+      frame = receiveFrame(100000);
+      Assert.assertTrue(frame.startsWith("CONNECTED"));
+
+      frame = "SUBSCRIBE\n" + "destination:" +
+         getTopicPrefix() +
+         getTopicName() +
+         "\n" +
+         "receipt: 12\n" +
+         "\n\n" +
+         Stomp.NULL;
+      sendFrame(frame);
+      // wait for SUBSCRIBE's receipt
+      frame = receiveFrame(10000);
+      Assert.assertTrue(frame.startsWith("RECEIPT"));
+
+      // disconnect, _without unsubscribing_
+      frame = "DISCONNECT\n" + "\n\n" + Stomp.NULL;
+      sendFrame(frame);
+      waitForFrameToTakeEffect();
+
+      // connect again
+      reconnect();
+      frame = "CONNECT\n" + "login: brianm\n" + "passcode: wombats\n\n" + Stomp.NULL;
+      sendFrame(frame);
+
+      frame = receiveFrame(100000);
+      Assert.assertTrue(frame.startsWith("CONNECTED"));
+
+      // send a receipted message to the topic
+      frame = "SEND\n" + "destination:" + getTopicPrefix() + getTopicName() + "\nreceipt:42\n\n\n" + "Hello World" + Stomp.NULL;
+      sendFrame(frame);
+
+      // the topic should exist and receive the message, and we should get the requested receipt
+      frame = receiveFrame(2000);
+      log.info("Received frame: " + frame);
+      Assert.assertTrue(frame.startsWith("RECEIPT"));
+
+      // ...and nothing else
+      frame = receiveFrame(2000);
+      log.info("Received frame: " + frame);
+      Assert.assertNull(frame);
 
       frame = "DISCONNECT\n" + "\n\n" + Stomp.NULL;
       sendFrame(frame);

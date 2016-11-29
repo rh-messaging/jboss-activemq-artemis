@@ -21,7 +21,10 @@ import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.TransportConfigurationHelper;
+import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactory;
+import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.utils.ClassloadingUtil;
 
 /**
@@ -60,6 +63,7 @@ public class TransportConfigurationUtil {
 
    private static Object instantiateObject(final String className) {
       return AccessController.doPrivileged(new PrivilegedAction<Object>() {
+         @Override
          public Object run() {
             try {
                return ClassloadingUtil.newInstanceFromClassLoader(className);
@@ -72,10 +76,26 @@ public class TransportConfigurationUtil {
    }
 
    private static Map<String, Object> cloneDefaults(Map<String, Object> defaults) {
-      Map<String, Object> cloned = new HashMap<String, Object>();
+      Map<String, Object> cloned = new HashMap<>();
       for (Map.Entry entry : defaults.entrySet()) {
          cloned.put((String) entry.getKey(), entry.getValue());
       }
       return cloned;
+   }
+
+   public static boolean isSameHost(TransportConfiguration tc1, TransportConfiguration tc2) {
+      if (NettyConnectorFactory.class.getName().equals(tc1.getFactoryClassName())) {
+         String host1 = tc1.getParams().get("host") != null ? tc1.getParams().get("host").toString() : TransportConstants.DEFAULT_HOST;
+         String host2 = tc2.getParams().get("host") != null ? tc2.getParams().get("host").toString() : TransportConstants.DEFAULT_HOST;
+         String port1 = String.valueOf(tc1.getParams().get("port") != null ? tc1.getParams().get("port") : TransportConstants.DEFAULT_PORT);
+         String port2 = String.valueOf(tc2.getParams().get("port") != null ? tc2.getParams().get("port") : TransportConstants.DEFAULT_PORT);
+         return host1.equals(host2) && port1.equals(port2);
+      }
+      else if ("org.apache.activemq.artemis.core.remoting.impl.invm.InVMConnectorFactory".equals(tc1.getFactoryClassName())) {
+         String serverId1 = tc1.getParams().get("serverId") != null ? tc1.getParams().get("serverId").toString() : "0";
+         String serverId2 = tc2.getParams().get("serverId") != null ? tc2.getParams().get("serverId").toString() : "0";
+         return serverId1.equals(serverId2);
+      }
+      return false;
    }
 }

@@ -16,9 +16,12 @@
  */
 package org.apache.activemq.artemis.api.core.client;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+
+import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.api.core.Interceptor;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
-import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.core.client.impl.Topology;
 import org.apache.activemq.artemis.spi.core.remoting.ClientProtocolManagerFactory;
 
@@ -722,6 +725,7 @@ public interface ServerLocator extends AutoCloseable {
    /**
     * Closes this factory and release all its resources
     */
+   @Override
    void close();
 
    /**
@@ -769,6 +773,19 @@ public interface ServerLocator extends AutoCloseable {
 
    ClientProtocolManagerFactory getProtocolManagerFactory();
 
-   void setProtocolManagerFactory(ClientProtocolManagerFactory protocolManager);
+   ServerLocator setProtocolManagerFactory(ClientProtocolManagerFactory protocolManager);
 
+   /**
+    * @param interceptorList a comma separated string of incoming interceptor class names to be used. Each interceptor needs a default Constructor to be used with this method.
+    * @return this
+    */
+   ServerLocator setIncomingInterceptorList(String interceptorList);
+
+   String getIncomingInterceptorList();
+
+   ServerLocator setOutgoingInterceptorList(String interceptorList);
+
+   String getOutgoingInterceptorList();
+
+   boolean setThreadPools(ExecutorService threadPool, ScheduledExecutorService scheduledThreadPoolExecutor);
 }

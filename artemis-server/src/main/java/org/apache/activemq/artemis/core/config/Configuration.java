@@ -25,8 +25,10 @@ import org.apache.activemq.artemis.api.core.BroadcastGroupConfiguration;
 import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
+import org.apache.activemq.artemis.core.config.impl.ConfigurationImpl;
 import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.JournalType;
+import org.apache.activemq.artemis.core.server.SecuritySettingPlugin;
 import org.apache.activemq.artemis.core.server.group.impl.GroupingHandlerConfiguration;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.core.settings.impl.ResourceLimitSettings;
@@ -193,6 +195,16 @@ public interface Configuration {
     */
    Configuration setJMXDomain(String domain);
 
+  /**
+   * whether or not to use the broker name in the JMX tree
+   * */
+   boolean isJMXUseBrokerName();
+
+   /**
+    * whether or not to use the broker name in the JMX tree
+    * */
+   ConfigurationImpl setJMXUseBrokerName(boolean jmxUseBrokerName);
+
    /**
     * Returns the list of interceptors classes used by this server for incoming messages (i.e. those being delivered to
     * the server from clients).
@@ -257,6 +269,16 @@ public interface Configuration {
 
    Configuration addAcceptorConfiguration(final TransportConfiguration infos);
 
+   /**
+    * Add an acceptor to the config
+    *
+    * @param name the name of the acceptor
+    * @param uri  the URI of the acceptor
+    * @return this
+    * @throws Exception in case of Parsing errors on the URI
+    */
+   Configuration addAcceptorConfiguration(String name, String uri) throws Exception;
+
    Configuration clearAcceptorConfigurations();
 
    /**
@@ -270,6 +292,8 @@ public interface Configuration {
    Configuration setConnectorConfigurations(Map<String, TransportConfiguration> infos);
 
    Configuration addConnectorConfiguration(final String key, final TransportConfiguration info);
+
+   Configuration addConnectorConfiguration(final String name, final String uri) throws Exception;
 
    Configuration clearConnectorConfigurations();
 
@@ -344,6 +368,8 @@ public interface Configuration {
    Configuration setClusterConfigurations(final List<ClusterConnectionConfiguration> configs);
 
    Configuration addClusterConfiguration(final ClusterConnectionConfiguration config);
+
+   ClusterConnectionConfiguration addClusterConfiguration(String name, String uri) throws Exception;
 
    Configuration clearClusterConfigurations();
 
@@ -534,6 +560,13 @@ public interface Configuration {
     */
    Configuration setJournalCompactMinFiles(int minFiles);
 
+   /** Number of files that would be acceptable to keep on a pool. Default value is {@link org.apache.activemq.artemis.api.config.ActiveMQDefaultConfiguration#DEFAULT_JOURNAL_POOL_SIZE}.*/
+   int getJournalPoolFiles();
+
+   /** Number of files that would be acceptable to keep on a pool. Default value is {@link org.apache.activemq.artemis.api.config.ActiveMQDefaultConfiguration#DEFAULT_JOURNAL_POOL_SIZE}.*/
+   Configuration setJournalPoolFiles(int poolSize);
+
+
    /**
     * Returns the percentage of live data before compacting the journal. <br>
     * Default value is {@link org.apache.activemq.artemis.api.config.ActiveMQDefaultConfiguration#DEFAULT_JOURNAL_COMPACT_PERCENTAGE}.
@@ -572,7 +605,7 @@ public interface Configuration {
    /**
     * Returns the timeout (in nanoseconds) used to flush buffers in the AIO queue.
     * <br>
-    * Default value is {@link org.apache.activemq.artemis.core.journal.impl.JournalConstants#DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO}.
+    * Default value is {@link org.apache.activemq.artemis.ArtemisConstants#DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO}.
     */
    int getJournalBufferTimeout_AIO();
 
@@ -584,7 +617,7 @@ public interface Configuration {
    /**
     * Returns the buffer size (in bytes) for AIO.
     * <br>
-    * Default value is {@link org.apache.activemq.artemis.core.journal.impl.JournalConstants#DEFAULT_JOURNAL_BUFFER_SIZE_AIO}.
+    * Default value is {@link org.apache.activemq.artemis.ArtemisConstants#DEFAULT_JOURNAL_BUFFER_SIZE_AIO}.
     */
    int getJournalBufferSize_AIO();
 
@@ -607,7 +640,7 @@ public interface Configuration {
    /**
     * Returns the timeout (in nanoseconds) used to flush buffers in the NIO.
     * <br>
-    * Default value is {@link org.apache.activemq.artemis.core.journal.impl.JournalConstants#DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO}.
+    * Default value is {@link org.apache.activemq.artemis.ArtemisConstants#DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO}.
     */
    int getJournalBufferTimeout_NIO();
 
@@ -619,7 +652,7 @@ public interface Configuration {
    /**
     * Returns the buffer size (in bytes) for NIO.
     * <br>
-    * Default value is {@link org.apache.activemq.artemis.core.journal.impl.JournalConstants#DEFAULT_JOURNAL_BUFFER_SIZE_NIO}.
+    * Default value is {@link org.apache.activemq.artemis.ArtemisConstants#DEFAULT_JOURNAL_BUFFER_SIZE_NIO}.
     */
    int getJournalBufferSize_NIO();
 
@@ -837,14 +870,22 @@ public interface Configuration {
     */
    Map<String, Set<Role>> getSecurityRoles();
 
+   Configuration putSecurityRoles(String match, Set<Role> roles);
+
    Configuration setConnectorServiceConfigurations(List<ConnectorServiceConfiguration> configs);
 
    Configuration addConnectorServiceConfiguration(ConnectorServiceConfiguration config);
+
+   Configuration setSecuritySettingPlugins(final List<SecuritySettingPlugin> plugins);
+
+   Configuration addSecuritySettingPlugin(final SecuritySettingPlugin plugin);
 
    /**
     * @return list of {@link ConnectorServiceConfiguration}
     */
    List<ConnectorServiceConfiguration> getConnectorServiceConfigurations();
+
+   List<SecuritySettingPlugin> getSecuritySettingPlugins();
 
    /**
     * The default password decoder
@@ -871,6 +912,10 @@ public interface Configuration {
    * be set, any other protocols will need to be set directly on the ActiveMQServer
    * */
    Configuration setResolveProtocols(boolean resolveProtocols);
+
+   TransportConfiguration[] getTransportConfigurations(String ...connectorNames);
+
+   TransportConfiguration[] getTransportConfigurations(List<String> connectorNames);
 
    /*
    * @see #setResolveProtocols()
@@ -899,4 +944,7 @@ public interface Configuration {
     */
    File getBrokerInstance();
 
+   StoreConfiguration getStoreConfiguration();
+
+   Configuration setStoreConfiguration(StoreConfiguration storeConfiguration);
 }

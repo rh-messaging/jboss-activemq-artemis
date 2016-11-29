@@ -58,6 +58,8 @@ import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 import javax.transaction.TransactionRolledbackException;
 import javax.transaction.xa.XAResource;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -67,6 +69,7 @@ import java.util.Map.Entry;
 import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 public final class JMSBridgeImpl implements JMSBridge {
@@ -176,11 +179,13 @@ public final class JMSBridgeImpl implements JMSBridge {
 
    private ActiveMQRegistry registry;
 
+   private ClassLoader moduleTccl;
+
    /*
     * Constructor for MBean
     */
    public JMSBridgeImpl() {
-      messages = new LinkedList<Message>();
+      messages = new LinkedList<>();
       executor = createExecutor();
    }
 
@@ -314,10 +319,18 @@ public final class JMSBridgeImpl implements JMSBridge {
 
    // ActiveMQComponent overrides --------------------------------------------------
 
+   @Override
    public synchronized void start() throws Exception {
       synchronized (stoppingGuard) {
          stopping = false;
       }
+
+      moduleTccl = AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
+         @Override
+         public ClassLoader run() {
+            return Thread.currentThread().getContextClassLoader();
+         }
+      });
 
       locateRecoveryRegistry();
 
@@ -437,6 +450,7 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   @Override
    public void stop() throws Exception {
       synchronized (stoppingGuard) {
          if (stopping)
@@ -512,6 +526,7 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   @Override
    public synchronized boolean isStarted() {
       return started;
    }
@@ -529,6 +544,7 @@ public final class JMSBridgeImpl implements JMSBridge {
 
    // JMSBridge implementation ------------------------------------------------------------
 
+   @Override
    public synchronized void pause() throws Exception {
       if (JMSBridgeImpl.trace) {
          ActiveMQJMSBridgeLogger.LOGGER.trace("Pausing " + this);
@@ -545,6 +561,7 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   @Override
    public synchronized void resume() throws Exception {
       if (JMSBridgeImpl.trace) {
          ActiveMQJMSBridgeLogger.LOGGER.trace("Resuming " + this);
@@ -561,10 +578,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   @Override
    public DestinationFactory getSourceDestinationFactory() {
       return sourceDestinationFactory;
    }
 
+   @Override
    public void setSourceDestinationFactory(final DestinationFactory dest) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkNotNull(dest, "TargetDestinationFactory");
@@ -572,10 +591,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       sourceDestinationFactory = dest;
    }
 
+   @Override
    public DestinationFactory getTargetDestinationFactory() {
       return targetDestinationFactory;
    }
 
+   @Override
    public void setTargetDestinationFactory(final DestinationFactory dest) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkNotNull(dest, "TargetDestinationFactory");
@@ -583,60 +604,72 @@ public final class JMSBridgeImpl implements JMSBridge {
       targetDestinationFactory = dest;
    }
 
+   @Override
    public synchronized String getSourceUsername() {
       return sourceUsername;
    }
 
+   @Override
    public synchronized void setSourceUsername(final String name) {
       checkBridgeNotStarted();
 
       sourceUsername = name;
    }
 
+   @Override
    public synchronized String getSourcePassword() {
       return sourcePassword;
    }
 
+   @Override
    public synchronized void setSourcePassword(final String pwd) {
       checkBridgeNotStarted();
 
       sourcePassword = pwd;
    }
 
+   @Override
    public synchronized String getTargetUsername() {
       return targetUsername;
    }
 
+   @Override
    public synchronized void setTargetUsername(final String name) {
       checkBridgeNotStarted();
 
       targetUsername = name;
    }
 
+   @Override
    public synchronized String getTargetPassword() {
       return targetPassword;
    }
 
+   @Override
    public synchronized void setTargetPassword(final String pwd) {
       checkBridgeNotStarted();
 
       targetPassword = pwd;
    }
 
+   @Override
    public synchronized String getSelector() {
       return selector;
    }
 
+   @Override
    public synchronized void setSelector(final String selector) {
       checkBridgeNotStarted();
 
       this.selector = selector;
    }
 
+   @Override
    public synchronized long getFailureRetryInterval() {
       return failureRetryInterval;
    }
 
+   @Override
    public synchronized void setFailureRetryInterval(final long interval) {
       checkBridgeNotStarted();
       if (interval < 1) {
@@ -646,10 +679,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       failureRetryInterval = interval;
    }
 
+   @Override
    public synchronized int getMaxRetries() {
       return maxRetries;
    }
 
+   @Override
    public synchronized void setMaxRetries(final int retries) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkValidValue(retries, "MaxRetries");
@@ -657,10 +692,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       maxRetries = retries;
    }
 
+   @Override
    public synchronized QualityOfServiceMode getQualityOfServiceMode() {
       return qualityOfServiceMode;
    }
 
+   @Override
    public synchronized void setQualityOfServiceMode(final QualityOfServiceMode mode) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkNotNull(mode, "QualityOfServiceMode");
@@ -668,10 +705,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       qualityOfServiceMode = mode;
    }
 
+   @Override
    public synchronized int getMaxBatchSize() {
       return maxBatchSize;
    }
 
+   @Override
    public synchronized void setMaxBatchSize(final int size) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkMaxBatchSize(size);
@@ -679,10 +718,12 @@ public final class JMSBridgeImpl implements JMSBridge {
       maxBatchSize = size;
    }
 
+   @Override
    public synchronized long getMaxBatchTime() {
       return maxBatchTime;
    }
 
+   @Override
    public synchronized void setMaxBatchTime(final long time) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkValidValue(time, "MaxBatchTime");
@@ -690,41 +731,50 @@ public final class JMSBridgeImpl implements JMSBridge {
       maxBatchTime = time;
    }
 
+   @Override
    public synchronized String getSubscriptionName() {
       return subName;
    }
 
+   @Override
    public synchronized void setSubscriptionName(final String subname) {
       checkBridgeNotStarted();
       subName = subname;
    }
 
+   @Override
    public synchronized String getClientID() {
       return clientID;
    }
 
+   @Override
    public synchronized void setClientID(final String clientID) {
       checkBridgeNotStarted();
 
       this.clientID = clientID;
    }
 
+   @Override
    public boolean isAddMessageIDInHeader() {
       return addMessageIDInHeader;
    }
 
+   @Override
    public void setAddMessageIDInHeader(final boolean value) {
       addMessageIDInHeader = value;
    }
 
+   @Override
    public synchronized boolean isPaused() {
       return paused;
    }
 
+   @Override
    public synchronized boolean isFailed() {
       return failed;
    }
 
+   @Override
    public synchronized void setSourceConnectionFactoryFactory(final ConnectionFactoryFactory cff) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkNotNull(cff, "SourceConnectionFactoryFactory");
@@ -732,6 +782,7 @@ public final class JMSBridgeImpl implements JMSBridge {
       sourceCff = cff;
    }
 
+   @Override
    public synchronized void setTargetConnectionFactoryFactory(final ConnectionFactoryFactory cff) {
       checkBridgeNotStarted();
       JMSBridgeImpl.checkNotNull(cff, "TargetConnectionFactoryFactory");
@@ -739,6 +790,7 @@ public final class JMSBridgeImpl implements JMSBridge {
       targetCff = cff;
    }
 
+   @Override
    public void setTransactionManager(final TransactionManager tm) {
       this.tm = tm;
    }
@@ -1502,7 +1554,6 @@ public final class JMSBridgeImpl implements JMSBridge {
     * don't lose them!!
     */
    private static void copyProperties(final Message msg) throws JMSException {
-      @SuppressWarnings("unchecked")
       Enumeration<String> en = msg.getPropertyNames();
 
       Map<String, Object> oldProps = null;
@@ -1511,7 +1562,7 @@ public final class JMSBridgeImpl implements JMSBridge {
          String propName = en.nextElement();
 
          if (oldProps == null) {
-            oldProps = new HashMap<String, Object>();
+            oldProps = new HashMap<>();
          }
 
          oldProps.put(propName, msg.getObjectProperty(propName));
@@ -1545,7 +1596,23 @@ public final class JMSBridgeImpl implements JMSBridge {
     * and 1 for the eventual failureHandler)
     */
    private ExecutorService createExecutor() {
-      return Executors.newFixedThreadPool(3);
+      ExecutorService service = Executors.newFixedThreadPool(3, new ThreadFactory() {
+         @Override
+         public Thread newThread(Runnable r) {
+            final Thread thr = new Thread(r);
+            if (moduleTccl != null) {
+               AccessController.doPrivileged(new PrivilegedAction() {
+                  @Override
+                  public Object run() {
+                     thr.setContextClassLoader(moduleTccl);
+                     return null;
+                  }
+               });
+            }
+            return thr;
+         }
+      });
+      return service;
    }
 
    // Inner classes ---------------------------------------------------------------
@@ -1680,6 +1747,7 @@ public final class JMSBridgeImpl implements JMSBridge {
          }
       }
 
+      @Override
       public void run() {
          if (JMSBridgeImpl.trace) {
             ActiveMQJMSBridgeLogger.LOGGER.trace("Failure handler running");
@@ -1745,6 +1813,7 @@ public final class JMSBridgeImpl implements JMSBridge {
 
    private class BatchTimeChecker implements Runnable {
 
+      @Override
       public void run() {
          if (JMSBridgeImpl.trace) {
             ActiveMQJMSBridgeLogger.LOGGER.trace(this + " running");
@@ -1815,6 +1884,7 @@ public final class JMSBridgeImpl implements JMSBridge {
          this.isSource = isSource;
       }
 
+      @Override
       public void onException(final JMSException e) {
          if (stopping) {
             return;
@@ -1875,18 +1945,22 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   @Override
    public boolean isUseMaskedPassword() {
       return useMaskedPassword;
    }
 
+   @Override
    public void setUseMaskedPassword(boolean maskPassword) {
       this.useMaskedPassword = maskPassword;
    }
 
+   @Override
    public String getPasswordCodec() {
       return passwordCodec;
    }
 
+   @Override
    public void setPasswordCodec(String passwordCodec) {
       this.passwordCodec = passwordCodec;
    }

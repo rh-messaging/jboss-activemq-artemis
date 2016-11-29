@@ -30,9 +30,11 @@ import javax.resource.spi.work.WorkManager;
 import javax.transaction.xa.XAResource;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
@@ -42,9 +44,10 @@ import org.apache.activemq.artemis.api.core.ActiveMQNotConnectedException;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
+import org.apache.activemq.artemis.api.core.client.ClusterTopologyListener;
+import org.apache.activemq.artemis.api.core.client.TopologyMember;
 import org.apache.activemq.artemis.api.jms.ActiveMQJMSClient;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
-import org.apache.activemq.artemis.ra.ActiveMQRAConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQDestination;
 import org.apache.activemq.artemis.ra.ActiveMQRABundle;
@@ -107,12 +110,18 @@ public class ActiveMQActivation {
     */
    private SimpleString topicTemporaryQueue;
 
-   private final List<ActiveMQMessageHandler> handlers = new ArrayList<ActiveMQMessageHandler>();
+   private final List<ActiveMQMessageHandler> handlers = new ArrayList<>();
 
    private ActiveMQConnectionFactory factory;
 
+   private List<String> nodes = Collections.synchronizedList(new ArrayList<String>());
+
+   private Map<String, Long> removedNodes = new ConcurrentHashMap<>();
+
+   private boolean lastReceived = false;
+
    // Whether we are in the failure recovery loop
-   private final AtomicBoolean inFailure = new AtomicBoolean(false);
+   private final AtomicBoolean inReconnect = new AtomicBoolean(false);
    private XARecoveryConfig resourceRecovery;
 
    static {
@@ -262,7 +271,7 @@ public class ActiveMQActivation {
     * @return the list of XAResources for this activation endpoint
     */
    public List<XAResource> getXAResources() {
-      List<XAResource> xaresources = new ArrayList<XAResource>();
+      List<XAResource> xaresources = new ArrayList<>();
       for (ActiveMQMessageHandler handler : handlers) {
          XAResource xares = handler.getXAResource();
          if (xares != null) {
@@ -335,9 +344,12 @@ public class ActiveMQActivation {
          handler.start();
       }
 
-      Map<String, String> recoveryConfProps = new HashMap<String, String>();
+      Map<String, String> recoveryConfProps = new HashMap<>();
       recoveryConfProps.put(XARecoveryConfig.JNDI_NAME_PROPERTY_KEY, ra.getJndiName());
       resourceRecovery = ra.getRecoveryManager().register(factory, spec.getUser(), spec.getPassword(), recoveryConfProps);
+      if (spec.isRebalanceConnections()) {
+         factory.getServerLocator().addClusterTopologyListener(new RebalancingListener());
+      }
 
       ActiveMQRALogger.LOGGER.debug("Setup complete " + this);
    }
@@ -387,6 +399,7 @@ public class ActiveMQActivation {
       }
 
       Thread threadTearDown = new Thread("TearDown/ActiveMQActivation") {
+         @Override
          public void run() {
             for (ActiveMQMessageHandler handler : handlersCopy) {
                handler.teardown();
@@ -406,12 +419,19 @@ public class ActiveMQActivation {
          // nothing to be done on this context.. we will just keep going as we need to send an interrupt to threadTearDown and give up
       }
 
-      if (threadTearDown.isAlive()) {
-         if (factory != null) {
-            // This will interrupt any threads waiting on reconnect
+      if (factory != null) {
+         try {
+            // closing the factory will help making sure pending threads are closed
             factory.close();
-            factory = null;
          }
+         catch (Throwable e) {
+            ActiveMQRALogger.LOGGER.warn(e);
+         }
+
+         factory = null;
+      }
+
+      if (threadTearDown.isAlive()) {
          threadTearDown.interrupt();
 
          try {
@@ -426,10 +446,8 @@ public class ActiveMQActivation {
          }
       }
 
-      if (spec.isHasBeenUpdated() && factory != null) {
-         ra.closeConnectionFactory(spec);
-         factory = null;
-      }
+      nodes.clear();
+      lastReceived = false;
 
       ActiveMQRALogger.LOGGER.debug("Tearing down complete " + this);
    }
@@ -445,26 +463,16 @@ public class ActiveMQActivation {
          }
          Object fac = ctx.lookup(spec.getConnectionFactoryLookup());
          if (fac instanceof ActiveMQConnectionFactory) {
-            factory = (ActiveMQConnectionFactory) fac;
+            // This will clone the connection factory
+            // to make sure we won't close anyone's connection factory when we stop the MDB
+            factory = ActiveMQJMSClient.createConnectionFactory(((ActiveMQConnectionFactory) fac).toURI().toString(), "internalConnection");
          }
          else {
-            ActiveMQRAConnectionFactory raFact = (ActiveMQRAConnectionFactory) fac;
-            if (spec.isHasBeenUpdated()) {
-               factory = raFact.getResourceAdapter().createActiveMQConnectionFactory(spec);
-            }
-            else {
-               factory = raFact.getDefaultFactory();
-               if (factory != ra.getDefaultActiveMQConnectionFactory()) {
-                  ActiveMQRALogger.LOGGER.warnDifferentConnectionfactory();
-               }
-            }
+            factory = ra.newConnectionFactory(spec);
          }
       }
-      else if (spec.isHasBeenUpdated()) {
-         factory = ra.createActiveMQConnectionFactory(spec);
-      }
       else {
-         factory = ra.getDefaultActiveMQConnectionFactory();
+         factory = ra.newConnectionFactory(spec);
       }
    }
 
@@ -610,27 +618,46 @@ public class ActiveMQActivation {
       return buffer.toString();
    }
 
+   public void startReconnectThread(final String threadName) {
+      if (trace) {
+         ActiveMQRALogger.LOGGER.trace("Starting reconnect Thread " + threadName + " on MDB activation " + this);
+      }
+      Runnable runnable = new Runnable() {
+         @Override
+         public void run() {
+            reconnect(null);
+         }
+      };
+      Thread t = new Thread(runnable, threadName);
+      t.start();
+   }
+
    /**
-    * Handles any failure by trying to reconnect
+    * Drops all existing connection-related resources and reconnects
     *
-    * @param failure the reason for the failure
+    * @param failure if reconnecting in the event of a failure
     */
-   public void handleFailure(Throwable failure) {
-      if (failure instanceof ActiveMQException && ((ActiveMQException) failure).getType() == ActiveMQExceptionType.QUEUE_DOES_NOT_EXIST) {
-         ActiveMQRALogger.LOGGER.awaitingTopicQueueCreation(getActivationSpec().getDestination());
+   public void reconnect(Throwable failure) {
+      if (trace) {
+         ActiveMQRALogger.LOGGER.trace("reconnecting activation " + this);
       }
-      else if (failure instanceof ActiveMQException && ((ActiveMQException) failure).getType() == ActiveMQExceptionType.NOT_CONNECTED) {
-         ActiveMQRALogger.LOGGER.awaitingJMSServerCreation();
-      }
-      else {
-         ActiveMQRALogger.LOGGER.failureInActivation(failure, spec);
+      if (failure != null) {
+         if (failure instanceof ActiveMQException && ((ActiveMQException) failure).getType() == ActiveMQExceptionType.QUEUE_DOES_NOT_EXIST) {
+            ActiveMQRALogger.LOGGER.awaitingTopicQueueCreation(getActivationSpec().getDestination());
+         }
+         else if (failure instanceof ActiveMQException && ((ActiveMQException) failure).getType() == ActiveMQExceptionType.NOT_CONNECTED) {
+            ActiveMQRALogger.LOGGER.awaitingJMSServerCreation();
+         }
+         else {
+            ActiveMQRALogger.LOGGER.failureInActivation(failure, spec);
+         }
       }
       int reconnectCount = 0;
       int setupAttempts = spec.getSetupAttempts();
       long setupInterval = spec.getSetupInterval();
 
-      // Only enter the failure loop once
-      if (inFailure.getAndSet(true))
+      // Only enter the reconnect loop once
+      if (inReconnect.getAndSet(true))
          return;
       try {
          Throwable lastException = failure;
@@ -675,7 +702,7 @@ public class ActiveMQActivation {
       }
       finally {
          // Leaving failure recovery loop
-         inFailure.set(false);
+         inReconnect.set(false);
       }
    }
 
@@ -688,16 +715,51 @@ public class ActiveMQActivation {
     */
    private class SetupActivation implements Work {
 
+      @Override
       public void run() {
          try {
             setup();
          }
          catch (Throwable t) {
-            handleFailure(t);
+            reconnect(t);
          }
       }
 
+      @Override
       public void release() {
+      }
+   }
+
+   private class RebalancingListener implements ClusterTopologyListener {
+
+      @Override
+      public void nodeUP(TopologyMember member, boolean last) {
+         boolean newNode = false;
+
+         String id = member.getNodeId();
+         if (!nodes.contains(id)) {
+            if (removedNodes.get(id) == null || (removedNodes.get(id) != null && removedNodes.get(id) < member.getUniqueEventID())) {
+               nodes.add(id);
+               newNode = true;
+            }
+         }
+
+         if (lastReceived && newNode) {
+            ActiveMQRALogger.LOGGER.rebalancingConnections("nodeUp " + member.toString());
+            startReconnectThread("NodeUP Connection Rebalancer");
+         }
+         else if (last) {
+            lastReceived = true;
+         }
+      }
+
+      @Override
+      public void nodeDown(long eventUID, String nodeID) {
+         if (nodes.remove(nodeID)) {
+            removedNodes.put(nodeID, eventUID);
+            ActiveMQRALogger.LOGGER.rebalancingConnections("nodeDown " + nodeID);
+            startReconnectThread("NodeDOWN Connection Rebalancer");
+         }
       }
    }
 }

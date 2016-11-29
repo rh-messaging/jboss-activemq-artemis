@@ -47,7 +47,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServers;
 import org.apache.activemq.artemis.core.server.management.Notification;
 import org.apache.activemq.artemis.tests.integration.SimpleNotificationService;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.json.JSONArray;
 
 public class ClusterConnectionControlTest extends ManagementTestBase {
@@ -187,14 +187,14 @@ public class ClusterConnectionControlTest extends ManagementTestBase {
    public void setUp() throws Exception {
       super.setUp();
 
-      Map<String, Object> acceptorParams = new HashMap<String, Object>();
+      Map<String, Object> acceptorParams = new HashMap<>();
       acceptorParams.put(TransportConstants.SERVER_ID_PROP_NAME, 1);
       TransportConfiguration acceptorConfig = new TransportConfiguration(InVMAcceptorFactory.class.getName(), acceptorParams, RandomUtil.randomString());
 
       TransportConfiguration connectorConfig = new TransportConfiguration(InVMConnectorFactory.class.getName(), acceptorParams, RandomUtil.randomString());
 
       CoreQueueConfiguration queueConfig = new CoreQueueConfiguration().setAddress(RandomUtil.randomString()).setName(RandomUtil.randomString()).setDurable(false);
-      List<String> connectors = new ArrayList<String>();
+      List<String> connectors = new ArrayList<>();
       connectors.add(connectorConfig.getName());
 
       String discoveryGroupName = RandomUtil.randomString();

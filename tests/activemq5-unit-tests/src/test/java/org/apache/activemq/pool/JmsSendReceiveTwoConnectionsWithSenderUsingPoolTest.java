@@ -19,8 +19,6 @@ package org.apache.activemq.pool;
 import javax.jms.Connection;
 
 import org.apache.activemq.test.JmsTopicSendReceiveWithTwoConnectionsTest;
-import org.junit.Ignore;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,15 +30,18 @@ public class JmsSendReceiveTwoConnectionsWithSenderUsingPoolTest extends JmsTopi
    protected static final Logger LOG = LoggerFactory.getLogger(JmsSendReceiveTwoConnectionsWithSenderUsingPoolTest.class);
    protected PooledConnectionFactory senderConnectionFactory = new PooledConnectionFactory("vm://localhost?broker.persistent=false");
 
+   @Override
    protected Connection createSendConnection() throws Exception {
       return senderConnectionFactory.createConnection();
    }
 
+   @Override
    protected void setUp() throws Exception {
       verbose = true;
       super.setUp();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       super.tearDown();
       senderConnectionFactory.stop();

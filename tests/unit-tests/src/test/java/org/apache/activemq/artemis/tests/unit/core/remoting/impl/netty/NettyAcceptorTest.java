@@ -66,24 +66,29 @@ public class NettyAcceptorTest extends ActiveMQTestBase {
    public void testStartStop() throws Exception {
       BufferHandler handler = new BufferHandler() {
 
+         @Override
          public void bufferReceived(final Object connectionID, final ActiveMQBuffer buffer) {
          }
       };
 
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
       ConnectionLifeCycleListener listener = new ConnectionLifeCycleListener() {
 
+         @Override
          public void connectionException(final Object connectionID, final ActiveMQException me) {
          }
 
+         @Override
          public void connectionDestroyed(final Object connectionID) {
          }
 
+         @Override
          public void connectionCreated(final ActiveMQComponent component,
                                        final Connection connection,
                                        final String protocol) {
          }
 
+         @Override
          public void connectionReadyForWrites(Object connectionID, boolean ready) {
          }
       };

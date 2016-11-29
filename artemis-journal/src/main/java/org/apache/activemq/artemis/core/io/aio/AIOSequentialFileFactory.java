@@ -19,26 +19,20 @@ package org.apache.activemq.artemis.core.io.aio;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.activemq.artemis.ArtemisConstants;
 import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
 import org.apache.activemq.artemis.core.io.AbstractSequentialFileFactory;
 import org.apache.activemq.artemis.core.io.IOCallback;
 import org.apache.activemq.artemis.core.io.IOCriticalErrorListener;
 import org.apache.activemq.artemis.core.io.SequentialFile;
-import org.apache.activemq.artemis.core.journal.impl.JournalConstants;
 import org.apache.activemq.artemis.jlibaio.LibaioContext;
 import org.apache.activemq.artemis.jlibaio.LibaioFile;
 import org.apache.activemq.artemis.jlibaio.SubmitInfo;
 import org.apache.activemq.artemis.jlibaio.util.CallbackCache;
 import org.apache.activemq.artemis.journal.ActiveMQJournalLogger;
-import org.apache.activemq.artemis.utils.ActiveMQThreadFactory;
 
 public final class AIOSequentialFileFactory extends AbstractSequentialFileFactory {
 
@@ -48,7 +42,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
 
    private volatile boolean reuseBuffers = true;
 
-   private ExecutorService pollerExecutor;
+   private Thread pollerThread;
 
    volatile LibaioContext<AIOSequentialCallback> libaioContext;
 
@@ -64,11 +58,11 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
    }
 
    public AIOSequentialFileFactory(final File journalDir, int maxIO) {
-      this(journalDir, JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO, JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO, maxIO, false, null);
+      this(journalDir, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO, maxIO, false, null);
    }
 
    public AIOSequentialFileFactory(final File journalDir, final IOCriticalErrorListener listener, int maxIO) {
-      this(journalDir, JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO, JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO, maxIO, false, listener);
+      this(journalDir, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO, maxIO, false, listener);
    }
 
    public AIOSequentialFileFactory(final File journalDir,
@@ -106,10 +100,12 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       this.reuseBuffers = false;
    }
 
+   @Override
    public SequentialFile createSequentialFile(final String fileName) {
       return new AIOSequentialFile(this, bufferSize, bufferTimeout, journalDir, fileName, writeExecutor);
    }
 
+   @Override
    public boolean isSupportsCallbacks() {
       return true;
    }
@@ -118,6 +114,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       return LibaioContext.isLoaded();
    }
 
+   @Override
    public ByteBuffer allocateDirectBuffer(final int size) {
 
       int blocks = size / 512;
@@ -133,10 +130,12 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       return buffer;
    }
 
+   @Override
    public void releaseDirectBuffer(final ByteBuffer buffer) {
       LibaioContext.freeBuffer(buffer);
    }
 
+   @Override
    public ByteBuffer newBuffer(int size) {
       if (size % 512 != 0) {
          size = (size / 512 + 1) * 512;
@@ -145,22 +144,26 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       return buffersControl.newBuffer(size);
    }
 
+   @Override
    public void clearBuffer(final ByteBuffer directByteBuffer) {
       directByteBuffer.position(0);
       libaioContext.memsetBuffer(directByteBuffer);
    }
 
+   @Override
    public int getAlignment() {
       return 512;
    }
 
    // For tests only
+   @Override
    public ByteBuffer wrapBuffer(final byte[] bytes) {
       ByteBuffer newbuffer = newBuffer(bytes.length);
       newbuffer.put(bytes);
       return newbuffer;
    }
 
+   @Override
    public int calculateBlockSize(final int position) {
       int alignment = getAlignment();
 
@@ -186,9 +189,8 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
 
          this.running.set(true);
 
-         pollerExecutor = Executors.newCachedThreadPool(new ActiveMQThreadFactory("ActiveMQ-AIO-poller-pool" + System.identityHashCode(this), true, AIOSequentialFileFactory.getThisClassLoader()));
-
-         pollerExecutor.execute(new PollerRunnable());
+         pollerThread = new PollerThread();
+         pollerThread.start();
       }
 
    }
@@ -201,11 +203,11 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
          libaioContext.close();
          libaioContext = null;
 
-         if (pollerExecutor != null) {
-            pollerExecutor.shutdown();
-
+         if (pollerThread != null) {
             try {
-               if (!pollerExecutor.awaitTermination(AbstractSequentialFileFactory.EXECUTOR_TIMEOUT, TimeUnit.SECONDS)) {
+               pollerThread.join(AbstractSequentialFileFactory.EXECUTOR_TIMEOUT * 1000);
+
+               if (pollerThread.isAlive()) {
                   ActiveMQJournalLogger.LOGGER.timeoutOnPollerShutdown(new Exception("trace"));
                }
             }
@@ -216,11 +218,6 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
 
          super.stop();
       }
-   }
-
-   @Override
-   protected void finalize() {
-      stop();
    }
 
    /**
@@ -258,6 +255,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
          return this;
       }
 
+      @Override
       public void run() {
          try {
             libaioFile.write(position, bytes, buffer, this);
@@ -267,6 +265,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
          }
       }
 
+      @Override
       public int compareTo(AIOSequentialCallback other) {
          if (this == other || this.writeSequence == other.writeSequence) {
             return 0;
@@ -304,6 +303,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       /**
        * this is called by libaio.
        */
+      @Override
       public void done() {
          this.sequentialFile.done(this);
       }
@@ -331,10 +331,22 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
       }
    }
 
-   private class PollerRunnable implements Runnable {
+   private class PollerThread extends Thread {
 
+      public PollerThread() {
+         super("Apache ActiveMQ Artemis libaio poller");
+      }
+
+      @Override
       public void run() {
-         libaioContext.poll();
+         while (running.get()) {
+            try {
+               libaioContext.poll();
+            }
+            catch (Throwable e) {
+               ActiveMQJournalLogger.LOGGER.warn(e.getMessage(), e);
+            }
+         }
       }
    }
 
@@ -345,7 +357,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
 
       private volatile long bufferReuseLastTime = System.currentTimeMillis();
 
-      private final ConcurrentLinkedQueue<ByteBuffer> reuseBuffersQueue = new ConcurrentLinkedQueue<ByteBuffer>();
+      private final ConcurrentLinkedQueue<ByteBuffer> reuseBuffersQueue = new ConcurrentLinkedQueue<>();
 
       private boolean stopped = false;
 
@@ -429,15 +441,6 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
             }
          }
       }
-   }
-
-   private static ClassLoader getThisClassLoader() {
-      return AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
-         public ClassLoader run() {
-            return AIOSequentialFileFactory.class.getClassLoader();
-         }
-      });
-
    }
 
    @Override

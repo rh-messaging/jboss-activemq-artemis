@@ -24,13 +24,14 @@ import org.apache.activemq.store.kahadb.MultiKahaDBPersistenceAdapter;
 public class AutoStorePerDestinationTest extends StorePerDestinationTest {
 
    // use perDestinationFlag to get multiple stores from one match all adapter
+   @Override
    public void prepareBrokerWithMultiStore(boolean deleteAllMessages) throws Exception {
 
       MultiKahaDBPersistenceAdapter multiKahaDBPersistenceAdapter = new MultiKahaDBPersistenceAdapter();
       if (deleteAllMessages) {
          multiKahaDBPersistenceAdapter.deleteAllMessages();
       }
-      ArrayList<FilteredKahaDBPersistenceAdapter> adapters = new ArrayList<FilteredKahaDBPersistenceAdapter>();
+      ArrayList<FilteredKahaDBPersistenceAdapter> adapters = new ArrayList<>();
 
       FilteredKahaDBPersistenceAdapter template = new FilteredKahaDBPersistenceAdapter();
       template.setPersistenceAdapter(createStore(deleteAllMessages));

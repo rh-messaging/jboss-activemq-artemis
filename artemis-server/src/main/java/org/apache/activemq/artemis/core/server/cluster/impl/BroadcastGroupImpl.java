@@ -50,7 +50,7 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
 
    private final String name;
 
-   private final List<TransportConfiguration> connectors = new ArrayList<TransportConfiguration>();
+   private final List<TransportConfiguration> connectors = new ArrayList<>();
 
    private boolean started;
 
@@ -88,10 +88,12 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
       uniqueID = UUIDGenerator.getInstance().generateStringUUID();
    }
 
+   @Override
    public void setNotificationService(final NotificationService notificationService) {
       this.notificationService = notificationService;
    }
 
+   @Override
    public synchronized void start() throws Exception {
       if (started) {
          return;
@@ -111,6 +113,7 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
       activate();
    }
 
+   @Override
    public synchronized void stop() {
       if (!started) {
          return;
@@ -143,22 +146,27 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
 
    }
 
+   @Override
    public synchronized boolean isStarted() {
       return started;
    }
 
+   @Override
    public String getName() {
       return name;
    }
 
+   @Override
    public synchronized void addConnector(final TransportConfiguration tcConfig) {
       connectors.add(tcConfig);
    }
 
+   @Override
    public synchronized void removeConnector(final TransportConfiguration tcConfig) {
       connectors.remove(tcConfig);
    }
 
+   @Override
    public synchronized int size() {
       return connectors.size();
    }
@@ -169,6 +177,7 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
       }
    }
 
+   @Override
    public synchronized void broadcastConnectors() throws Exception {
       ActiveMQBuffer buff = ActiveMQBuffers.dynamicBuffer(4096);
 
@@ -182,11 +191,14 @@ public class BroadcastGroupImpl implements BroadcastGroup, Runnable {
          tcConfig.encode(buff);
       }
 
-      byte[] data = buff.toByteBuffer().array();
+      // Only send as many bytes as we need.
+      byte[] data = new byte[buff.readableBytes()];
+      buff.getBytes(buff.readerIndex(), data);
 
       endpoint.broadcast(data);
    }
 
+   @Override
    public void run() {
       if (!started) {
          return;

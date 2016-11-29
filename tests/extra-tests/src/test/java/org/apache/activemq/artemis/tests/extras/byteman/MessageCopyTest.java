@@ -24,7 +24,7 @@ import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.SessionSendMessage;
 import org.apache.activemq.artemis.core.server.impl.ServerMessageImpl;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.jboss.byteman.contrib.bmunit.BMRules;
 import org.jboss.byteman.contrib.bmunit.BMUnitRunner;
@@ -132,7 +132,7 @@ public class MessageCopyTest {
          }
       }
 
-      ArrayList<Thread> threads = new ArrayList<Thread>();
+      ArrayList<Thread> threads = new ArrayList<>();
 
       for (int i = 0; i < T1_number; i++) {
          T1 t = new T1();

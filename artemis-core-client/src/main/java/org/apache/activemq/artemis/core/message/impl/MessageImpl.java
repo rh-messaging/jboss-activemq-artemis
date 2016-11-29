@@ -21,12 +21,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import io.netty.buffer.ByteBuf;
 import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
 import org.apache.activemq.artemis.api.core.ActiveMQBuffers;
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQPropertyConversionException;
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.SimpleString;
+import org.apache.activemq.artemis.core.buffers.impl.ChannelBufferWrapper;
 import org.apache.activemq.artemis.core.buffers.impl.ResetLimitWrappedActiveMQBuffer;
 import org.apache.activemq.artemis.core.message.BodyEncoder;
 import org.apache.activemq.artemis.core.protocol.core.impl.PacketImpl;
@@ -83,10 +85,6 @@ public abstract class MessageImpl implements MessageInternal {
    private int endOfBodyPosition = -1;
 
    private int endOfMessagePosition;
-
-   private boolean copied = true;
-
-   private boolean bufferUsed;
 
    private UUID userID;
 
@@ -151,25 +149,27 @@ public abstract class MessageImpl implements MessageInternal {
       // with getEncodedBuffer(), otherwise can introduce race condition when delivering concurrently to
       // many subscriptions and bridging to other nodes in a cluster
       synchronized (other) {
-         bufferValid = other.bufferValid;
-         endOfBodyPosition = other.endOfBodyPosition;
+         bufferValid = false;
+         endOfBodyPosition = -1;
          endOfMessagePosition = other.endOfMessagePosition;
-         copied = other.copied;
 
          if (other.buffer != null) {
-            other.bufferUsed = true;
-
             // We need to copy the underlying buffer too, since the different messsages thereafter might have different
             // properties set on them, making their encoding different
-            buffer = other.buffer.copy(0, other.buffer.writerIndex());
+            buffer = other.buffer.copy(0, other.buffer.capacity());
 
             buffer.setIndex(other.buffer.readerIndex(), buffer.capacity());
+
+            bodyBuffer = new ResetLimitWrappedActiveMQBuffer(BODY_OFFSET, buffer, this);
+            bodyBuffer.readerIndex(BODY_OFFSET);
+            bodyBuffer.writerIndex(other.getBodyBuffer().writerIndex());
          }
       }
    }
 
    // Message implementation ----------------------------------------
 
+   @Override
    public int getEncodeSize() {
       int headersPropsSize = getHeadersAndPropertiesEncodeSize();
 
@@ -180,6 +180,7 @@ public abstract class MessageImpl implements MessageInternal {
       return DataConstants.SIZE_INT + bodySize + DataConstants.SIZE_INT + headersPropsSize;
    }
 
+   @Override
    public int getHeadersAndPropertiesEncodeSize() {
       return DataConstants.SIZE_LONG + // Message ID
          DataConstants.SIZE_BYTE + // user id null?
@@ -193,6 +194,7 @@ public abstract class MessageImpl implements MessageInternal {
              /* PropertySize and Properties */properties.getEncodeSize();
    }
 
+   @Override
    public void encodeHeadersAndProperties(final ActiveMQBuffer buffer) {
       buffer.writeLong(messageID);
       buffer.writeNullableSimpleString(address);
@@ -211,6 +213,7 @@ public abstract class MessageImpl implements MessageInternal {
       properties.encode(buffer);
    }
 
+   @Override
    public void decodeHeadersAndProperties(final ActiveMQBuffer buffer) {
       messageID = buffer.readLong();
       address = buffer.readNullableSimpleString();
@@ -242,6 +245,7 @@ public abstract class MessageImpl implements MessageInternal {
       properties = msg.getTypedProperties();
    }
 
+   @Override
    public ActiveMQBuffer getBodyBuffer() {
       if (bodyBuffer == null) {
          bodyBuffer = new ResetLimitWrappedActiveMQBuffer(BODY_OFFSET, buffer, this);
@@ -250,12 +254,14 @@ public abstract class MessageImpl implements MessageInternal {
       return bodyBuffer;
    }
 
+   @Override
    public Message writeBodyBufferBytes(byte[] bytes) {
       getBodyBuffer().writeBytes(bytes);
 
       return this;
    }
 
+   @Override
    public Message writeBodyBufferString(String string) {
       getBodyBuffer().writeString(string);
 
@@ -266,24 +272,30 @@ public abstract class MessageImpl implements MessageInternal {
       // no op on regular messages
    }
 
-   public synchronized ActiveMQBuffer getBodyBufferCopy() {
+   @Override
+   public synchronized ActiveMQBuffer getBodyBufferDuplicate() {
+
       // Must copy buffer before sending it
 
-      ActiveMQBuffer newBuffer = buffer.copy(0, buffer.capacity());
+      ByteBuf byteBuf = ChannelBufferWrapper.unwrap(getBodyBuffer().byteBuf());
+      byteBuf = byteBuf.duplicate();
+      byteBuf.readerIndex(getBodyBuffer().readerIndex());
+      byteBuf.writerIndex(getBodyBuffer().writerIndex());
 
-      newBuffer.setIndex(0, getEndOfBodyPosition());
-
-      return new ResetLimitWrappedActiveMQBuffer(BODY_OFFSET, newBuffer, null);
+      return new ResetLimitWrappedActiveMQBuffer(BODY_OFFSET, byteBuf, null);
    }
 
+   @Override
    public long getMessageID() {
       return messageID;
    }
 
+   @Override
    public UUID getUserID() {
       return userID;
    }
 
+   @Override
    public MessageImpl setUserID(final UUID userID) {
       this.userID = userID;
       return this;
@@ -293,6 +305,7 @@ public abstract class MessageImpl implements MessageInternal {
     * this doesn't need to be synchronized as setAddress is protecting the buffer,
     * not the address
     */
+   @Override
    public SimpleString getAddress() {
       return address;
    }
@@ -302,6 +315,7 @@ public abstract class MessageImpl implements MessageInternal {
     * This synchronization can probably be removed since setAddress is always called from a single thread.
     * However I will keep it as it's harmless and it's been well tested
     */
+   @Override
    public Message setAddress(final SimpleString address) {
       // This is protecting the buffer
       synchronized (this) {
@@ -315,6 +329,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public byte getType() {
       return type;
    }
@@ -323,10 +338,12 @@ public abstract class MessageImpl implements MessageInternal {
       this.type = type;
    }
 
+   @Override
    public boolean isDurable() {
       return durable;
    }
 
+   @Override
    public MessageImpl setDurable(final boolean durable) {
       if (this.durable != durable) {
          this.durable = durable;
@@ -336,10 +353,12 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public long getExpiration() {
       return expiration;
    }
 
+   @Override
    public MessageImpl setExpiration(final long expiration) {
       if (this.expiration != expiration) {
          this.expiration = expiration;
@@ -349,10 +368,12 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public long getTimestamp() {
       return timestamp;
    }
 
+   @Override
    public MessageImpl setTimestamp(final long timestamp) {
       if (this.timestamp != timestamp) {
          this.timestamp = timestamp;
@@ -362,10 +383,12 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public byte getPriority() {
       return priority;
    }
 
+   @Override
    public MessageImpl setPriority(final byte priority) {
       if (this.priority != priority) {
          this.priority = priority;
@@ -375,6 +398,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public boolean isExpired() {
       if (expiration == 0) {
          return false;
@@ -383,8 +407,9 @@ public abstract class MessageImpl implements MessageInternal {
       return System.currentTimeMillis() - expiration >= 0;
    }
 
+   @Override
    public Map<String, Object> toMap() {
-      Map<String, Object> map = new HashMap<String, Object>();
+      Map<String, Object> map = new HashMap<>();
 
       map.put("messageID", messageID);
       if (userID != null) {
@@ -396,47 +421,53 @@ public abstract class MessageImpl implements MessageInternal {
       map.put("expiration", expiration);
       map.put("timestamp", timestamp);
       map.put("priority", priority);
+      map.putAll(toPropertyMap());
+      return map;
+   }
+
+   @Override
+   public Map<String, Object> toPropertyMap() {
+      Map<String, Object> map = new HashMap<>();
       for (SimpleString propName : properties.getPropertyNames()) {
          map.put(propName.toString(), properties.getProperty(propName));
       }
       return map;
    }
 
+   @Override
    public void decodeFromBuffer(final ActiveMQBuffer buffer) {
       this.buffer = buffer;
 
       decode();
+
+      // Setting up the BodyBuffer based on endOfBodyPosition set from decode
+      ResetLimitWrappedActiveMQBuffer tmpbodyBuffer = new ResetLimitWrappedActiveMQBuffer(BODY_OFFSET, buffer, null);
+      tmpbodyBuffer.readerIndex(BODY_OFFSET);
+      tmpbodyBuffer.writerIndex(endOfBodyPosition);
+      // only set this after the writer and reader is set,
+      // otherwise the buffer would be reset through the listener
+      tmpbodyBuffer.setMessage(this);
+      this.bodyBuffer = tmpbodyBuffer;
+
+
    }
 
+   @Override
    public void bodyChanged() {
-      // If the body is changed we must copy the buffer otherwise can affect the previously sent message
-      // which might be in the Netty write queue
-      checkCopy();
-
       bufferValid = false;
 
       endOfBodyPosition = -1;
    }
 
-   public synchronized void checkCopy() {
-      if (!copied) {
-         forceCopy();
-
-         copied = true;
-      }
-   }
-
-   public synchronized void resetCopied() {
-      copied = false;
-   }
-
+   @Override
    public int getEndOfMessagePosition() {
       return endOfMessagePosition;
    }
 
+   @Override
    public int getEndOfBodyPosition() {
       if (endOfBodyPosition < 0) {
-         endOfBodyPosition = buffer.writerIndex();
+         endOfBodyPosition = getBodyBuffer().writerIndex();
       }
       return endOfBodyPosition;
    }
@@ -467,25 +498,13 @@ public abstract class MessageImpl implements MessageInternal {
       buff.readerIndex(start + length);
    }
 
+   @Override
    public synchronized ActiveMQBuffer getEncodedBuffer() {
       ActiveMQBuffer buff = encodeToBuffer();
-
-      if (bufferUsed) {
-         ActiveMQBuffer copied = buff.copy(0, buff.capacity());
-
-         copied.setIndex(0, endOfMessagePosition);
-
-         return copied;
-      }
-      else {
-         buffer.setIndex(0, endOfMessagePosition);
-
-         bufferUsed = true;
-
-         return buffer;
-      }
+      return buff.duplicate();
    }
 
+   @Override
    public void setAddressTransient(final SimpleString address) {
       this.address = address;
    }
@@ -493,6 +512,7 @@ public abstract class MessageImpl implements MessageInternal {
    // Properties
    // ---------------------------------------------------------------------------------------
 
+   @Override
    public Message putBooleanProperty(final SimpleString key, final boolean value) {
       properties.putBooleanProperty(key, value);
 
@@ -501,6 +521,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putByteProperty(final SimpleString key, final byte value) {
       properties.putByteProperty(key, value);
 
@@ -509,6 +530,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putBytesProperty(final SimpleString key, final byte[] value) {
       properties.putBytesProperty(key, value);
 
@@ -533,6 +555,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putShortProperty(final SimpleString key, final short value) {
       properties.putShortProperty(key, value);
       bufferValid = false;
@@ -540,6 +563,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putIntProperty(final SimpleString key, final int value) {
       properties.putIntProperty(key, value);
       bufferValid = false;
@@ -547,6 +571,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putLongProperty(final SimpleString key, final long value) {
       properties.putLongProperty(key, value);
       bufferValid = false;
@@ -554,6 +579,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putFloatProperty(final SimpleString key, final float value) {
       properties.putFloatProperty(key, value);
 
@@ -562,6 +588,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putDoubleProperty(final SimpleString key, final double value) {
       properties.putDoubleProperty(key, value);
 
@@ -570,6 +597,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putStringProperty(final SimpleString key, final SimpleString value) {
       properties.putSimpleStringProperty(key, value);
 
@@ -578,6 +606,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putObjectProperty(final SimpleString key,
                                     final Object value) throws ActiveMQPropertyConversionException {
       TypedProperties.setObjectProperty(key, value, properties);
@@ -586,6 +615,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putObjectProperty(final String key, final Object value) throws ActiveMQPropertyConversionException {
       putObjectProperty(new SimpleString(key), value);
 
@@ -594,6 +624,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putBooleanProperty(final String key, final boolean value) {
       properties.putBooleanProperty(new SimpleString(key), value);
 
@@ -602,6 +633,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putByteProperty(final String key, final byte value) {
       properties.putByteProperty(new SimpleString(key), value);
 
@@ -610,6 +642,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putBytesProperty(final String key, final byte[] value) {
       properties.putBytesProperty(new SimpleString(key), value);
 
@@ -618,6 +651,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putShortProperty(final String key, final short value) {
       properties.putShortProperty(new SimpleString(key), value);
 
@@ -626,6 +660,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putIntProperty(final String key, final int value) {
       properties.putIntProperty(new SimpleString(key), value);
 
@@ -634,6 +669,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putLongProperty(final String key, final long value) {
       properties.putLongProperty(new SimpleString(key), value);
 
@@ -642,6 +678,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putFloatProperty(final String key, final float value) {
       properties.putFloatProperty(new SimpleString(key), value);
 
@@ -650,6 +687,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putDoubleProperty(final String key, final double value) {
       properties.putDoubleProperty(new SimpleString(key), value);
 
@@ -658,6 +696,7 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Message putStringProperty(final String key, final String value) {
       properties.putSimpleStringProperty(new SimpleString(key), SimpleString.toSimpleString(value));
 
@@ -674,74 +713,92 @@ public abstract class MessageImpl implements MessageInternal {
       return this;
    }
 
+   @Override
    public Object getObjectProperty(final SimpleString key) {
       return properties.getProperty(key);
    }
 
+   @Override
    public Boolean getBooleanProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getBooleanProperty(key);
    }
 
+   @Override
    public Boolean getBooleanProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getBooleanProperty(new SimpleString(key));
    }
 
+   @Override
    public Byte getByteProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getByteProperty(key);
    }
 
+   @Override
    public Byte getByteProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getByteProperty(new SimpleString(key));
    }
 
+   @Override
    public byte[] getBytesProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getBytesProperty(key);
    }
 
+   @Override
    public byte[] getBytesProperty(final String key) throws ActiveMQPropertyConversionException {
       return getBytesProperty(new SimpleString(key));
    }
 
+   @Override
    public Double getDoubleProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getDoubleProperty(key);
    }
 
+   @Override
    public Double getDoubleProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getDoubleProperty(new SimpleString(key));
    }
 
+   @Override
    public Integer getIntProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getIntProperty(key);
    }
 
+   @Override
    public Integer getIntProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getIntProperty(new SimpleString(key));
    }
 
+   @Override
    public Long getLongProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getLongProperty(key);
    }
 
+   @Override
    public Long getLongProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getLongProperty(new SimpleString(key));
    }
 
+   @Override
    public Short getShortProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getShortProperty(key);
    }
 
+   @Override
    public Short getShortProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getShortProperty(new SimpleString(key));
    }
 
+   @Override
    public Float getFloatProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getFloatProperty(key);
    }
 
+   @Override
    public Float getFloatProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getFloatProperty(new SimpleString(key));
    }
 
+   @Override
    public String getStringProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       SimpleString str = getSimpleStringProperty(key);
 
@@ -753,54 +810,66 @@ public abstract class MessageImpl implements MessageInternal {
       }
    }
 
+   @Override
    public String getStringProperty(final String key) throws ActiveMQPropertyConversionException {
       return getStringProperty(new SimpleString(key));
    }
 
+   @Override
    public SimpleString getSimpleStringProperty(final SimpleString key) throws ActiveMQPropertyConversionException {
       return properties.getSimpleStringProperty(key);
    }
 
+   @Override
    public SimpleString getSimpleStringProperty(final String key) throws ActiveMQPropertyConversionException {
       return properties.getSimpleStringProperty(new SimpleString(key));
    }
 
+   @Override
    public Object getObjectProperty(final String key) {
       return properties.getProperty(new SimpleString(key));
    }
 
+   @Override
    public Object removeProperty(final SimpleString key) {
       bufferValid = false;
 
       return properties.removeProperty(key);
    }
 
+   @Override
    public Object removeProperty(final String key) {
       bufferValid = false;
 
       return properties.removeProperty(new SimpleString(key));
    }
 
+   @Override
    public boolean containsProperty(final SimpleString key) {
       return properties.containsProperty(key);
    }
 
+   @Override
    public boolean containsProperty(final String key) {
       return properties.containsProperty(new SimpleString(key));
    }
 
+   @Override
    public Set<SimpleString> getPropertyNames() {
       return properties.getPropertyNames();
    }
 
+   @Override
    public ActiveMQBuffer getWholeBuffer() {
       return buffer;
    }
 
+   @Override
    public BodyEncoder getBodyEncoder() throws ActiveMQException {
       return new DecodingContext();
    }
 
+   @Override
    public TypedProperties getTypedProperties() {
       return this.properties;
    }
@@ -846,9 +915,12 @@ public abstract class MessageImpl implements MessageInternal {
          buffer2 = new byte[bodyBuffer.writerIndex() - bodyBuffer.readerIndex()];
          bodyBuffer.readBytes(buffer2);
          bodyBuffer.readerIndex(readerIndex2);
+         return "ServerMessage@" + Integer.toHexString(System.identityHashCode(this)) + "[writerIndex=" + buffer.writerIndex() + ",capacity=" + buffer.capacity() + ",bodyStart=" + getEndOfBodyPosition() + " buffer=" + ByteUtil.bytesToHex(buffer1, 1) + ", bodyBuffer=" + ByteUtil.bytesToHex(buffer2, 1);
+      }
+      else {
+         return "ServerMessage@" + Integer.toHexString(System.identityHashCode(this)) + "[writerIndex=" + buffer.writerIndex() + ",capacity=" + buffer.capacity() + ",bodyStart=" + getEndOfBodyPosition() + " buffer=" + ByteUtil.bytesToHex(buffer1, 1);
       }
 
-      return "ServerMessage@" + Integer.toHexString(System.identityHashCode(this)) + "[" + ",bodyStart=" + getEndOfBodyPosition() + " buffer=" + ByteUtil.bytesToHex(buffer1, 1) + ", bodyBuffer=" + ByteUtil.bytesToHex(buffer2, 1);
    }
 
    @Override
@@ -873,17 +945,7 @@ public abstract class MessageImpl implements MessageInternal {
    // many queues - the first caller in this case will actually encode it
    private synchronized ActiveMQBuffer encodeToBuffer() {
       if (!bufferValid) {
-         if (bufferUsed) {
-            // Cannot use same buffer - must copy
-
-            forceCopy();
-         }
-
          int bodySize = getEndOfBodyPosition();
-
-         // Clebert: I've started sending this on encoding due to conversions between protocols
-         //          and making sure we are not losing the buffer start position between protocols
-         this.endOfBodyPosition = bodySize;
 
          // write it
          buffer.setInt(BUFFER_HEADER_SPACE, bodySize);
@@ -943,8 +1005,6 @@ public abstract class MessageImpl implements MessageInternal {
       if (bodyBuffer != null) {
          bodyBuffer.setBuffer(buffer);
       }
-
-      bufferUsed = false;
    }
 
    // Inner classes -------------------------------------------------
@@ -956,21 +1016,26 @@ public abstract class MessageImpl implements MessageInternal {
       public DecodingContext() {
       }
 
+      @Override
       public void open() {
       }
 
+      @Override
       public void close() {
       }
 
+      @Override
       public long getLargeBodySize() {
          return buffer.writerIndex();
       }
 
+      @Override
       public int encode(final ByteBuffer bufferRead) throws ActiveMQException {
          ActiveMQBuffer buffer = ActiveMQBuffers.wrappedBuffer(bufferRead);
          return encode(buffer, bufferRead.capacity());
       }
 
+      @Override
       public int encode(final ActiveMQBuffer bufferOut, final int size) {
          bufferOut.writeBytes(getWholeBuffer(), lastPos, size);
          lastPos += size;

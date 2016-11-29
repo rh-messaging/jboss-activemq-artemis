@@ -47,7 +47,7 @@ import org.apache.activemq.artemis.core.paging.impl.Page;
 import org.apache.activemq.artemis.core.paging.impl.PagingManagerImpl;
 import org.apache.activemq.artemis.core.paging.impl.PagingStoreFactoryNIO;
 import org.apache.activemq.artemis.core.persistence.StorageManager;
-import org.apache.activemq.artemis.core.persistence.impl.journal.JournalStorageManager.JournalContent;
+import org.apache.activemq.artemis.core.persistence.impl.journal.AbstractJournalStorageManager.JournalContent;
 import org.apache.activemq.artemis.core.persistence.impl.journal.LargeServerMessageInSync;
 import org.apache.activemq.artemis.core.protocol.core.Channel;
 import org.apache.activemq.artemis.core.protocol.core.ChannelHandler;
@@ -68,6 +68,7 @@ import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.Replicatio
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationPageWriteMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationPrepareMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationResponseMessage;
+import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationResponseMessageV2;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationStartSyncMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationStartSyncMessage.SyncDataType;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationSyncFileMessage;
@@ -101,20 +102,20 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
    /**
     * Files reserved in each journal for synchronization of existing data from the 'live' server.
     */
-   private final Map<JournalContent, Map<Long, JournalSyncFile>> filesReservedForSync = new HashMap<JournalContent, Map<Long, JournalSyncFile>>();
+   private final Map<JournalContent, Map<Long, JournalSyncFile>> filesReservedForSync = new HashMap<>();
 
    /**
     * Used to hold the real Journals before the backup is synchronized. This field should be
     * {@code null} on an up-to-date server.
     */
-   private Map<JournalContent, Journal> journalsHolder = new HashMap<JournalContent, Journal>();
+   private Map<JournalContent, Journal> journalsHolder = new HashMap<>();
 
    private StorageManager storageManager;
 
    private PagingManager pageManager;
 
-   private final ConcurrentMap<SimpleString, ConcurrentMap<Integer, Page>> pageIndex = new ConcurrentHashMap<SimpleString, ConcurrentMap<Integer, Page>>();
-   private final ConcurrentMap<Long, ReplicatedLargeMessage> largeMessages = new ConcurrentHashMap<Long, ReplicatedLargeMessage>();
+   private final ConcurrentMap<SimpleString, ConcurrentMap<Integer, Page>> pageIndex = new ConcurrentHashMap<>();
+   private final ConcurrentMap<Long, ReplicatedLargeMessage> largeMessages = new ConcurrentHashMap<>();
 
    // Used on tests, to simulate failures on delete pages
    private boolean deletePages = true;
@@ -196,7 +197,7 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
             handleLargeMessageEnd((ReplicationLargeMessageEndMessage) packet);
          }
          else if (type == PacketImpl.REPLICATION_START_FINISH_SYNC) {
-            handleStartReplicationSynchronization((ReplicationStartSyncMessage) packet);
+            response = handleStartReplicationSynchronization((ReplicationStartSyncMessage) packet);
          }
          else if (type == PacketImpl.REPLICATION_SYNC_FILE) {
             handleReplicationSynchronization((ReplicationSyncFileMessage) packet);
@@ -238,10 +239,12 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
       activation.remoteFailOver(packet.isFinalMessage());
    }
 
+   @Override
    public boolean isStarted() {
       return started;
    }
 
+   @Override
    public synchronized void start() throws Exception {
       Configuration config = server.getConfiguration();
       try {
@@ -271,6 +274,7 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
       }
    }
 
+   @Override
    public synchronized void stop() throws Exception {
       if (!started) {
          return;
@@ -476,19 +480,23 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
     *
     * @param packet
     * @throws Exception
+    * @return if the incoming packet indicates the synchronization is finished then return an acknowledgement otherwise
+    *         return an empty response
     */
-   private void handleStartReplicationSynchronization(final ReplicationStartSyncMessage packet) throws Exception {
+   private ReplicationResponseMessageV2 handleStartReplicationSynchronization(final ReplicationStartSyncMessage packet) throws Exception {
+      ReplicationResponseMessageV2 replicationResponseMessage = new ReplicationResponseMessageV2();
       if (activation.isRemoteBackupUpToDate()) {
          throw ActiveMQMessageBundle.BUNDLE.replicationBackupUpToDate();
       }
 
       synchronized (this) {
          if (!started)
-            return;
+            return replicationResponseMessage;
 
          if (packet.isSynchronizationFinished()) {
             finishSynchronization(packet.getNodeID());
-            return;
+            replicationResponseMessage.setSynchronizationIsFinishedAcknowledgement(true);
+            return replicationResponseMessage;
          }
 
          switch (packet.getDataType()) {
@@ -523,6 +531,8 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
                throw ActiveMQMessageBundle.BUNDLE.replicationUnhandledDataType();
          }
       }
+
+      return replicationResponseMessage;
    }
 
    private void handleLargeMessageEnd(final ReplicationLargeMessageEndMessage packet) {
@@ -705,7 +715,7 @@ public final class ReplicationEndpoint implements ChannelHandler, ActiveMQCompon
       ConcurrentMap<Integer, Page> resultIndex = pageIndex.get(storeName);
 
       if (resultIndex == null) {
-         resultIndex = new ConcurrentHashMap<Integer, Page>();
+         resultIndex = new ConcurrentHashMap<>();
          ConcurrentMap<Integer, Page> mapResult = pageIndex.putIfAbsent(storeName, resultIndex);
          if (mapResult != null) {
             resultIndex = mapResult;

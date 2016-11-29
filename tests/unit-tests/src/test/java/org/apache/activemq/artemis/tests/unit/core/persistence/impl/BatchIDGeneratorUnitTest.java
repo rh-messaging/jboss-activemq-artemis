@@ -39,7 +39,7 @@ public class BatchIDGeneratorUnitTest extends ActiveMQTestBase {
    @Test
    public void testSequence() throws Exception {
       NIOSequentialFileFactory factory = new NIOSequentialFileFactory(new File(getTestDir()), 1);
-      Journal journal = new JournalImpl(10 * 1024, 2, 0, 0, factory, "activemq-bindings", "bindings", 1);
+      Journal journal = new JournalImpl(10 * 1024, 2, 2, 0, 0, factory, "activemq-bindings", "bindings", 1);
 
       journal.start();
 
@@ -114,8 +114,8 @@ public class BatchIDGeneratorUnitTest extends ActiveMQTestBase {
    }
 
    protected void loadIDs(final Journal journal, final BatchingIDGenerator batch) throws Exception {
-      ArrayList<RecordInfo> records = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> tx = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> records = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> tx = new ArrayList<>();
 
       journal.start();
       journal.load(records, tx, null);

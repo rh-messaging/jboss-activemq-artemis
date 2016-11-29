@@ -31,8 +31,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.activemq.artemis.api.core.ActiveMQIOErrorException;
 import org.apache.activemq.artemis.core.io.SequentialFile;
 import org.apache.activemq.artemis.core.io.SequentialFileFactory;
+import org.apache.activemq.artemis.journal.ActiveMQJournalBundle;
 import org.apache.activemq.artemis.journal.ActiveMQJournalLogger;
 
 /**
@@ -61,17 +63,19 @@ public class JournalFilesRepository {
 
    private final JournalImpl journal;
 
-   private final BlockingDeque<JournalFile> dataFiles = new LinkedBlockingDeque<JournalFile>();
+   private final BlockingDeque<JournalFile> dataFiles = new LinkedBlockingDeque<>();
 
-   private final ConcurrentLinkedQueue<JournalFile> freeFiles = new ConcurrentLinkedQueue<JournalFile>();
+   private final ConcurrentLinkedQueue<JournalFile> freeFiles = new ConcurrentLinkedQueue<>();
 
-   private final BlockingQueue<JournalFile> openedFiles = new LinkedBlockingQueue<JournalFile>();
+   private final BlockingQueue<JournalFile> openedFiles = new LinkedBlockingQueue<>();
 
    private final AtomicLong nextFileID = new AtomicLong(0);
 
    private final int maxAIO;
 
    private final int minFiles;
+
+   private final int poolSize;
 
    private final int fileSize;
 
@@ -86,6 +90,7 @@ public class JournalFilesRepository {
    private Executor openFilesExecutor;
 
    private final Runnable pushOpenRunnable = new Runnable() {
+      @Override
       public void run() {
          try {
             pushOpenedFile();
@@ -103,7 +108,8 @@ public class JournalFilesRepository {
                                  final int userVersion,
                                  final int maxAIO,
                                  final int fileSize,
-                                 final int minFiles) {
+                                 final int minFiles,
+                                 final int poolSize) {
       if (filePrefix == null) {
          throw new IllegalArgumentException("filePrefix cannot be null");
       }
@@ -119,6 +125,7 @@ public class JournalFilesRepository {
       this.fileExtension = fileExtension;
       this.minFiles = minFiles;
       this.fileSize = fileSize;
+      this.poolSize = poolSize;
       this.userVersion = userVersion;
       this.journal = journal;
    }
@@ -273,7 +280,7 @@ public class JournalFilesRepository {
             ActiveMQJournalLogger.LOGGER.checkFiles();
             ActiveMQJournalLogger.LOGGER.info(debugFiles());
             ActiveMQJournalLogger.LOGGER.seqOutOfOrder();
-            System.exit(-1);
+            throw new IllegalStateException("Sequence out of order");
          }
 
          if (journal.getCurrentFile() != null && journal.getCurrentFile().getFileID() <= file.getFileID()) {
@@ -349,15 +356,13 @@ public class JournalFilesRepository {
          calculatedSize = file.getFile().size();
       }
       catch (Exception e) {
-         e.printStackTrace();
-         System.out.println("Can't get file size on " + file);
-         System.exit(-1);
+         throw new IllegalStateException(e.getMessage() + " file: " + file);
       }
       if (calculatedSize != fileSize) {
          ActiveMQJournalLogger.LOGGER.deletingFile(file);
          file.getFile().delete();
       }
-      else if (!checkDelete || (freeFilesCount.get() + dataFiles.size() + 1 + openedFiles.size() < minFiles)) {
+      else if (!checkDelete || (freeFilesCount.get() + dataFiles.size() + 1 + openedFiles.size() < poolSize) || (poolSize < 0)) {
          // Re-initialise it
 
          if (JournalFilesRepository.trace) {
@@ -377,7 +382,7 @@ public class JournalFilesRepository {
          if (trace) {
             ActiveMQJournalLogger.LOGGER.trace("DataFiles.size() = " + dataFiles.size());
             ActiveMQJournalLogger.LOGGER.trace("openedFiles.size() = " + openedFiles.size());
-            ActiveMQJournalLogger.LOGGER.trace("minfiles = " + minFiles);
+            ActiveMQJournalLogger.LOGGER.trace("minfiles = " + minFiles + ", poolSize = " + poolSize);
             ActiveMQJournalLogger.LOGGER.trace("Free Files = " + freeFilesCount.get());
             ActiveMQJournalLogger.LOGGER.trace("File " + file +
                                                   " being deleted as freeFiles.size() + dataFiles.size() + 1 + openedFiles.size() (" +
@@ -412,8 +417,10 @@ public class JournalFilesRepository {
     * <p>This method will instantly return the opened file, and schedule opening and reclaiming.</p>
     * <p>In case there are no cached opened files, this method will block until the file was opened,
     * what would happen only if the system is under heavy load by another system (like a backup system, or a DB sharing the same box as ActiveMQ).</p>
+    *
+    * @throws ActiveMQIOErrorException In case the file could not be opened
     */
-   public JournalFile openFile() throws InterruptedException {
+   public JournalFile openFile() throws InterruptedException, ActiveMQIOErrorException {
       if (JournalFilesRepository.trace) {
          JournalFilesRepository.trace("enqueueOpenFile with openedFiles.size=" + openedFiles.size());
       }
@@ -425,13 +432,13 @@ public class JournalFilesRepository {
          openFilesExecutor.execute(pushOpenRunnable);
       }
 
-      JournalFile nextFile = null;
-
-      while (nextFile == null) {
-         nextFile = openedFiles.poll(5, TimeUnit.SECONDS);
-         if (nextFile == null) {
-            ActiveMQJournalLogger.LOGGER.errorOpeningFile(new Exception("trace"));
-         }
+      JournalFile nextFile = openedFiles.poll(5, TimeUnit.SECONDS);
+      if (nextFile == null) {
+         fileFactory.onIOError(ActiveMQJournalBundle.BUNDLE.fileNotOpened(), "unable to open ", null);
+         // We need to reconnect the current file with the timed buffer as we were not able to roll the file forward
+         // If you don't do this you will get a NPE in TimedBuffer::checkSize where it uses the bufferobserver
+         fileFactory.activateBuffer(journal.getCurrentFile().getFile());
+         throw ActiveMQJournalBundle.BUNDLE.fileNotOpened();
       }
 
       if (JournalFilesRepository.trace) {
@@ -459,7 +466,19 @@ public class JournalFilesRepository {
    public void closeFile(final JournalFile file) throws Exception {
       fileFactory.deactivateBuffer();
       file.getFile().close();
-      dataFiles.add(file);
+      if (!dataFiles.contains(file)) {
+         // This is not a retry from openFile
+         // If you don't check this then retries keep adding the same file into
+         // dataFiles list and the compactor then re-adds multiple copies of the
+         // same file into freeFiles.
+         // The consequence of that is that you can end up with the same file
+         // twice in a row in the list of openedFiles
+         // The consequence of that is that JournalImpl::switchFileIfNecessary
+         // will throw throw new IllegalStateException("Invalid logic on buffer allocation")
+         // because the file will be checked effectively twice and the buffer will
+         // not fit in it
+         dataFiles.add(file);
+      }
    }
 
    /**

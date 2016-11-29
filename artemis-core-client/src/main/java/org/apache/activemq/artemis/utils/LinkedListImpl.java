@@ -29,7 +29,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
 
    private static final int INITIAL_ITERATOR_ARRAY_SIZE = 10;
 
-   private final Node<E> head = new Node<E>(null);
+   private final Node<E> head = new Node<>(null);
 
    private Node<E> tail = null;
 
@@ -46,8 +46,9 @@ public class LinkedListImpl<E> implements LinkedList<E> {
       iters = createIteratorArray(INITIAL_ITERATOR_ARRAY_SIZE);
    }
 
+   @Override
    public void addHead(E e) {
-      Node<E> node = new Node<E>(e);
+      Node<E> node = new Node<>(e);
 
       node.next = head.next;
 
@@ -66,12 +67,13 @@ public class LinkedListImpl<E> implements LinkedList<E> {
       size++;
    }
 
+   @Override
    public void addTail(E e) {
       if (size == 0) {
          addHead(e);
       }
       else {
-         Node<E> node = new Node<E>(e);
+         Node<E> node = new Node<>(e);
 
          node.prev = tail;
 
@@ -83,6 +85,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
       }
    }
 
+   @Override
    public E poll() {
       Node<E> ret = head.next;
 
@@ -96,20 +99,24 @@ public class LinkedListImpl<E> implements LinkedList<E> {
       }
    }
 
+   @Override
    public void clear() {
       tail = head.next = null;
 
       size = 0;
    }
 
+   @Override
    public int size() {
       return size;
    }
 
+   @Override
    public LinkedListIterator<E> iterator() {
       return new Iterator();
    }
 
+   @Override
    public String toString() {
       StringBuilder str = new StringBuilder("LinkedListImpl [ ");
 
@@ -227,6 +234,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
          val = e;
       }
 
+      @Override
       public String toString() {
          return "Node, value = " + val;
       }
@@ -248,10 +256,12 @@ public class LinkedListImpl<E> implements LinkedList<E> {
          addIter(this);
       }
 
+      @Override
       public void repeat() {
          repeat = true;
       }
 
+      @Override
       public boolean hasNext() {
          Node<E> e = getNode();
 
@@ -262,6 +272,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
          return canAdvance();
       }
 
+      @Override
       public E next() {
          Node<E> e = getNode();
 
@@ -303,6 +314,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
          return e.val;
       }
 
+      @Override
       public void remove() {
          if (last == null) {
             throw new NoSuchElementException();
@@ -317,6 +329,7 @@ public class LinkedListImpl<E> implements LinkedList<E> {
          last = null;
       }
 
+      @Override
       public void close() {
          removeIter(this);
       }

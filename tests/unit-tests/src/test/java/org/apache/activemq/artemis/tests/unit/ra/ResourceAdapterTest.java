@@ -24,22 +24,22 @@ import java.util.Map;
 import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.UDPBroadcastEndpointFactory;
+import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
-import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.api.jms.ActiveMQJMSClient;
-import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.core.remoting.impl.invm.InVMConnectorFactory;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactory;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQDestination;
-import org.apache.activemq.artemis.ra.ConnectionFactoryProperties;
 import org.apache.activemq.artemis.ra.ActiveMQRAManagedConnectionFactory;
 import org.apache.activemq.artemis.ra.ActiveMQResourceAdapter;
+import org.apache.activemq.artemis.ra.ConnectionFactoryProperties;
 import org.apache.activemq.artemis.ra.inflow.ActiveMQActivation;
 import org.apache.activemq.artemis.ra.inflow.ActiveMQActivationSpec;
+import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -99,7 +99,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
    public void testCreateConnectionFactoryNoOverrides() throws Exception {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ra.setConnectorClassName(InVMConnectorFactory.class.getName());
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(new ConnectionFactoryProperties());
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(new ConnectionFactoryProperties());
       Assert.assertEquals(factory.getCallTimeout(), ActiveMQClient.DEFAULT_CALL_TIMEOUT);
       Assert.assertEquals(factory.getClientFailureCheckPeriod(), ActiveMQClient.DEFAULT_CLIENT_FAILURE_CHECK_PERIOD);
       Assert.assertEquals(factory.getClientID(), null);
@@ -211,7 +211,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       connectionFactoryProperties.setThreadPoolMaxSize(17);
       connectionFactoryProperties.setTransactionBatchSize(18);
       connectionFactoryProperties.setUseGlobalPools(!ActiveMQClient.DEFAULT_USE_GLOBAL_POOLS);
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(connectionFactoryProperties);
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(connectionFactoryProperties);
       Assert.assertEquals(factory.getCallTimeout(), 1);
       Assert.assertEquals(factory.getClientFailureCheckPeriod(), 2);
       Assert.assertEquals(factory.getClientID(), "myid");
@@ -242,10 +242,10 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ra.setConnectorClassName(InVMConnectorFactory.class.getName());
       ConnectionFactoryProperties connectionFactoryProperties = new ConnectionFactoryProperties();
-      ArrayList<String> value = new ArrayList<String>();
+      ArrayList<String> value = new ArrayList<>();
       value.add(NettyConnectorFactory.class.getName());
       connectionFactoryProperties.setParsedConnectorClassNames(value);
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(connectionFactoryProperties);
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(connectionFactoryProperties);
       ActiveMQConnectionFactory defaultFactory = ra.getDefaultActiveMQConnectionFactory();
       Assert.assertNotSame(factory, defaultFactory);
    }
@@ -258,7 +258,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       connectionFactoryProperties.setDiscoveryAddress("myhost");
       connectionFactoryProperties.setDiscoveryPort(5678);
       connectionFactoryProperties.setDiscoveryLocalBindAddress("newAddress");
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(connectionFactoryProperties);
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(connectionFactoryProperties);
       ActiveMQConnectionFactory defaultFactory = ra.getDefaultActiveMQConnectionFactory();
       Assert.assertNotSame(factory, defaultFactory);
       DiscoveryGroupConfiguration dc = factory.getServerLocator().getDiscoveryGroupConfiguration();
@@ -272,7 +272,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
    public void testCreateConnectionFactoryMultipleConnectors() {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ra.setConnectorClassName(NETTY_CONNECTOR_FACTORY + "," + INVM_CONNECTOR_FACTORY + "," + NETTY_CONNECTOR_FACTORY);
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(new ConnectionFactoryProperties());
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(new ConnectionFactoryProperties());
       TransportConfiguration[] configurations = factory.getServerLocator().getStaticTransportConfigurations();
       assertNotNull(configurations);
       assertEquals(3, configurations.length);
@@ -289,7 +289,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ra.setConnectorClassName(NETTY_CONNECTOR_FACTORY + "," + INVM_CONNECTOR_FACTORY + "," + NETTY_CONNECTOR_FACTORY);
       ra.setConnectionParameters("host=host1;port=61616, serverid=0, host=host2;port=61617");
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(new ConnectionFactoryProperties());
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(new ConnectionFactoryProperties());
       TransportConfiguration[] configurations = factory.getServerLocator().getStaticTransportConfigurations();
       assertNotNull(configurations);
       assertEquals(3, configurations.length);
@@ -311,12 +311,12 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ra.setConnectorClassName(NETTY_CONNECTOR_FACTORY + "," + INVM_CONNECTOR_FACTORY + "," + NETTY_CONNECTOR_FACTORY);
       ConnectionFactoryProperties overrideProperties = new ConnectionFactoryProperties();
-      ArrayList<String> value = new ArrayList<String>();
+      ArrayList<String> value = new ArrayList<>();
       value.add(INVM_CONNECTOR_FACTORY);
       value.add(NETTY_CONNECTOR_FACTORY);
       value.add(INVM_CONNECTOR_FACTORY);
       overrideProperties.setParsedConnectorClassNames(value);
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(overrideProperties);
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(overrideProperties);
       TransportConfiguration[] configurations = factory.getServerLocator().getStaticTransportConfigurations();
       assertNotNull(configurations);
       assertEquals(3, configurations.length);
@@ -334,24 +334,24 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       ra.setConnectorClassName(NETTY_CONNECTOR_FACTORY + "," + INVM_CONNECTOR_FACTORY + "," + NETTY_CONNECTOR_FACTORY);
       ra.setConnectionParameters("host=host1;port=61616, serverid=0, host=host2;port=61617");
       ConnectionFactoryProperties overrideProperties = new ConnectionFactoryProperties();
-      ArrayList<String> value = new ArrayList<String>();
+      ArrayList<String> value = new ArrayList<>();
       value.add(INVM_CONNECTOR_FACTORY);
       value.add(NETTY_CONNECTOR_FACTORY);
       value.add(INVM_CONNECTOR_FACTORY);
       overrideProperties.setParsedConnectorClassNames(value);
-      ArrayList<Map<String, Object>> connectionParameters = new ArrayList<Map<String, Object>>();
-      Map<String, Object> map1 = new HashMap<String, Object>();
+      ArrayList<Map<String, Object>> connectionParameters = new ArrayList<>();
+      Map<String, Object> map1 = new HashMap<>();
       map1.put("serverid", "0");
       connectionParameters.add(map1);
-      Map<String, Object> map2 = new HashMap<String, Object>();
+      Map<String, Object> map2 = new HashMap<>();
       map2.put("host", "myhost");
       map2.put("port", "61616");
       connectionParameters.add(map2);
-      Map<String, Object> map3 = new HashMap<String, Object>();
+      Map<String, Object> map3 = new HashMap<>();
       map3.put("serverid", "1");
       connectionParameters.add(map3);
       overrideProperties.setParsedConnectionParameters(connectionParameters);
-      ActiveMQConnectionFactory factory = ra.createActiveMQConnectionFactory(overrideProperties);
+      ActiveMQConnectionFactory factory = ra.getConnectionFactory(overrideProperties);
       TransportConfiguration[] configurations = factory.getServerLocator().getStaticTransportConfigurations();
       assertNotNull(configurations);
       assertEquals(3, configurations.length);
@@ -372,7 +372,7 @@ public class ResourceAdapterTest extends ActiveMQTestBase {
       ActiveMQResourceAdapter ra = new ActiveMQResourceAdapter();
       ConnectionFactoryProperties connectionFactoryProperties = new ConnectionFactoryProperties();
       try {
-         ra.createActiveMQConnectionFactory(connectionFactoryProperties);
+         ra.getConnectionFactory(connectionFactoryProperties);
          Assert.fail("should throw exception");
       }
       catch (IllegalArgumentException e) {

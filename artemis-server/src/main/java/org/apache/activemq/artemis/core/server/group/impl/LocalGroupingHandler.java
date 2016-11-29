@@ -46,9 +46,9 @@ import org.apache.activemq.artemis.utils.TypedProperties;
  */
 public final class LocalGroupingHandler extends GroupHandlingAbstract {
 
-   private final ConcurrentMap<SimpleString, GroupBinding> map = new ConcurrentHashMap<SimpleString, GroupBinding>();
+   private final ConcurrentMap<SimpleString, GroupBinding> map = new ConcurrentHashMap<>();
 
-   private final ConcurrentMap<SimpleString, List<GroupBinding>> groupMap = new ConcurrentHashMap<SimpleString, List<GroupBinding>>();
+   private final ConcurrentMap<SimpleString, List<GroupBinding>> groupMap = new ConcurrentHashMap<>();
 
    private final SimpleString name;
 
@@ -65,7 +65,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
     * when the group is waiting for them.
     * During a small window between the server is started and the wait wasn't called yet, this will contain bindings that were already added
     */
-   private List<SimpleString> expectedBindings = new LinkedList<SimpleString>();
+   private List<SimpleString> expectedBindings = new LinkedList<>();
 
    private final long groupTimeout;
 
@@ -97,10 +97,12 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       this.groupTimeout = groupTimeout;
    }
 
+   @Override
    public SimpleString getName() {
       return name;
    }
 
+   @Override
    public Response propose(final Proposal proposal) throws Exception {
       OperationContext originalCtx = storageManager.getContext();
 
@@ -134,7 +136,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
                addRecord = true;
                groupBinding = new GroupBinding(proposal.getGroupId(), proposal.getClusterName());
                groupBinding.setId(storageManager.generateID());
-               List<GroupBinding> newList = new ArrayList<GroupBinding>();
+               List<GroupBinding> newList = new ArrayList<>();
                List<GroupBinding> oldList = groupMap.putIfAbsent(groupBinding.getClusterName(), newList);
                if (oldList != null) {
                   newList = oldList;
@@ -157,11 +159,13 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       }
    }
 
+   @Override
    public void resendPending() throws Exception {
       // this only make sense on RemoteGroupingHandler.
       // this is a no-op on the local one
    }
 
+   @Override
    public void proposed(final Response response) throws Exception {
    }
 
@@ -170,6 +174,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       remove(groupid, clusterName);
    }
 
+   @Override
    public void sendProposalResponse(final Response response, final int distance) throws Exception {
       TypedProperties props = new TypedProperties();
       props.putSimpleStringProperty(ManagementHelper.HDR_PROPOSAL_GROUP_ID, response.getGroupId());
@@ -182,14 +187,16 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       managementService.sendNotification(notification);
    }
 
+   @Override
    public Response receive(final Proposal proposal, final int distance) throws Exception {
       ActiveMQServerLogger.LOGGER.trace("received proposal " + proposal);
       return propose(proposal);
    }
 
+   @Override
    public void addGroupBinding(final GroupBinding groupBinding) {
       map.put(groupBinding.getGroupId(), groupBinding);
-      List<GroupBinding> newList = new ArrayList<GroupBinding>();
+      List<GroupBinding> newList = new ArrayList<>();
       List<GroupBinding> oldList = groupMap.putIfAbsent(groupBinding.getClusterName(), newList);
       if (oldList != null) {
          newList = oldList;
@@ -197,6 +204,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       newList.add(groupBinding);
    }
 
+   @Override
    public Response getProposal(final SimpleString fullID, final boolean touchTime) {
       GroupBinding original = map.get(fullID);
 
@@ -240,10 +248,10 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
             List<SimpleString> bindingsAlreadyAdded;
             if (expectedBindings == null) {
                bindingsAlreadyAdded = Collections.emptyList();
-               expectedBindings = new LinkedList<SimpleString>();
+               expectedBindings = new LinkedList<>();
             }
             else {
-               bindingsAlreadyAdded = new ArrayList<SimpleString>(expectedBindings);
+               bindingsAlreadyAdded = new ArrayList<>(expectedBindings);
                //clear the bindings
                expectedBindings.clear();
             }
@@ -271,6 +279,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       }
    }
 
+   @Override
    public void onNotification(final Notification notification) {
       if (!(notification.getType() instanceof CoreNotificationType))
          return;
@@ -315,13 +324,14 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       }
    }
 
+   @Override
    public synchronized void start() throws Exception {
       if (started)
          return;
 
       if (expectedBindings == null) {
          // just in case the component is restarted
-         expectedBindings = new LinkedList<SimpleString>();
+         expectedBindings = new LinkedList<>();
       }
 
       if (reaperPeriod > 0 && groupTimeout > 0) {
@@ -335,6 +345,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       started = true;
    }
 
+   @Override
    public synchronized void stop() throws Exception {
       started = false;
       if (reaperFuture != null) {
@@ -343,6 +354,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
       }
    }
 
+   @Override
    public boolean isStarted() {
       return started;
    }
@@ -392,6 +404,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
 
       final GroupIdReaper reaper = new GroupIdReaper();
 
+      @Override
       public void run() {
          executor.execute(reaper);
       }
@@ -400,6 +413,7 @@ public final class LocalGroupingHandler extends GroupHandlingAbstract {
 
    private final class GroupIdReaper implements Runnable {
 
+      @Override
       public void run() {
          // The reaper thread should be finished case the PostOffice is gone
          // This is to avoid leaks on PostOffice between stops and starts

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
+import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.core.filter.Filter;
 import org.apache.activemq.artemis.core.paging.cursor.PageSubscription;
@@ -67,9 +68,9 @@ public interface Queue extends Bindable {
 
    void addTail(MessageReference ref, boolean direct);
 
-   void addHead(MessageReference ref);
+   void addHead(MessageReference ref, boolean scheduling);
 
-   void addHead(final List<MessageReference> refs);
+   void addHead(final List<MessageReference> refs, boolean scheduling);
 
    void acknowledge(MessageReference ref) throws Exception;
 
@@ -122,7 +123,7 @@ public interface Queue extends Bindable {
 
    MessageReference removeReferenceWithID(long id) throws Exception;
 
-   MessageReference getReference(long id);
+   MessageReference getReference(long id) throws ActiveMQException;
 
    int deleteAllReferences() throws Exception;
 
@@ -163,6 +164,8 @@ public interface Queue extends Bindable {
                       Filter filter,
                       SimpleString toAddress,
                       boolean rejectDuplicates) throws Exception;
+
+   int retryMessages(Filter filter) throws Exception;
 
    void addRedistributor(long delay);
 
@@ -234,7 +237,7 @@ public interface Queue extends Bindable {
    /**
     * cancels scheduled messages and send them to the head of the queue.
     */
-   void deliverScheduledMessages();
+   void deliverScheduledMessages() throws ActiveMQException;
 
    void postAcknowledge(MessageReference ref);
 

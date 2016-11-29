@@ -34,6 +34,7 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.MessageHandler;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
+import org.apache.activemq.artemis.core.client.impl.ServerLocatorImpl;
 import org.apache.activemq.artemis.core.protocol.core.Packet;
 import org.apache.activemq.artemis.core.protocol.core.impl.PacketImpl;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
@@ -250,6 +251,7 @@ public class ConsumerTest extends ActiveMQTestBase {
       sf.close();
       final CountDownLatch latch = new CountDownLatch(numMessages);
       server.getRemotingService().addIncomingInterceptor(new Interceptor() {
+         @Override
          public boolean intercept(final Packet packet, final RemotingConnection connection) throws ActiveMQException {
             if (packet.getType() == PacketImpl.SESS_ACKNOWLEDGE) {
                latch.countDown();
@@ -262,6 +264,7 @@ public class ConsumerTest extends ActiveMQTestBase {
       ClientSession sessionRec = sfReceive.createSession(false, true, true);
       ClientConsumer consumer = sessionRec.createConsumer(QUEUE);
       consumer.setMessageHandler(new MessageHandler() {
+         @Override
          public void onMessage(final ClientMessage message) {
             try {
                message.acknowledge();
@@ -272,7 +275,7 @@ public class ConsumerTest extends ActiveMQTestBase {
          }
       });
       sessionRec.start();
-      Assert.assertTrue(latch.await(5, TimeUnit.SECONDS));
+      Assert.assertTrue(latch.await(60, TimeUnit.SECONDS));
       sessionRec.close();
       locator.close();
    }
@@ -327,6 +330,7 @@ public class ConsumerTest extends ActiveMQTestBase {
       ClientConsumer consumer = session.createConsumer(QUEUE);
 
       consumer.setMessageHandler(new MessageHandler() {
+         @Override
          public void onMessage(final ClientMessage msg) {
          }
       });
@@ -348,6 +352,7 @@ public class ConsumerTest extends ActiveMQTestBase {
       ClientConsumer consumer = session.createConsumer(QUEUE);
 
       consumer.setMessageHandler(new MessageHandler() {
+         @Override
          public void onMessage(final ClientMessage msg) {
          }
       });
@@ -369,7 +374,7 @@ public class ConsumerTest extends ActiveMQTestBase {
    @Test
    public void testReceiveAndResend() throws Exception {
 
-      final Set<Object> sessions = new ConcurrentHashSet<Object>();
+      final Set<Object> sessions = new ConcurrentHashSet<>();
       final AtomicInteger errors = new AtomicInteger(0);
 
       final SimpleString QUEUE_RESPONSE = SimpleString.toSimpleString("QUEUE_RESPONSE");
@@ -398,6 +403,7 @@ public class ConsumerTest extends ActiveMQTestBase {
          {
 
             consumer.setMessageHandler(new MessageHandler() {
+               @Override
                public void onMessage(final ClientMessage msg) {
                   try {
                      ServerLocator locatorSendx = createFactory(isNetty()).setReconnectAttempts(-1);
@@ -440,6 +446,7 @@ public class ConsumerTest extends ActiveMQTestBase {
       }
 
       Thread tCons = new Thread() {
+         @Override
          public void run() {
             try {
                final ServerLocator locatorSend = createFactory(isNetty());
@@ -540,6 +547,26 @@ public class ConsumerTest extends ActiveMQTestBase {
       }
 
       session.close();
+   }
+
+   // https://jira.jboss.org/jira/browse/HORNETQ-111
+   // Test that, on rollback credits are released for messages cleared in the buffer
+   @Test
+   public void testInVMURI() throws Exception {
+      locator.close();
+      ServerLocator locator = addServerLocator(ServerLocatorImpl.newLocator("vm:/1"));
+      ClientSessionFactory factory = locator.createSessionFactory();
+      ClientSession session = factory.createSession();
+      session.createQueue(QUEUE, QUEUE);
+      ClientProducer producer = session.createProducer(QUEUE);
+      producer.send(session.createMessage(true));
+
+      ClientConsumer consumer = session.createConsumer(QUEUE);
+      session.start();
+      Assert.assertNotNull(consumer.receiveImmediate());
+      session.close();
+      factory.close();
+
    }
 
    // https://jira.jboss.org/jira/browse/HORNETQ-111

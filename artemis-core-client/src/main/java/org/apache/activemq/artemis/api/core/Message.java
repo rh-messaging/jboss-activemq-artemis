@@ -51,25 +51,60 @@ import org.apache.activemq.artemis.utils.UUID;
  */
 public interface Message {
 
+   /**
+    * the actual time the message was expired.
+    * * *  */
    SimpleString HDR_ACTUAL_EXPIRY_TIME = new SimpleString("_AMQ_ACTUAL_EXPIRY");
 
+   /**
+    * The original address of a message when a message is transferred through DLQ or expiry
+    */
    SimpleString HDR_ORIGINAL_ADDRESS = new SimpleString("_AMQ_ORIG_ADDRESS");
 
+   /**
+    * The original address of a message when a message is transferred through DLQ or expiry
+    */
    SimpleString HDR_ORIGINAL_QUEUE = new SimpleString("_AMQ_ORIG_QUEUE");
 
+   /**
+    * The original message ID before th emessage was transferred.
+    */
    SimpleString HDR_ORIG_MESSAGE_ID = new SimpleString("_AMQ_ORIG_MESSAGE_ID");
 
+   /**
+    * For the Message Grouping feature.
+    */
    SimpleString HDR_GROUP_ID = new SimpleString("_AMQ_GROUP_ID");
 
+   /**
+    * to determine if the Large Message was compressed.
+    */
    SimpleString HDR_LARGE_COMPRESSED = new SimpleString("_AMQ_LARGE_COMPRESSED");
 
+   /**
+    * The body size of a large message before it was compressed.
+    */
    SimpleString HDR_LARGE_BODY_SIZE = new SimpleString("_AMQ_LARGE_SIZE");
 
+   /**
+    * To be used with Scheduled Delivery.
+    */
    SimpleString HDR_SCHEDULED_DELIVERY_TIME = new SimpleString("_AMQ_SCHED_DELIVERY");
 
+   /**
+    * To be used with duplicate detection.
+    */
    SimpleString HDR_DUPLICATE_DETECTION_ID = new SimpleString("_AMQ_DUPL_ID");
 
+   /**
+    * To be used with Last value queues.
+    */
    SimpleString HDR_LAST_VALUE_NAME = new SimpleString("_AMQ_LVQ_NAME");
+
+   /**
+    * To define the mime-type of body messages. Mainly for stomp but it could be informed on any message for user purposes.
+    */
+   SimpleString HDR_CONTENT_TYPE = new SimpleString("_AMQ_CONTENT_TYPE");
 
    byte DEFAULT_TYPE = 0;
 
@@ -213,7 +248,7 @@ public interface Message {
     * Returns a <em>copy</em> of the message body as an ActiveMQBuffer. Any modification
     * of this buffer should not impact the underlying buffer.
     */
-   ActiveMQBuffer getBodyBufferCopy();
+   ActiveMQBuffer getBodyBufferDuplicate();
 
    // Properties
    // -----------------------------------------------------------------
@@ -544,4 +579,10 @@ public interface Message {
     * @return Returns the message in Map form, useful when encoding to JSON
     */
    Map<String, Object> toMap();
+
+
+   /**
+    * @return Returns the message properties in Map form, useful when encoding to JSON
+    */
+   Map<String, Object> toPropertyMap();
 }

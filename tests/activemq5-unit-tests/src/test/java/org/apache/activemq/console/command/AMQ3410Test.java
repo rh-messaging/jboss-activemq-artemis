@@ -42,6 +42,7 @@ public class AMQ3410Test extends TestCase {
 
    protected AbstractApplicationContext context;
 
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
 
@@ -53,6 +54,7 @@ public class AMQ3410Test extends TestCase {
       return new ClassPathXmlApplicationContext("org/apache/activemq/console/command/activemq.xml");
    }
 
+   @Override
    protected void tearDown() throws Exception {
       BrokerService broker = (BrokerService) context.getBean("localbroker");
       broker.stop();
@@ -69,7 +71,7 @@ public class AMQ3410Test extends TestCase {
 
       command.setCommandContext(context);
 
-      List<String> tokens = new ArrayList<String>();
+      List<String> tokens = new ArrayList<>();
       tokens.addAll(DEFAULT_OPTIONS);
       tokens.addAll(DEFAULT_TOKENS);
 
@@ -86,7 +88,7 @@ public class AMQ3410Test extends TestCase {
 
       command.setCommandContext(context);
 
-      List<String> tokens = new ArrayList<String>();
+      List<String> tokens = new ArrayList<>();
       tokens.addAll(DEFAULT_OPTIONS);
       tokens.add("--factory");
       tokens.add(DummyConnectionFactory.class.getCanonicalName());
@@ -106,7 +108,7 @@ public class AMQ3410Test extends TestCase {
 
       command.setCommandContext(context);
 
-      List<String> tokens = new ArrayList<String>();
+      List<String> tokens = new ArrayList<>();
       tokens.addAll(DEFAULT_OPTIONS);
       tokens.add("--factory");
       tokens.add("org.apache.activemq.console.command.TestAMQ3410.DoesntExistFactory");
@@ -133,7 +135,7 @@ public class AMQ3410Test extends TestCase {
 
       command.setCommandContext(context);
 
-      List<String> tokens = new ArrayList<String>();
+      List<String> tokens = new ArrayList<>();
       tokens.addAll(DEFAULT_OPTIONS);
       tokens.add("--factory");
       tokens.add(InvalidConnectionFactory.class.getCanonicalName());
@@ -162,7 +164,7 @@ public class AMQ3410Test extends TestCase {
 
       command.setCommandContext(context);
 
-      List<String> tokens = new ArrayList<String>();
+      List<String> tokens = new ArrayList<>();
       tokens.addAll(DEFAULT_OPTIONS);
       tokens.add("--factory");
       tokens.add("java.lang.Object");

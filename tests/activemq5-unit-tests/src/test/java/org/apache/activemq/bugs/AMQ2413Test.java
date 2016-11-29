@@ -69,7 +69,7 @@ public class AMQ2413Test extends CombinationTestSupport implements MessageListen
    public boolean useVMCursor = false;
    public boolean useOptimizeAcks = false;
 
-   private final ArrayList<Service> services = new ArrayList<Service>(CONSUMER_COUNT + PRODUCER_COUNT);
+   private final ArrayList<Service> services = new ArrayList<>(CONSUMER_COUNT + PRODUCER_COUNT);
    AtomicInteger count = new AtomicInteger(0);
    Semaphore receivedMessages;
    AtomicBoolean running = new AtomicBoolean(false);
@@ -128,33 +128,19 @@ public class AMQ2413Test extends CombinationTestSupport implements MessageListen
    public void testReceipt() throws Exception {
 
       running.set(true);
-      TestProducer p = null;
-      TestConsumer c = null;
-      try {
 
-         for (int i = 0; i < CONSUMER_COUNT; i++) {
-            TestConsumer consumer = new TestConsumer();
-            consumer.start();
-            services.add(consumer);
-         }
-         for (int i = 0; i < PRODUCER_COUNT; i++) {
-            TestProducer producer = new TestProducer(i);
-            producer.start();
-            services.add(producer);
-         }
-         waitForMessageReceipt();
-
+      for (int i = 0; i < CONSUMER_COUNT; i++) {
+         TestConsumer consumer = new TestConsumer();
+         consumer.start();
+         services.add(consumer);
       }
-      finally {
-         if (p != null) {
-            p.close();
-         }
-
-         if (c != null) {
-            c.close();
-         }
+      for (int i = 0; i < PRODUCER_COUNT; i++) {
+         TestProducer producer = new TestProducer(i);
+         producer.start();
+         services.add(producer);
       }
 
+      waitForMessageReceipt();
    }
 
    /*
@@ -180,7 +166,7 @@ public class AMQ2413Test extends CombinationTestSupport implements MessageListen
 
    }
 
-   HashMap<ProducerId, boolean[]> tracker = new HashMap<ProducerId, boolean[]>();
+   HashMap<ProducerId, boolean[]> tracker = new HashMap<>();
 
    private synchronized void track(Message message) {
       try {
@@ -224,7 +210,7 @@ public class AMQ2413Test extends CombinationTestSupport implements MessageListen
    }
 
    private void verifyTracking() {
-      Vector<MessageId> missing = new Vector<MessageId>();
+      Vector<MessageId> missing = new Vector<>();
       for (ProducerId pid : tracker.keySet()) {
          boolean[] ids = tracker.get(pid);
          for (int i = 1; i < TO_SEND + 1; i++) {

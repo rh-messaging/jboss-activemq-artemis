@@ -48,18 +48,18 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
    private static final short COMPACT_SPLIT_LINE = 2;
 
    // Snapshot of transactions that were pending when the compactor started
-   private final Map<Long, PendingTransaction> pendingTransactions = new ConcurrentHashMap<Long, PendingTransaction>();
+   private final Map<Long, PendingTransaction> pendingTransactions = new ConcurrentHashMap<>();
 
-   private final Map<Long, JournalRecord> newRecords = new HashMap<Long, JournalRecord>();
+   private final Map<Long, JournalRecord> newRecords = new HashMap<>();
 
-   private final Map<Long, JournalTransaction> newTransactions = new HashMap<Long, JournalTransaction>();
+   private final Map<Long, JournalTransaction> newTransactions = new HashMap<>();
 
    /**
     * Commands that happened during compacting
     * We can't process any counts during compacting, as we won't know in what files the records are taking place, so
     * we cache those updates. As soon as we are done we take the right account.
     */
-   private final LinkedList<CompactCommand> pendingCommands = new LinkedList<CompactCommand>();
+   private final LinkedList<CompactCommand> pendingCommands = new LinkedList<>();
 
    public static SequentialFile readControlFile(final SequentialFileFactory fileFactory,
                                                 final List<String> dataFiles,
@@ -70,7 +70,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       if (controlFile.exists()) {
          JournalFile file = new JournalFileImpl(controlFile, 0, JournalImpl.FORMAT_VERSION);
 
-         final ArrayList<RecordInfo> records = new ArrayList<RecordInfo>();
+         final ArrayList<RecordInfo> records = new ArrayList<>();
 
          JournalImpl.readJournalFile(fileFactory, file, new JournalReaderCallbackAbstract() {
             @Override
@@ -101,7 +101,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
             for (int i = 0; i < numberRenames; i++) {
                String from = input.readUTF();
                String to = input.readUTF();
-               renameFile.add(new Pair<String, String>(from, to));
+               renameFile.add(new Pair<>(from, to));
             }
 
          }
@@ -254,6 +254,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
 
    // JournalReaderCallback implementation -------------------------------------------
 
+   @Override
    public void onReadAddRecord(final RecordInfo info) throws Exception {
       if (lookupRecord(info.id)) {
          JournalInternalRecord addRecord = new JournalAddRecord(true, info.id, info.getUserRecordType(), new ByteArrayEncoding(info.data));
@@ -267,6 +268,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadAddRecordTX(final long transactionID, final RecordInfo info) throws Exception {
       if (pendingTransactions.get(transactionID) != null || lookupRecord(info.id)) {
          JournalTransaction newTransaction = getNewJournalTransaction(transactionID);
@@ -283,6 +285,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadCommitRecord(final long transactionID, final int numberOfRecords) throws Exception {
 
       if (pendingTransactions.get(transactionID) != null) {
@@ -303,6 +306,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadDeleteRecord(final long recordID) throws Exception {
       if (newRecords.get(recordID) != null) {
          // Sanity check, it should never happen
@@ -311,6 +315,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
 
    }
 
+   @Override
    public void onReadDeleteRecordTX(final long transactionID, final RecordInfo info) throws Exception {
       if (pendingTransactions.get(transactionID) != null) {
          JournalTransaction newTransaction = getNewJournalTransaction(transactionID);
@@ -326,10 +331,12 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       // else.. nothing to be done
    }
 
+   @Override
    public void markAsDataFile(final JournalFile file) {
       // nothing to be done here
    }
 
+   @Override
    public void onReadPrepareRecord(final long transactionID,
                                    final byte[] extraData,
                                    final int numberOfRecords) throws Exception {
@@ -348,6 +355,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadRollbackRecord(final long transactionID) throws Exception {
       if (pendingTransactions.get(transactionID) != null) {
          // Sanity check, this should never happen
@@ -370,6 +378,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadUpdateRecord(final RecordInfo info) throws Exception {
       if (lookupRecord(info.id)) {
          JournalInternalRecord updateRecord = new JournalAddRecord(false, info.id, info.userRecordType, new ByteArrayEncoding(info.data));
@@ -391,6 +400,7 @@ public class JournalCompactor extends AbstractJournalUpdateTask implements Journ
       }
    }
 
+   @Override
    public void onReadUpdateRecordTX(final long transactionID, final RecordInfo info) throws Exception {
       if (pendingTransactions.get(transactionID) != null || lookupRecord(info.id)) {
          JournalTransaction newTransaction = getNewJournalTransaction(transactionID);

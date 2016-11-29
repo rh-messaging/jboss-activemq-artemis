@@ -41,6 +41,7 @@ import org.apache.activemq.artemis.core.server.impl.ServerMessageImpl;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.Acceptor;
 import org.apache.activemq.artemis.spi.core.remoting.Connection;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.artemis.utils.ConfigurationHelper;
 import org.apache.activemq.artemis.utils.VersionLoader;
 
@@ -71,9 +72,9 @@ public final class StompConnection implements RemotingConnection {
 
    private final Acceptor acceptorUsed;
 
-   private final List<FailureListener> failureListeners = new CopyOnWriteArrayList<FailureListener>();
+   private final List<FailureListener> failureListeners = new CopyOnWriteArrayList<>();
 
-   private final List<CloseListener> closeListeners = new CopyOnWriteArrayList<CloseListener>();
+   private final List<CloseListener> closeListeners = new CopyOnWriteArrayList<>();
 
    private final Object failLock = new Object();
 
@@ -116,6 +117,11 @@ public final class StompConnection implements RemotingConnection {
          }
       }
       return frame;
+   }
+
+   @Override
+   public boolean isWritable(ReadyListener callback) {
+      return transportConnection.isWritable(callback);
    }
 
    public boolean hasBytes() {
@@ -177,7 +183,7 @@ public final class StompConnection implements RemotingConnection {
 
    @Override
    public List<CloseListener> removeCloseListeners() {
-      List<CloseListener> ret = new ArrayList<CloseListener>(closeListeners);
+      List<CloseListener> ret = new ArrayList<>(closeListeners);
 
       closeListeners.clear();
 
@@ -186,7 +192,7 @@ public final class StompConnection implements RemotingConnection {
 
    @Override
    public List<FailureListener> removeFailureListeners() {
-      List<FailureListener> ret = new ArrayList<FailureListener>(failureListeners);
+      List<FailureListener> ret = new ArrayList<>(failureListeners);
 
       failureListeners.clear();
 
@@ -211,6 +217,7 @@ public final class StompConnection implements RemotingConnection {
       dataReceived = true;
    }
 
+   @Override
    public synchronized boolean checkDataReceived() {
       boolean res = dataReceived;
 
@@ -251,6 +258,7 @@ public final class StompConnection implements RemotingConnection {
       return ActiveMQBuffers.dynamicBuffer(size);
    }
 
+   @Override
    public void destroy() {
       synchronized (failLock) {
          if (destroyed) {
@@ -277,6 +285,7 @@ public final class StompConnection implements RemotingConnection {
       manager.cleanup(this);
    }
 
+   @Override
    public void fail(final ActiveMQException me) {
       synchronized (failLock) {
          if (destroyed) {
@@ -295,43 +304,53 @@ public final class StompConnection implements RemotingConnection {
       internalClose();
    }
 
+   @Override
    public void fail(final ActiveMQException me, String scaleDownTargetNodeID) {
       fail(me);
    }
 
+   @Override
    public void flush() {
    }
 
+   @Override
    public List<FailureListener> getFailureListeners() {
       // we do not return the listeners otherwise the remoting service
       // would NOT destroy the connection.
       return Collections.emptyList();
    }
 
+   @Override
    public Object getID() {
       return transportConnection.getID();
    }
 
+   @Override
    public String getRemoteAddress() {
       return transportConnection.getRemoteAddress();
    }
 
+   @Override
    public long getCreationTime() {
       return creationTime;
    }
 
+   @Override
    public Connection getTransportConnection() {
       return transportConnection;
    }
 
+   @Override
    public boolean isClient() {
       return false;
    }
 
+   @Override
    public boolean isDestroyed() {
       return destroyed;
    }
 
+   @Override
    public void bufferReceived(Object connectionID, ActiveMQBuffer buffer) {
       manager.handleBuffer(this, buffer);
    }
@@ -361,7 +380,7 @@ public final class StompConnection implements RemotingConnection {
    }
 
    private void callFailureListeners(final ActiveMQException me) {
-      final List<FailureListener> listenersClone = new ArrayList<FailureListener>(failureListeners);
+      final List<FailureListener> listenersClone = new ArrayList<>(failureListeners);
 
       for (final FailureListener listener : listenersClone) {
          try {
@@ -377,7 +396,7 @@ public final class StompConnection implements RemotingConnection {
    }
 
    private void callClosingListeners() {
-      final List<CloseListener> listenersClone = new ArrayList<CloseListener>(closeListeners);
+      final List<CloseListener> listenersClone = new ArrayList<>(closeListeners);
 
       for (final CloseListener listener : listenersClone) {
          try {
@@ -404,7 +423,7 @@ public final class StompConnection implements RemotingConnection {
       }
       else {
          StringTokenizer tokenizer = new StringTokenizer(acceptVersion, ",");
-         Set<String> requestVersions = new HashSet<String>(tokenizer.countTokens());
+         Set<String> requestVersions = new HashSet<>(tokenizer.countTokens());
          while (tokenizer.hasMoreTokens()) {
             requestVersions.add(tokenizer.nextToken());
          }

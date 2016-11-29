@@ -16,17 +16,15 @@
  */
 package org.apache.activemq.artemis.tests.integration.client;
 
+import java.lang.ref.WeakReference;
+
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
-import org.apache.activemq.artemis.core.client.impl.ClientSessionFactoryImpl;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.lang.ref.WeakReference;
 
 public class SessionCloseOnGCTest extends ActiveMQTestBase {
 
@@ -58,8 +56,8 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       s1.close();
       s2.close();
 
-      WeakReference<ClientSession> wrs1 = new WeakReference<ClientSession>(s1);
-      WeakReference<ClientSession> wrs2 = new WeakReference<ClientSession>(s2);
+      WeakReference<ClientSession> wrs1 = new WeakReference<>(s1);
+      WeakReference<ClientSession> wrs2 = new WeakReference<>(s2);
 
       s1 = null;
       s2 = null;
@@ -69,7 +67,7 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       locator = null;
       ActiveMQTestBase.checkWeakReferences(wrs1, wrs2);
 
-      WeakReference<ClientSessionFactory> fref = new WeakReference<ClientSessionFactory>(factory);
+      WeakReference<ClientSessionFactory> fref = new WeakReference<>(factory);
 
       factory.close();
 
@@ -90,8 +88,8 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       s1.close();
       s2.close();
 
-      WeakReference<ClientSession> wrs1 = new WeakReference<ClientSession>(s1);
-      WeakReference<ClientSession> wrs2 = new WeakReference<ClientSession>(s2);
+      WeakReference<ClientSession> wrs1 = new WeakReference<>(s1);
+      WeakReference<ClientSession> wrs2 = new WeakReference<>(s2);
 
       s1 = null;
       s2 = null;
@@ -101,7 +99,7 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       locator = null;
       ActiveMQTestBase.checkWeakReferences(wrs1, wrs2);
 
-      WeakReference<ClientSessionFactory> fref = new WeakReference<ClientSessionFactory>(factory);
+      WeakReference<ClientSessionFactory> fref = new WeakReference<>(factory);
 
       factory.close();
 
@@ -120,8 +118,8 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       s1.close();
       s2.close();
 
-      WeakReference<ClientSession> wrs1 = new WeakReference<ClientSession>(s1);
-      WeakReference<ClientSession> wrs2 = new WeakReference<ClientSession>(s2);
+      WeakReference<ClientSession> wrs1 = new WeakReference<>(s1);
+      WeakReference<ClientSession> wrs2 = new WeakReference<>(s2);
 
       s1 = null;
       s2 = null;
@@ -131,7 +129,7 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       locator = null;
       ActiveMQTestBase.checkWeakReferences(wrs1, wrs2);
 
-      WeakReference<ClientSessionFactory> fref = new WeakReference<ClientSessionFactory>(factory);
+      WeakReference<ClientSessionFactory> fref = new WeakReference<>(factory);
 
       factory = null;
 
@@ -145,8 +143,8 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       ClientSession s1 = factory.createSession();
       ClientSession s2 = factory.createSession();
 
-      WeakReference<ClientSession> wrs1 = new WeakReference<ClientSession>(s1);
-      WeakReference<ClientSession> wrs2 = new WeakReference<ClientSession>(s2);
+      WeakReference<ClientSession> wrs1 = new WeakReference<>(s1);
+      WeakReference<ClientSession> wrs2 = new WeakReference<>(s2);
 
       s1 = null;
       s2 = null;
@@ -156,7 +154,7 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       locator = null;
       ActiveMQTestBase.checkWeakReferences(wrs1, wrs2);
 
-      WeakReference<ClientSessionFactory> fref = new WeakReference<ClientSessionFactory>(factory);
+      WeakReference<ClientSessionFactory> fref = new WeakReference<>(factory);
 
       factory = null;
 
@@ -167,7 +165,7 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
    public void testValidateFactoryGC5() throws Exception {
       ClientSessionFactory factory = locator.createSessionFactory();
 
-      WeakReference<ClientSessionFactory> fref = new WeakReference<ClientSessionFactory>(factory);
+      WeakReference<ClientSessionFactory> fref = new WeakReference<>(factory);
 
       factory = null;
 
@@ -176,64 +174,4 @@ public class SessionCloseOnGCTest extends ActiveMQTestBase {
       locator = null;
       ActiveMQTestBase.checkWeakReferences(fref);
    }
-
-   @Test
-   public void testCloseOneSessionOnGC() throws Exception {
-      ClientSessionFactoryImpl sf = (ClientSessionFactoryImpl) locator.createSessionFactory();
-
-      ClientSession session = sf.createSession(false, true, true);
-
-      WeakReference<ClientSession> wses = new WeakReference<ClientSession>(session);
-
-      Assert.assertEquals(1, server.getRemotingService().getConnections().size());
-
-      session = null;
-
-      ActiveMQTestBase.checkWeakReferences(wses);
-
-      Assert.assertEquals(0, sf.numSessions());
-      Assert.assertEquals(1, sf.numConnections());
-      Assert.assertEquals(1, server.getRemotingService().getConnections().size());
-   }
-
-   @Test
-   public void testCloseSeveralSessionOnGC() throws Exception {
-      ClientSessionFactoryImpl sf = (ClientSessionFactoryImpl) locator.createSessionFactory();
-
-      ClientSession session1 = sf.createSession(false, true, true);
-      ClientSession session2 = sf.createSession(false, true, true);
-      ClientSession session3 = sf.createSession(false, true, true);
-
-      Assert.assertEquals(1, server.getRemotingService().getConnections().size());
-
-      WeakReference<ClientSession> ref1 = new WeakReference<ClientSession>(session1);
-      WeakReference<ClientSession> ref2 = new WeakReference<ClientSession>(session2);
-      WeakReference<ClientSession> ref3 = new WeakReference<ClientSession>(session3);
-
-      session1 = null;
-      session2 = null;
-      session3 = null;
-
-      ActiveMQTestBase.checkWeakReferences(ref1, ref2, ref3);
-
-      int count = 0;
-      final int TOTAL_SLEEP_TIME = 400;
-      final int MAX_COUNT = 20;
-      while (count++ < MAX_COUNT) {
-         /*
-          * The assertion is vulnerable to races, both in the session closing as well as the return
-          * value of the sessions.size() (i.e. HashSet.size()).
-          */
-         synchronized (this) {
-            // synchronized block will (as a side effect) force sync all field values
-            if (sf.numSessions() == 0)
-               break;
-            Thread.sleep(TOTAL_SLEEP_TIME / MAX_COUNT);
-         }
-      }
-      Assert.assertEquals("# sessions", 0, sf.numSessions());
-      Assert.assertEquals("# connections", 1, sf.numConnections());
-      Assert.assertEquals("# connections in remoting service", 1, server.getRemotingService().getConnections().size());
-   }
-
 }

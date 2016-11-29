@@ -153,6 +153,7 @@ public class AMQ3014Test {
       // local VMTransport dispatcher is artificially delayed.
       final TaskRunnerFactory realTaskRunnerFactory = localBroker.getTaskRunnerFactory();
       localBroker.setTaskRunnerFactory(new TaskRunnerFactory() {
+         @Override
          public TaskRunner createTaskRunner(Task task, String name) {
             final TaskRunner realTaskRunner = realTaskRunnerFactory.createTaskRunner(task, name);
             if (name.startsWith("ActiveMQ Connection Dispatcher: ")) {
@@ -194,7 +195,6 @@ public class AMQ3014Test {
       }
 
       Assert.assertFalse("Timed out waiting for bridge to form.", remoteBrokerInfos.isEmpty());
-      ;
       Assert.assertNotNull("Local broker ID is null.", remoteBrokerInfos.get(0).getBrokerId());
    }
 }

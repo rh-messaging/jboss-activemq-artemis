@@ -39,11 +39,13 @@ public class JmsConsumerResetActiveListenerTest extends TestCase {
    private Connection connection;
    private ActiveMQConnectionFactory factory;
 
+   @Override
    protected void setUp() throws Exception {
       factory = new ActiveMQConnectionFactory("vm://localhost?broker.persistent=false");
       connection = factory.createConnection();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       if (connection != null) {
          connection.close();
@@ -63,9 +65,10 @@ public class JmsConsumerResetActiveListenerTest extends TestCase {
 
       final CountDownLatch latch = new CountDownLatch(2);
       final AtomicBoolean first = new AtomicBoolean(true);
-      final Vector<Object> results = new Vector<Object>();
+      final Vector<Object> results = new Vector<>();
       consumer.setMessageListener(new MessageListener() {
 
+         @Override
          public void onMessage(Message message) {
             if (first.compareAndSet(true, false)) {
                try {
@@ -113,9 +116,10 @@ public class JmsConsumerResetActiveListenerTest extends TestCase {
 
       final CountDownLatch latch = new CountDownLatch(2);
       final AtomicBoolean first = new AtomicBoolean(true);
-      final Vector<Object> results = new Vector<Object>();
+      final Vector<Object> results = new Vector<>();
       consumer.setMessageListener(new MessageListener() {
 
+         @Override
          public void onMessage(Message message) {
             if (first.compareAndSet(true, false)) {
                try {

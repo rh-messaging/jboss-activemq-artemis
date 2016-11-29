@@ -17,10 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
 import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
@@ -37,12 +33,14 @@ public class ProducerIdTest extends DataFileGeneratorTestSupport {
 
    public static ProducerIdTest SINGLETON = new ProducerIdTest();
 
+   @Override
    public Object createObject() throws Exception {
       ProducerId info = new ProducerId();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       ProducerId info = (ProducerId) object;

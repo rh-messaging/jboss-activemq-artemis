@@ -88,6 +88,7 @@ public class AMQServerSession extends ServerSessionImpl {
       super(name, username, password, minLargeMessageSize, autoCommitSends, autoCommitAcks, preAcknowledge, persistDeliveryCountBeforeDelivery, xa, connection, storageManager, postOffice, resourceManager, securityStore, managementService, activeMQServerImpl, managementAddress, simpleString, callback, context, new AMQTransactionFactory(), queueCreator);
    }
 
+   @Override
    protected void doClose(final boolean failed) throws Exception {
       synchronized (this) {
          if (tx != null && tx.getXid() == null) {
@@ -153,7 +154,7 @@ public class AMQServerSession extends ServerSessionImpl {
 
       if (oper != null) {
          List<MessageReference> ackRefs = oper.getReferencesToAcknowledge();
-         Map<Long, List<MessageReference>> toAcks = new HashMap<Long, List<MessageReference>>();
+         Map<Long, List<MessageReference>> toAcks = new HashMap<>();
          for (MessageReference ref : ackRefs) {
             Long consumerId = ref.getConsumerId();
 
@@ -161,7 +162,7 @@ public class AMQServerSession extends ServerSessionImpl {
                if (acked.contains(ref.getMessage().getMessageID())) {
                   List<MessageReference> ackList = toAcks.get(consumerId);
                   if (ackList == null) {
-                     ackList = new ArrayList<MessageReference>();
+                     ackList = new ArrayList<>();
                      toAcks.put(consumerId, ackList);
                   }
                   ackList.add(ref);
@@ -328,7 +329,7 @@ public class AMQServerSession extends ServerSessionImpl {
          Pair<UUID, AtomicLong> value = targetAddressInfos.get(msg.getAddress());
 
          if (value == null) {
-            targetAddressInfos.put(msg.getAddress(), new Pair<UUID, AtomicLong>(msg.getUserID(), new AtomicLong(1)));
+            targetAddressInfos.put(msg.getAddress(), new Pair<>(msg.getUserID(), new AtomicLong(1)));
          }
          else {
             value.setA(msg.getUserID());
@@ -354,7 +355,7 @@ public class AMQServerSession extends ServerSessionImpl {
                                         ManagementService managementService2,
                                         boolean supportLargeMessage,
                                         Integer credits) throws Exception {
-      return new AMQServerConsumer(consumerID, this, (QueueBinding) binding, filter, started, browseOnly, storageManager, callback, preAcknowledge, strictUpdateDeliveryCount, managementService, supportLargeMessage, credits);
+      return new AMQServerConsumer(consumerID, this, binding, filter, started, browseOnly, storageManager, callback, preAcknowledge, strictUpdateDeliveryCount, managementService, supportLargeMessage, credits);
    }
 
    public AMQServerConsumer getConsumer(long nativeId) {

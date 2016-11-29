@@ -32,7 +32,7 @@ import org.apache.activemq.artemis.core.server.Queue;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -180,6 +180,7 @@ public class DeadLetterAddressTest extends ActiveMQTestBase {
          this.clientSession = clientSession;
       }
 
+      @Override
       public void onMessage(ClientMessage message) {
          count++;
          latch.countDown();
@@ -267,7 +268,7 @@ public class DeadLetterAddressTest extends ActiveMQTestBase {
       ClientSessionFactory sessionFactory = createSessionFactory(locator);
       ClientSession sendSession = sessionFactory.createSession(false, true, true);
       ClientProducer producer = sendSession.createProducer(qName);
-      Map<String, Long> origIds = new HashMap<String, Long>();
+      Map<String, Long> origIds = new HashMap<>();
 
       for (int i = 0; i < NUM_MESSAGES; i++) {
          ClientMessage tm = createTextMessage(clientSession, "Message:" + i);

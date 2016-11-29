@@ -46,7 +46,7 @@ public class InVMInitialContextFactory implements InitialContextFactory {
     * @return the JNDI environment to use to get this InitialContextFactory.
     */
    public static Hashtable<String, String> getJNDIEnvironment(final int serverIndex) {
-      Hashtable<String, String> env = new Hashtable<String, String>();
+      Hashtable<String, String> env = new Hashtable<>();
       env.put("java.naming.factory.initial", "org.apache.activemq.artemis.jms.tests.tools.container.InVMInitialContextFactory");
       env.put(Constants.SERVER_INDEX_PROPERTY_NAME, Integer.toString(serverIndex));
       return env;
@@ -58,6 +58,7 @@ public class InVMInitialContextFactory implements InitialContextFactory {
 
    // Public --------------------------------------------------------
 
+   @Override
    public Context getInitialContext(final Hashtable environment) throws NamingException {
       // try first in the environment passed as argument ...
       String s = (String) environment.get(Constants.SERVER_INDEX_PROPERTY_NAME);

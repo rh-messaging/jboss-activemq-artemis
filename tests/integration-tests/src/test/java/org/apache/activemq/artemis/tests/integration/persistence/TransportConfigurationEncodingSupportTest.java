@@ -29,7 +29,7 @@ import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactory;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.jms.server.config.impl.TransportConfigurationEncodingSupport;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.api.core.Pair;
 
 import org.junit.Assert;
@@ -48,7 +48,7 @@ public class TransportConfigurationEncodingSupportTest extends Assert {
 
    @Test
    public void testTransportConfiguration() throws Exception {
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
       params.put(TransportConstants.PORT_PROP_NAME, 5665);
       params.put(TransportConstants.HOST_PROP_NAME, RandomUtil.randomString());
       TransportConfiguration config = new TransportConfiguration(NettyConnectorFactory.class.getName(), params);
@@ -72,18 +72,18 @@ public class TransportConfigurationEncodingSupportTest extends Assert {
 
    @Test
    public void testTransportConfigurations() throws Exception {
-      List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<Pair<TransportConfiguration, TransportConfiguration>>();
-      Map<String, Object> liveParams = new HashMap<String, Object>();
+      List<Pair<TransportConfiguration, TransportConfiguration>> connectorConfigs = new ArrayList<>();
+      Map<String, Object> liveParams = new HashMap<>();
       liveParams.put(TransportConstants.PORT_PROP_NAME, 5665);
       TransportConfiguration live1 = new TransportConfiguration(NettyConnectorFactory.class.getName(), liveParams);
-      Map<String, Object> backupParams = new HashMap<String, Object>();
+      Map<String, Object> backupParams = new HashMap<>();
       backupParams.put(TransportConstants.PORT_PROP_NAME, 5775);
       TransportConfiguration backup1 = new TransportConfiguration(NettyConnectorFactory.class.getName(), backupParams);
-      Map<String, Object> liveParams2 = new HashMap<String, Object>();
+      Map<String, Object> liveParams2 = new HashMap<>();
       liveParams2.put(TransportConstants.PORT_PROP_NAME, 6665);
       TransportConfiguration live2 = new TransportConfiguration(NettyConnectorFactory.class.getName(), liveParams2);
 
-      connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(live1, backup1));
+      connectorConfigs.add(new Pair<>(live1, backup1));
       connectorConfigs.add(new Pair<TransportConfiguration, TransportConfiguration>(live2, null));
 
       ActiveMQBuffer buffer = ActiveMQBuffers.fixedBuffer(TransportConfigurationEncodingSupport.getEncodeSize(connectorConfigs));

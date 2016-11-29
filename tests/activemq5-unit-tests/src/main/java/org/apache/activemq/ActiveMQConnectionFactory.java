@@ -173,8 +173,8 @@ public class ActiveMQConnectionFactory extends JNDIBaseStorable implements Conne
    private boolean sendAcksAsync = true;
    private TransportListener transportListener;
    private ExceptionListener exceptionListener;
-   private int auditDepth = ActiveMQMessageAudit.DEFAULT_WINDOW_SIZE;
-   private int auditMaximumProducerNumber = ActiveMQMessageAudit.MAXIMUM_PRODUCER_COUNT;
+   private int auditDepth = ActiveMQMessageAuditNoSync.DEFAULT_WINDOW_SIZE;
+   private int auditMaximumProducerNumber = ActiveMQMessageAuditNoSync.MAXIMUM_PRODUCER_COUNT;
    private boolean useDedicatedTaskRunner;
    private long consumerFailoverRedeliveryWaitPeriod = 0;
    private boolean checkForDuplicates = true;
@@ -209,7 +209,6 @@ public class ActiveMQConnectionFactory extends JNDIBaseStorable implements Conne
             params.clear();
 
             this.vmBrokerUri = URISupport.createRemainingURI(uri, params);
-            ;
          }
       }
       catch (URISyntaxException e) {
@@ -250,7 +249,7 @@ public class ActiveMQConnectionFactory extends JNDIBaseStorable implements Conne
             Map<String, String> params = URISupport.parseParameters(uri);
             //EMPTY_MAP is immutable, so use a normal map instead.
             if (params == Collections.EMPTY_MAP) {
-               params = new HashMap<String, String>();
+               params = new HashMap<>();
             }
             params.put("invmBrokerId", uri.getHost() == null ? "localhost" : uri.getHost());
             defaultTcpUri = URISupport.createRemainingURI(defaultTcpUri, params);

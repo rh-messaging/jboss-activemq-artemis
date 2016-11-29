@@ -33,6 +33,7 @@ import org.apache.activemq.artemis.api.core.client.ClientProducer;
 import org.apache.activemq.artemis.api.core.management.CoreNotificationType;
 import org.apache.activemq.artemis.api.core.management.ManagementHelper;
 import org.apache.activemq.artemis.api.core.management.ResourceNames;
+import org.apache.activemq.artemis.core.client.ActiveMQClientLogger;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionFactoryInternal;
 import org.apache.activemq.artemis.core.client.impl.ServerLocatorInternal;
 import org.apache.activemq.artemis.core.filter.Filter;
@@ -42,9 +43,9 @@ import org.apache.activemq.artemis.core.postoffice.BindingType;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.Queue;
 import org.apache.activemq.artemis.core.server.ServerMessage;
+import org.apache.activemq.artemis.core.server.cluster.ActiveMQServerSideProtocolManagerFactory;
 import org.apache.activemq.artemis.core.server.cluster.ClusterConnection;
 import org.apache.activemq.artemis.core.server.cluster.ClusterManager;
-import org.apache.activemq.artemis.core.server.cluster.ActiveMQServerSideProtocolManagerFactory;
 import org.apache.activemq.artemis.core.server.cluster.MessageFlowRecord;
 import org.apache.activemq.artemis.core.server.cluster.Transformer;
 import org.apache.activemq.artemis.utils.UUID;
@@ -129,7 +130,7 @@ public class ClusterConnectionBridge extends BridgeImpl {
 
    @Override
    protected ClientSessionFactoryInternal createSessionFactory() throws Exception {
-      serverLocator.setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance());
+      serverLocator.setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance(serverLocator));
       ClientSessionFactoryInternal factory = (ClientSessionFactoryInternal) serverLocator.createSessionFactory(targetNodeID);
       setSessionFactory(factory);
 
@@ -156,7 +157,7 @@ public class ClusterConnectionBridge extends BridgeImpl {
 
       // TODO - we can optimise this
 
-      Set<SimpleString> propNames = new HashSet<SimpleString>(messageCopy.getPropertyNames());
+      Set<SimpleString> propNames = new HashSet<>(messageCopy.getPropertyNames());
 
       byte[] queueIds = message.getBytesProperty(idsHeaderName);
 
@@ -240,27 +241,28 @@ public class ClusterConnectionBridge extends BridgeImpl {
                                                    createSelectorFromAddress(flowRecord.getAddress()) +
                                                    ")");
 
-         session.createTemporaryQueue(managementNotificationAddress, notifQueueName, filter);
+         sessionConsumer.createTemporaryQueue(managementNotificationAddress, notifQueueName, filter);
 
-         notifConsumer = session.createConsumer(notifQueueName);
+         notifConsumer = sessionConsumer.createConsumer(notifQueueName);
 
          notifConsumer.setMessageHandler(flowRecord);
 
-         session.start();
+         sessionConsumer.start();
 
-         ClientMessage message = session.createMessage(false);
-         if (ActiveMQServerLogger.LOGGER.isTraceEnabled()) {
-            ActiveMQServerLogger.LOGGER.trace("Requesting sendQueueInfoToQueue through " + this, new Exception("trace"));
+         ClientMessage message = sessionConsumer.createMessage(false);
+         if (ActiveMQClientLogger.LOGGER.isTraceEnabled()) {
+            ActiveMQClientLogger.LOGGER.trace("Requesting sendQueueInfoToQueue through " + this, new Exception("trace"));
          }
          ManagementHelper.putOperationInvocation(message, ResourceNames.CORE_SERVER, "sendQueueInfoToQueue", notifQueueName.toString(), flowRecord.getAddress());
 
-         ClientProducer prod = session.createProducer(managementAddress);
+         ClientProducer prod = sessionConsumer.createProducer(managementAddress);
 
-         if (ActiveMQServerLogger.LOGGER.isDebugEnabled()) {
-            ActiveMQServerLogger.LOGGER.debug("Cluster connetion bridge on " + clusterConnection + " requesting information on queues");
+         if (ActiveMQClientLogger.LOGGER.isDebugEnabled()) {
+            ActiveMQClientLogger.LOGGER.debug("Cluster connection bridge on " + clusterConnection + " requesting information on queues");
          }
 
          prod.send(message);
+         prod.close();
       }
    }
 
@@ -289,8 +291,8 @@ public class ClusterConnectionBridge extends BridgeImpl {
    }
 
    public static String buildSelectorFromArray(String[] list) {
-      List<String> includes = new ArrayList<String>();
-      List<String> excludes = new ArrayList<String>();
+      List<String> includes = new ArrayList<>();
+      List<String> excludes = new ArrayList<>();
 
       // Split the list into addresses to match and addresses to exclude.
       for (int i = 0; i < list.length; i++) {
@@ -359,6 +361,7 @@ public class ClusterConnectionBridge extends BridgeImpl {
       }
    }
 
+   @Override
    protected boolean isPlainCoreBridge() {
       return false;
    }

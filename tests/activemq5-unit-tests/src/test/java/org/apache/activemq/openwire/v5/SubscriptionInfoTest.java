@@ -17,10 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
 import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
@@ -37,12 +33,14 @@ public class SubscriptionInfoTest extends DataFileGeneratorTestSupport {
 
    public static SubscriptionInfoTest SINGLETON = new SubscriptionInfoTest();
 
+   @Override
    public Object createObject() throws Exception {
       SubscriptionInfo info = new SubscriptionInfo();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       SubscriptionInfo info = (SubscriptionInfo) object;

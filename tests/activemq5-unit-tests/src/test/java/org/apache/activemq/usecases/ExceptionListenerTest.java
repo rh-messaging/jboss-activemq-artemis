@@ -49,7 +49,7 @@ public class ExceptionListenerTest implements ExceptionListener {
    private static final Logger LOG = LoggerFactory.getLogger(ExceptionListenerTest.class);
    BrokerService brokerService;
    URI brokerUri;
-   LinkedList<Throwable> exceptionsViaListener = new LinkedList<Throwable>();
+   LinkedList<Throwable> exceptionsViaListener = new LinkedList<>();
 
    @Before
    public void startBroker() throws Exception {
@@ -114,6 +114,7 @@ public class ExceptionListenerTest implements ExceptionListener {
       }
    }
 
+   @Override
    public void onException(JMSException e) {
       LOG.info("onException:" + e, new Throwable("FromHere"));
       exceptionsViaListener.add(e);

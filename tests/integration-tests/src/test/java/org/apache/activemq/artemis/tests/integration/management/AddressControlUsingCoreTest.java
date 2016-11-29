@@ -26,7 +26,7 @@ import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.security.CheckType;
 import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -132,7 +132,7 @@ public class AddressControlUsingCoreTest extends ManagementTestBase {
       }
       Assert.assertEquals(0, roles.length);
 
-      Set<Role> newRoles = new HashSet<Role>();
+      Set<Role> newRoles = new HashSet<>();
       newRoles.add(role);
       server.getSecurityRepository().addMatch(address.toString(), newRoles);
 

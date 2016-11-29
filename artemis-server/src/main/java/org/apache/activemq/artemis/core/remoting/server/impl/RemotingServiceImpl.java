@@ -40,7 +40,6 @@ import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
 import org.apache.activemq.artemis.api.core.BaseInterceptor;
-import org.apache.activemq.artemis.api.core.Interceptor;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.protocol.core.CoreRemotingConnection;
@@ -88,9 +87,9 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
 
    private final List<BaseInterceptor> outgoingInterceptors = new CopyOnWriteArrayList<>();
 
-   private final Map<String, Acceptor> acceptors = new HashMap<String, Acceptor>();
+   private final Map<String, Acceptor> acceptors = new HashMap<>();
 
-   private final Map<Object, ConnectionEntry> connections = new ConcurrentHashMap<Object, ConnectionEntry>();
+   private final Map<Object, ConnectionEntry> connections = new ConcurrentHashMap<>();
 
    private final ReusableLatch connectionCountLatch = new ReusableLatch(0);
 
@@ -184,16 +183,11 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       outgoingInterceptors.addAll(serviceRegistry.getOutgoingInterceptors(configuration.getOutgoingInterceptorClassNames()));
    }
 
+   @Override
    public synchronized void start() throws Exception {
       if (started) {
          return;
       }
-
-      ClassLoader tccl = AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
-         public ClassLoader run() {
-            return Thread.currentThread().getContextClassLoader();
-         }
-      });
 
       // The remoting service maintains it's own thread pool for handling remoting traffic
       // If OIO each connection will have it's own thread
@@ -201,9 +195,14 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       // This needs to be a different thread pool to the main thread pool especially for OIO where we may need
       // to support many hundreds of connections, but the main thread pool must be kept small for better performance
 
-      ThreadFactory tFactory = new ActiveMQThreadFactory("ActiveMQ-remoting-threads-" + server.toString() +
-                                                            "-" +
-                                                            System.identityHashCode(this), false, tccl);
+      ThreadFactory tFactory = AccessController.doPrivileged(new PrivilegedAction<ThreadFactory>() {
+         @Override
+         public ThreadFactory run() {
+            return new ActiveMQThreadFactory("ActiveMQ-remoting-threads-" + server.toString() +
+                                                                        "-" +
+                                                                        System.identityHashCode(this), false, Thread.currentThread().getContextClassLoader());
+         }
+      });
 
       threadPool = Executors.newCachedThreadPool(tFactory);
 
@@ -213,6 +212,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
 
             Map<String, ProtocolManager> supportedProtocols = new ConcurrentHashMap();
 
+            @SuppressWarnings("deprecation")
             String protocol = ConfigurationHelper.getStringProperty(TransportConstants.PROTOCOL_PROP_NAME, null, info.getParams());
 
             if (protocol != null) {
@@ -280,6 +280,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       started = true;
    }
 
+   @Override
    public synchronized void startAcceptors() throws Exception {
       if (isStarted()) {
          for (Acceptor a : acceptors.values()) {
@@ -288,6 +289,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public synchronized void allowInvmSecurityOverride(ActiveMQPrincipal principal) {
       defaultInvmSecurityPrincipal = principal;
       for (Acceptor acceptor : acceptors.values()) {
@@ -297,6 +299,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public synchronized void pauseAcceptors() {
       if (!started)
          return;
@@ -306,16 +309,17 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
             acceptor.pause();
          }
          catch (Exception e) {
-            ActiveMQServerLogger.LOGGER.errorStoppingAcceptor();
+            ActiveMQServerLogger.LOGGER.errorStoppingAcceptor(acceptor.getName());
          }
       }
    }
 
+   @Override
    public synchronized void freeze(final String scaleDownNodeID, final CoreRemotingConnection connectionToKeepOpen) {
       if (!started)
          return;
       failureCheckAndFlushThread.close(false);
-      HashMap<Object, ConnectionEntry> connectionEntries = new HashMap<Object, ConnectionEntry>(connections);
+      HashMap<Object, ConnectionEntry> connectionEntries = new HashMap<>(connections);
 
       // Now we ensure that no connections will process any more packets after this method is
       // complete then send a disconnect packet
@@ -336,6 +340,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public void stop(final boolean criticalError) throws Exception {
       if (!started) {
          return;
@@ -348,14 +353,21 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
          if (ActiveMQServerLogger.LOGGER.isDebugEnabled()) {
             ActiveMQServerLogger.LOGGER.debug("Pausing acceptor " + acceptor);
          }
-         acceptor.pause();
+
+         try {
+            acceptor.pause();
+         }
+         catch (Throwable t) {
+            ActiveMQServerLogger.LOGGER.errorStoppingAcceptor(acceptor.getName());
+         }
+
       }
 
       if (ActiveMQServerLogger.LOGGER.isDebugEnabled()) {
          ActiveMQServerLogger.LOGGER.debug("Sending disconnect on live connections");
       }
 
-      HashSet<ConnectionEntry> connectionEntries = new HashSet<ConnectionEntry>(connections.values());
+      HashSet<ConnectionEntry> connectionEntries = new HashSet<>(connections.values());
 
       // Now we ensure that no connections will process any more packets after this method is complete
       // then send a disconnect packet
@@ -370,7 +382,12 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
 
       for (Acceptor acceptor : acceptors.values()) {
-         acceptor.stop();
+         try {
+            acceptor.stop();
+         }
+         catch (Throwable t) {
+            ActiveMQServerLogger.LOGGER.errorStoppingAcceptor(acceptor.getName());
+         }
       }
 
       acceptors.clear();
@@ -393,7 +410,6 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
 
       started = false;
-
    }
 
    @Override
@@ -401,6 +417,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       return acceptors.get(name);
    }
 
+   @Override
    public boolean isStarted() {
       return started;
    }
@@ -418,6 +435,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public RemotingConnection removeConnection(final Object remotingConnectionID) {
       ConnectionEntry entry = connections.remove(remotingConnectionID);
 
@@ -433,8 +451,9 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public synchronized Set<RemotingConnection> getConnections() {
-      Set<RemotingConnection> conns = new HashSet<RemotingConnection>(connections.size());
+      Set<RemotingConnection> conns = new HashSet<>(connections.size());
 
       for (ConnectionEntry entry : connections.values()) {
          conns.add(entry.connection);
@@ -443,6 +462,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       return conns;
    }
 
+   @Override
    public synchronized ReusableLatch getConnectionCountLatch() {
       return connectionCountLatch;
    }
@@ -453,6 +473,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       return protocolMap.get(protocol);
    }
 
+   @Override
    public void connectionCreated(final ActiveMQComponent component,
                                  final Connection connection,
                                  final String protocol) {
@@ -476,6 +497,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       connectionCountLatch.countUp();
    }
 
+   @Override
    public void connectionDestroyed(final Object connectionID) {
 
       if (isTrace) {
@@ -510,6 +532,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       }
    }
 
+   @Override
    public void connectionException(final Object connectionID, final ActiveMQException me) {
       // We DO NOT call fail on connection exception, otherwise in event of real connection failure, the
       // connection will be failed, the session will be closed and won't be able to reconnect
@@ -521,11 +544,12 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
       // Connections should only fail when TTL is exceeded
    }
 
+   @Override
    public void connectionReadyForWrites(final Object connectionID, final boolean ready) {
    }
 
    @Override
-   public void addIncomingInterceptor(final Interceptor interceptor) {
+   public void addIncomingInterceptor(final BaseInterceptor interceptor) {
       incomingInterceptors.add(interceptor);
 
       updateProtocols();
@@ -537,7 +561,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
    }
 
    @Override
-   public boolean removeIncomingInterceptor(final Interceptor interceptor) {
+   public boolean removeIncomingInterceptor(final BaseInterceptor interceptor) {
       if (incomingInterceptors.remove(interceptor)) {
          updateProtocols();
          return true;
@@ -548,7 +572,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
    }
 
    @Override
-   public void addOutgoingInterceptor(final Interceptor interceptor) {
+   public void addOutgoingInterceptor(final BaseInterceptor interceptor) {
       outgoingInterceptors.add(interceptor);
       updateProtocols();
    }
@@ -559,7 +583,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
    }
 
    @Override
-   public boolean removeOutgoingInterceptor(final Interceptor interceptor) {
+   public boolean removeOutgoingInterceptor(final BaseInterceptor interceptor) {
       if (outgoingInterceptors.remove(interceptor)) {
          updateProtocols();
          return true;
@@ -589,6 +613,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
 
    private final class DelegatingBufferHandler implements BufferHandler {
 
+      @Override
       public void bufferReceived(final Object connectionID, final ActiveMQBuffer buffer) {
          ConnectionEntry conn = connections.get(connectionID);
 
@@ -637,7 +662,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
             try {
                long now = System.currentTimeMillis();
 
-               Set<Object> idsToRemove = new HashSet<Object>();
+               Set<Object> idsToRemove = new HashSet<>();
 
                for (ConnectionEntry entry : connections.values()) {
                   final RemotingConnection conn = entry.connection;
@@ -659,6 +684,7 @@ public class RemotingServiceImpl implements RemotingService, ConnectionLifeCycle
 
                   if (flush) {
                      flushExecutor.execute(new Runnable() {
+                        @Override
                         public void run() {
                            try {
                               // this is using a different thread

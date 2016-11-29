@@ -45,6 +45,7 @@ public class DiscoveryTransportBrokerTest extends NetworkTestSupport {
 
    String groupName;
 
+   @Override
    public void setUp() throws Exception {
       super.setAutoFail(true);
       super.setUp();
@@ -85,7 +86,7 @@ public class DiscoveryTransportBrokerTest extends NetworkTestSupport {
       connection3.request(createMessage(producerInfo3, destination, deliveryMode));
 
       // The message will be sent to one of the brokers.
-      FailoverTransport ft = (FailoverTransport) connection3.getTransport().narrow(FailoverTransport.class);
+      FailoverTransport ft = connection3.getTransport().narrow(FailoverTransport.class);
 
       // See which broker we were connected to.
       StubConnection connectionA;
@@ -117,14 +118,17 @@ public class DiscoveryTransportBrokerTest extends NetworkTestSupport {
 
    }
 
+   @Override
    protected String getLocalURI() {
       return "tcp://localhost:0?wireFormat.tcpNoDelayEnabled=true";
    }
 
+   @Override
    protected String getRemoteURI() {
       return "tcp://localhost:0?wireFormat.tcpNoDelayEnabled=true";
    }
 
+   @Override
    protected TransportConnector createConnector() throws Exception, IOException, URISyntaxException {
       TransportConnector x = super.createConnector();
       x.setDiscoveryUri(new URI(getDiscoveryUri()));
@@ -138,6 +142,7 @@ public class DiscoveryTransportBrokerTest extends NetworkTestSupport {
       return "multicast://default?group=" + groupName;
    }
 
+   @Override
    protected TransportConnector createRemoteConnector() throws Exception, IOException, URISyntaxException {
       TransportConnector x = super.createRemoteConnector();
       x.setDiscoveryUri(new URI(getDiscoveryUri()));

@@ -55,7 +55,7 @@ public class MQTTTestSupport extends ActiveMQTestBase {
 
    protected int port = 1883;
    protected ActiveMQConnectionFactory cf;
-   protected LinkedList<Throwable> exceptions = new LinkedList<Throwable>();
+   protected LinkedList<Throwable> exceptions = new LinkedList<>();
    protected boolean persistent;
    protected String protocolConfig;
    protected String protocolScheme;
@@ -84,10 +84,12 @@ public class MQTTTestSupport extends ActiveMQTestBase {
       this.useSSL = useSSL;
    }
 
+   @Override
    public String getName() {
       return name.getMethodName();
    }
 
+   @Override
    @Before
    public void setUp() throws Exception {
       String basedir = basedir().getPath();
@@ -102,6 +104,7 @@ public class MQTTTestSupport extends ActiveMQTestBase {
       startBroker();
    }
 
+   @Override
    @After
    public void tearDown() throws Exception {
       System.clearProperty("javax.net.ssl.trustStore");
@@ -111,6 +114,7 @@ public class MQTTTestSupport extends ActiveMQTestBase {
       System.clearProperty("javax.net.ssl.keyStorePassword");
       System.clearProperty("javax.net.ssl.keyStoreType");
       stopBroker();
+      super.tearDown();
    }
 
    public void startBroker() throws Exception {
@@ -131,7 +135,7 @@ public class MQTTTestSupport extends ActiveMQTestBase {
       // MQTT transport connectors as needed, the port variable is always supposed to be
       // assigned the primary MQTT connector's port.
 
-      HashMap<String, Object> params = new HashMap<String, Object>();
+      HashMap<String, Object> params = new HashMap<>();
       params.put(TransportConstants.PORT_PROP_NAME, "" + 5445);
       params.put(TransportConstants.PROTOCOLS_PROP_NAME, "CORE");
       TransportConfiguration transportConfiguration = new TransportConfiguration(NETTY_ACCEPTOR_FACTORY, params);
@@ -145,7 +149,7 @@ public class MQTTTestSupport extends ActiveMQTestBase {
       // MQTT transport connectors as needed, the port variable is always supposed to be
       // assigned the primary MQTT connector's port.
 
-      HashMap<String, Object> params = new HashMap<String, Object>();
+      HashMap<String, Object> params = new HashMap<>();
       params.put(TransportConstants.PORT_PROP_NAME, "" + port);
       params.put(TransportConstants.PROTOCOLS_PROP_NAME, "MQTT");
       TransportConfiguration transportConfiguration = new TransportConfiguration(NETTY_ACCEPTOR_FACTORY, params);

@@ -19,7 +19,11 @@ package org.apache.activemq.artemis.core.client.impl;
 import org.apache.activemq.artemis.api.core.Pair;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.TopologyMember;
+import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
+import org.apache.activemq.artemis.utils.ConfigurationHelper;
+
+import java.util.Map;
 
 public final class TopologyMemberImpl implements TopologyMember {
 
@@ -46,7 +50,7 @@ public final class TopologyMemberImpl implements TopologyMember {
       this.nodeId = nodeId;
       this.backupGroupName = backupGroupName;
       this.scaleDownGroupName = scaleDownGroupName;
-      this.connector = new Pair<TransportConfiguration, TransportConfiguration>(a, b);
+      this.connector = new Pair<>(a, b);
       uniqueEventID = System.currentTimeMillis();
    }
 
@@ -99,6 +103,7 @@ public final class TopologyMemberImpl implements TopologyMember {
       return connector;
    }
 
+   @Override
    public boolean isMember(RemotingConnection connection) {
       TransportConfiguration connectorConfig = connection.getTransportConnection() != null ? connection.getTransportConnection().getConnectorConfig() : null;
 
@@ -106,13 +111,23 @@ public final class TopologyMemberImpl implements TopologyMember {
 
    }
 
+   @Override
    public boolean isMember(TransportConfiguration configuration) {
-      if (getConnector().getA() != null && getConnector().getA().equals(configuration) || getConnector().getB() != null && getConnector().getB().equals(configuration)) {
+      if (getConnector().getA() != null && getConnector().getA().isSameParams(configuration) || getConnector().getB() != null && getConnector().getB().isSameParams(configuration)) {
          return true;
       }
       else {
          return false;
       }
+   }
+
+   @Override
+   public String toURI() {
+      TransportConfiguration liveConnector = getLive();
+      Map<String, Object> props = liveConnector.getParams();
+      String host = ConfigurationHelper.getStringProperty(TransportConstants.HOST_PROP_NAME, "localhost", props);
+      int port = ConfigurationHelper.getIntProperty(TransportConstants.PORT_PROP_NAME, 0, props);
+      return "tcp://" + host + ":" + port;
    }
 
    @Override

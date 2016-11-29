@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.activemq.artemis.api.core.SimpleString;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.command.ActiveMQDestination;
 import org.apache.activemq.command.ConnectionInfo;
 import org.apache.activemq.command.ConsumerInfo;
@@ -58,7 +59,6 @@ import org.apache.activemq.artemis.core.server.ServerMessage;
 import org.apache.activemq.artemis.core.server.impl.ServerMessageImpl;
 import org.apache.activemq.artemis.core.transaction.impl.XidImpl;
 import org.apache.activemq.artemis.spi.core.protocol.SessionCallback;
-import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.wireformat.WireFormat;
 
 public class AMQSession implements SessionCallback {
@@ -148,6 +148,11 @@ public class AMQSession implements SessionCallback {
    }
 
    @Override
+   public boolean isWritable(ReadyListener callback) {
+      return connection.isWritable(callback);
+   }
+
+   @Override
    public void sendProducerCreditsMessage(int credits, SimpleString address) {
       // TODO Auto-generated method stub
 
@@ -182,18 +187,6 @@ public class AMQSession implements SessionCallback {
 
    @Override
    public void closed() {
-      // TODO Auto-generated method stub
-
-   }
-
-   @Override
-   public void addReadyListener(ReadyListener listener) {
-      // TODO Auto-generated method stub
-
-   }
-
-   @Override
-   public void removeReadyListener(ReadyListener listener) {
       // TODO Auto-generated method stub
 
    }
@@ -266,8 +259,8 @@ public class AMQSession implements SessionCallback {
          * not receive acks will be resent.  (ActiveMQ broker handles this by returning a last sequence id received to
          * the client).  To handle this in Artemis we use a duplicate ID cache.  To do this we check to see if the
          * message comes from failover connection.  If so we add a DUPLICATE_ID to handle duplicates after a resend. */
-         if (producerExchange.getConnectionContext().isFaultTolerant() && !messageSend.getProperties().containsKey(ServerMessage.HDR_DUPLICATE_DETECTION_ID)) {
-            coreMsg.putStringProperty(ServerMessage.HDR_DUPLICATE_DETECTION_ID.toString(), messageSend.getMessageId().toString());
+         if (producerExchange.getConnectionContext().isFaultTolerant() && !messageSend.getProperties().containsKey(org.apache.activemq.artemis.api.core.Message.HDR_DUPLICATE_DETECTION_ID)) {
+            coreMsg.putStringProperty(org.apache.activemq.artemis.api.core.Message.HDR_DUPLICATE_DETECTION_ID.toString(), messageSend.getMessageId().toString());
          }
          OpenWireMessageConverter.toCoreMessage(coreMsg, messageSend, connection.getMarshaller());
          SimpleString address = OpenWireUtil.toCoreAddress(dest);
@@ -399,7 +392,7 @@ public class AMQSession implements SessionCallback {
       }
       else {
          Iterator<AMQConsumer> iter = consumers.values().iterator();
-         Set<Long> acked = new HashSet<Long>();
+         Set<Long> acked = new HashSet<>();
          while (iter.hasNext()) {
             AMQConsumer consumer = iter.next();
             consumer.rollbackTx(acked);

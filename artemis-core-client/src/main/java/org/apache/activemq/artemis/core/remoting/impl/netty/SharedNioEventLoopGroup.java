@@ -36,20 +36,12 @@ public class SharedNioEventLoopGroup extends NioEventLoopGroup {
 
    private static SharedNioEventLoopGroup instance;
 
-   private final AtomicReference<ScheduledFuture<?>> shutdown = new AtomicReference<ScheduledFuture<?>>();
+   private final AtomicReference<ScheduledFuture<?>> shutdown = new AtomicReference<>();
    private final AtomicLong nioChannelFactoryCount = new AtomicLong();
    private final Promise<?> terminationPromise = ImmediateEventExecutor.INSTANCE.newPromise();
 
    private SharedNioEventLoopGroup(int numThreads, ThreadFactory factory) {
       super(numThreads, factory);
-   }
-
-   private static ClassLoader getThisClassLoader() {
-      return AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
-         public ClassLoader run() {
-            return ClientSessionFactoryImpl.class.getClassLoader();
-         }
-      });
    }
 
    public static synchronized void forceShutdown() {
@@ -68,7 +60,12 @@ public class SharedNioEventLoopGroup extends NioEventLoopGroup {
          }
       }
       else {
-         instance = new SharedNioEventLoopGroup(numThreads, new ActiveMQThreadFactory("ActiveMQ-client-netty-threads", true, getThisClassLoader()));
+         instance = new SharedNioEventLoopGroup(numThreads, AccessController.doPrivileged(new PrivilegedAction<ThreadFactory>() {
+            @Override
+            public ThreadFactory run() {
+               return new ActiveMQThreadFactory("ActiveMQ-client-netty-threads", true, ClientSessionFactoryImpl.class.getClassLoader());
+            }
+         }));
       }
       instance.nioChannelFactoryCount.incrementAndGet();
       return instance;

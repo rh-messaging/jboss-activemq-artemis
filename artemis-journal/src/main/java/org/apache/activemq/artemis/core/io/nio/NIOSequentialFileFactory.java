@@ -20,10 +20,10 @@ import java.io.File;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
+import org.apache.activemq.artemis.ArtemisConstants;
 import org.apache.activemq.artemis.core.io.AbstractSequentialFileFactory;
 import org.apache.activemq.artemis.core.io.IOCriticalErrorListener;
 import org.apache.activemq.artemis.core.io.SequentialFile;
-import org.apache.activemq.artemis.core.journal.impl.JournalConstants;
 
 public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
 
@@ -32,7 +32,7 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
    }
 
    public NIOSequentialFileFactory(final File journalDir, final IOCriticalErrorListener listener, final int maxIO) {
-      this(journalDir, false, JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, maxIO, false, listener);
+      this(journalDir, false, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, maxIO, false, listener);
    }
 
    public NIOSequentialFileFactory(final File journalDir, final boolean buffered, final int maxIO) {
@@ -43,7 +43,7 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
                                    final boolean buffered,
                                    final IOCriticalErrorListener listener,
                                    final int maxIO) {
-      this(journalDir, buffered, JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, maxIO, false, listener);
+      this(journalDir, buffered, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, maxIO, false, listener);
    }
 
    public NIOSequentialFileFactory(final File journalDir,
@@ -65,14 +65,17 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
       super(journalDir, buffered, bufferSize, bufferTimeout, maxIO, logRates, listener);
    }
 
+   @Override
    public SequentialFile createSequentialFile(final String fileName) {
       return new NIOSequentialFile(this, journalDir, fileName, maxIO, writeExecutor);
    }
 
+   @Override
    public boolean isSupportsCallbacks() {
       return timedBuffer != null;
    }
 
+   @Override
    public ByteBuffer allocateDirectBuffer(final int size) {
       // Using direct buffer, as described on https://jira.jboss.org/browse/HORNETQ-467
       ByteBuffer buffer2 = null;
@@ -84,7 +87,7 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
          // the main portion is outside of the VM heap
          // and the JDK will not have any reference about it to take GC into account
          // so we force a GC and try again.
-         WeakReference<Object> obj = new WeakReference<Object>(new Object());
+         WeakReference<Object> obj = new WeakReference<>(new Object());
          try {
             long timeout = System.currentTimeMillis() + 5000;
             while (System.currentTimeMillis() > timeout && obj.get() != null) {
@@ -101,14 +104,17 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
       return buffer2;
    }
 
+   @Override
    public void releaseDirectBuffer(ByteBuffer buffer) {
       // nothing we can do on this case. we can just have good faith on GC
    }
 
+   @Override
    public ByteBuffer newBuffer(final int size) {
       return ByteBuffer.allocate(size);
    }
 
+   @Override
    public void clearBuffer(final ByteBuffer buffer) {
       final int limit = buffer.limit();
       buffer.rewind();
@@ -120,14 +126,17 @@ public class NIOSequentialFileFactory extends AbstractSequentialFileFactory {
       buffer.rewind();
    }
 
+   @Override
    public ByteBuffer wrapBuffer(final byte[] bytes) {
       return ByteBuffer.wrap(bytes);
    }
 
+   @Override
    public int getAlignment() {
       return 1;
    }
 
+   @Override
    public int calculateBlockSize(final int bytes) {
       return bytes;
    }

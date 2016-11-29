@@ -23,6 +23,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.activemq.artemis.api.core.BroadcastGroupConfiguration;
 import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
@@ -39,7 +42,9 @@ import org.apache.activemq.artemis.core.config.ha.LiveOnlyPolicyConfiguration;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.JournalType;
+import org.apache.activemq.artemis.core.server.SecuritySettingPlugin;
 import org.apache.activemq.artemis.core.server.cluster.impl.MessageLoadBalancingType;
+import org.apache.activemq.artemis.core.server.impl.LegacyLDAPSecuritySettingPlugin;
 import org.apache.activemq.artemis.core.settings.impl.SlowConsumerPolicy;
 import org.junit.Assert;
 import org.junit.Test;
@@ -313,13 +318,15 @@ public class FileConfigurationTest extends ConfigurationImplTest {
       assertEquals("color='blue'", conf.getQueueConfigurations().get(1).getFilterString());
       assertEquals(false, conf.getQueueConfigurations().get(1).isDurable());
 
-      assertEquals(2, conf.getSecurityRoles().size());
+      Map<String, Set<Role>> roles = conf.getSecurityRoles();
 
-      assertTrue(conf.getSecurityRoles().containsKey("a1"));
+      assertEquals(2, roles.size());
 
-      assertTrue(conf.getSecurityRoles().containsKey("a2"));
+      assertTrue(roles.containsKey("a1"));
 
-      Role a1Role = conf.getSecurityRoles().get("a1").toArray(new Role[1])[0];
+      assertTrue(roles.containsKey("a2"));
+
+      Role a1Role = roles.get("a1").toArray(new Role[1])[0];
 
       assertFalse(a1Role.isSend());
       assertFalse(a1Role.isConsume());
@@ -329,7 +336,7 @@ public class FileConfigurationTest extends ConfigurationImplTest {
       assertFalse(a1Role.isDeleteNonDurableQueue());
       assertFalse(a1Role.isManage());
 
-      Role a2Role = conf.getSecurityRoles().get("a2").toArray(new Role[1])[0];
+      Role a2Role = roles.get("a2").toArray(new Role[1])[0];
 
       assertFalse(a2Role.isSend());
       assertFalse(a2Role.isConsume());
@@ -338,7 +345,32 @@ public class FileConfigurationTest extends ConfigurationImplTest {
       assertFalse(a2Role.isCreateNonDurableQueue());
       assertTrue(a2Role.isDeleteNonDurableQueue());
       assertFalse(a2Role.isManage());
+   }
 
+   @Test
+   public void testSecuritySettingPlugin() throws Exception {
+      FileConfiguration fc = new FileConfiguration();
+      FileDeploymentManager deploymentManager = new FileDeploymentManager("securitySettingPlugin.xml");
+      deploymentManager.addDeployable(fc);
+      deploymentManager.readConfiguration();
+
+      List<SecuritySettingPlugin> securitySettingPlugins = fc.getSecuritySettingPlugins();
+      SecuritySettingPlugin securitySettingPlugin = securitySettingPlugins.get(0);
+      assertTrue(securitySettingPlugin instanceof LegacyLDAPSecuritySettingPlugin);
+      LegacyLDAPSecuritySettingPlugin legacyLDAPSecuritySettingPlugin = (LegacyLDAPSecuritySettingPlugin) securitySettingPlugin;
+      assertEquals(legacyLDAPSecuritySettingPlugin.getInitialContextFactory(), "testInitialContextFactory");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getConnectionURL(), "testConnectionURL");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getConnectionUsername(), "testConnectionUsername");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getConnectionPassword(), "testConnectionPassword");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getConnectionProtocol(), "testConnectionProtocol");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getAuthentication(), "testAuthentication");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getDestinationBase(), "testDestinationBase");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getFilter(), "testFilter");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getRoleAttribute(), "testRoleAttribute");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getAdminPermissionValue(), "testAdminPermissionValue");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getReadPermissionValue(), "testReadPermissionValue");
+      assertEquals(legacyLDAPSecuritySettingPlugin.getWritePermissionValue(), "testWritePermissionValue");
+      assertEquals(legacyLDAPSecuritySettingPlugin.isEnableListener(), false);
    }
 
    @Test

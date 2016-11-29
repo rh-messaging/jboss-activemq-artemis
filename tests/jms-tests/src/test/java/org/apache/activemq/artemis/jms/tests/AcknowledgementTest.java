@@ -32,6 +32,7 @@ import javax.jms.TopicSubscriber;
 import java.util.concurrent.CountDownLatch;
 
 import org.apache.activemq.artemis.jms.tests.util.ProxyAssertSupport;
+import org.junit.Assert;
 import org.junit.Test;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -779,6 +780,14 @@ public class AcknowledgementTest extends JMSTestCase {
 
       ProxyAssertSupport.assertEquals("two", messageReceived.getText());
 
+      messageReceived = (TextMessage)consumer.receiveNoWait();
+
+      if (messageReceived != null) {
+         System.out.println("Message received " + messageReceived.getText());
+      }
+      Assert.assertNull(messageReceived);
+
+
       consumer.close();
 
       // I can't call xasession.close for this test as JCA layer would cache the session
@@ -927,6 +936,7 @@ public class AcknowledgementTest extends JMSTestCase {
          ProxyAssertSupport.assertTrue("failed to receive all messages", latch.await(2000, MILLISECONDS));
       }
 
+      @Override
       public abstract void onMessage(Message m);
 
    }

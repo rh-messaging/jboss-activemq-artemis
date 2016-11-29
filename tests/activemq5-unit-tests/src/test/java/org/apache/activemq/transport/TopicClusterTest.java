@@ -60,9 +60,10 @@ public class TopicClusterTest extends TestCase implements MessageListener {
    protected int deliveryMode = DeliveryMode.NON_PERSISTENT;
    protected MessageProducer[] producers;
    protected Connection[] connections;
-   protected List<BrokerService> services = new ArrayList<BrokerService>();
+   protected List<BrokerService> services = new ArrayList<>();
    protected String groupId;
 
+   @Override
    protected void setUp() throws Exception {
       groupId = "topic-cluster-test-" + System.currentTimeMillis();
       connections = new Connection[NUMBER_IN_CLUSTER];
@@ -94,6 +95,7 @@ public class TopicClusterTest extends TestCase implements MessageListener {
       }
    }
 
+   @Override
    protected void tearDown() throws Exception {
       if (connections != null) {
          for (int i = 0; i < connections.length; i++) {
@@ -147,6 +149,7 @@ public class TopicClusterTest extends TestCase implements MessageListener {
    /**
     * @param msg
     */
+   @Override
    public void onMessage(Message msg) {
       // log.info("GOT: " + msg);
       receivedMessageCount.incrementAndGet();

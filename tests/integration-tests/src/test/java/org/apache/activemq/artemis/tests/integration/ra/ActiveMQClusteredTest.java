@@ -65,7 +65,7 @@ public class ActiveMQClusteredTest extends ActiveMQRAClusteredTestBase {
       DummyMessageEndpoint endpoint = new DummyMessageEndpoint(latch);
       DummyMessageEndpointFactory endpointFactory = new DummyMessageEndpointFactory(endpoint, false);
       qResourceAdapter.endpointActivation(endpointFactory, spec);
-      //make sure thet activation didnt start, i.e. no MDB consumers
+      //make sure thet activation didn't start, i.e. no MDB consumers
       assertEquals(((Queue) server.getPostOffice().getBinding(MDBQUEUEPREFIXEDSIMPLE).getBindable()).getConsumerCount(), 0);
       qResourceAdapter.endpointDeactivation(endpointFactory, spec);
 
@@ -169,5 +169,87 @@ public class ActiveMQClusteredTest extends ActiveMQRAClusteredTestBase {
             mc.destroy();
          }
       }
+   }
+
+   @Test
+   public void testRebalanceWithInfiniteReconnect() throws Exception {
+      testRebalanceInternal(-1);
+   }
+
+   @Test
+   public void testRebalanceWithNoReconnect() throws Exception {
+      testRebalanceInternal(0);
+   }
+
+   public void testRebalanceInternal(int reconnectAttempts) throws Exception {
+      final int CONSUMER_COUNT = 10;
+      secondaryJmsServer.createQueue(true, MDBQUEUE, null, true, "/jms/" + MDBQUEUE);
+
+      ActiveMQResourceAdapter qResourceAdapter = newResourceAdapter();
+      MyBootstrapContext ctx = new MyBootstrapContext();
+      qResourceAdapter.start(ctx);
+      ActiveMQActivationSpec spec = new ActiveMQActivationSpec();
+      spec.setResourceAdapter(qResourceAdapter);
+      spec.setUseJNDI(false);
+      spec.setDestinationType("javax.jms.Queue");
+      spec.setDestination(MDBQUEUE);
+      spec.setRebalanceConnections(true);
+      spec.setMaxSession(CONSUMER_COUNT);
+      spec.setSetupAttempts(5);
+      spec.setSetupInterval(200);
+      spec.setReconnectAttempts(reconnectAttempts);
+      spec.setHA(true); // if this isn't true then the toplogy listener won't get nodeDown notifications
+      spec.setCallTimeout(500L); // if this isn't set then it may take a long time for tearDown to occur on the MDB connection
+      qResourceAdapter.setConnectorClassName(INVM_CONNECTOR_FACTORY);
+      CountDownLatch latch = new CountDownLatch(1);
+      DummyMessageEndpoint endpoint = new DummyMessageEndpoint(latch);
+      DummyMessageEndpointFactory endpointFactory = new DummyMessageEndpointFactory(endpoint, false);
+      qResourceAdapter.endpointActivation(endpointFactory, spec);
+
+      Queue primaryQueue = server.locateQueue(MDBQUEUEPREFIXEDSIMPLE);
+      Queue secondaryQueue = secondaryServer.locateQueue(MDBQUEUEPREFIXEDSIMPLE);
+
+      assertTrue(primaryQueue.getConsumerCount() < CONSUMER_COUNT);
+      assertTrue(secondaryQueue.getConsumerCount() < CONSUMER_COUNT);
+      assertTrue(primaryQueue.getConsumerCount() + secondaryQueue.getConsumerCount() == CONSUMER_COUNT);
+
+      ClientSession session = addClientSession(locator.createSessionFactory().createSession());
+      ClientProducer clientProducer = session.createProducer(MDBQUEUEPREFIXED);
+      ClientMessage message = session.createMessage(true);
+      message.getBodyBuffer().writeString("test");
+      clientProducer.send(message);
+
+      latch.await(5, TimeUnit.SECONDS);
+
+      assertNotNull(endpoint.lastMessage);
+      assertEquals(endpoint.lastMessage.getCoreMessage().getBodyBuffer().readString(), "test");
+
+      for (int i = 0; i < 10; i++) {
+         secondaryServer.stop();
+
+         long mark = System.currentTimeMillis();
+         long timeout = 5000;
+         while (primaryQueue.getConsumerCount() < CONSUMER_COUNT && (System.currentTimeMillis() - mark) < timeout) {
+            Thread.sleep(100);
+         }
+
+         assertTrue(primaryQueue.getConsumerCount() == CONSUMER_COUNT);
+
+         secondaryServer.start();
+         waitForServerToStart(secondaryServer);
+         secondaryQueue = secondaryServer.locateQueue(MDBQUEUEPREFIXEDSIMPLE);
+
+         mark = System.currentTimeMillis();
+         while (((primaryQueue.getConsumerCount() + secondaryQueue.getConsumerCount()) < (CONSUMER_COUNT) || primaryQueue.getConsumerCount() == CONSUMER_COUNT) && (System.currentTimeMillis() - mark) <= timeout) {
+            Thread.sleep(100);
+         }
+
+         assertTrue(primaryQueue.getConsumerCount() < CONSUMER_COUNT);
+         assertTrue(secondaryQueue.getConsumerCount() < CONSUMER_COUNT);
+         assertTrue(primaryQueue.getConsumerCount() + secondaryQueue.getConsumerCount() == CONSUMER_COUNT);
+      }
+
+      qResourceAdapter.endpointDeactivation(endpointFactory, spec);
+      qResourceAdapter.stop();
    }
 }

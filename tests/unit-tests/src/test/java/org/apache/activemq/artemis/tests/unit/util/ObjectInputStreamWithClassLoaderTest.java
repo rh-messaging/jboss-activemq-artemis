@@ -57,7 +57,7 @@ public class ObjectInputStreamWithClassLoaderTest extends ActiveMQTestBase {
          pathIgnore = classLocation.toString();
       }
 
-      List<URL> urls = new ArrayList<URL>();
+      List<URL> urls = new ArrayList<>();
       while (tokenString.hasMoreElements()) {
          String value = tokenString.nextToken();
          URL itemLocation = new File(value).toURI().toURL();
@@ -158,6 +158,7 @@ public class ObjectInputStreamWithClassLoaderTest extends ActiveMQTestBase {
          }
       }
 
+      @Override
       public void run() {
 
          try {

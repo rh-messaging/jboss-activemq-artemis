@@ -16,8 +16,7 @@
  */
 package org.apache.activemq.artemis.component;
 
-import java.net.URI;
-
+import org.apache.activemq.artemis.ActiveMQWebLogger;
 import org.apache.activemq.artemis.components.ExternalComponent;
 import org.apache.activemq.artemis.dto.AppDTO;
 import org.apache.activemq.artemis.dto.ComponentDTO;
@@ -30,17 +29,23 @@ import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.webapp.WebAppContext;
 
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 public class WebServerComponent implements ExternalComponent {
 
    private Server server;
    private HandlerList handlers;
    private WebServerDTO webServerConfig;
+   private URI uri;
+   private String jolokiaUrl;
 
    @Override
    public void configure(ComponentDTO config, String artemisInstance, String artemisHome) throws Exception {
       webServerConfig = (WebServerDTO) config;
-      String path = webServerConfig.path.startsWith("/") ? webServerConfig.path : "/" + webServerConfig.path;
-      URI uri = new URI(webServerConfig.bind);
+      uri = new URI(webServerConfig.bind);
       server = new Server();
       ServerConnector connector = new ServerConnector(server);
       connector.setPort(uri.getPort());
@@ -50,19 +55,25 @@ public class WebServerComponent implements ExternalComponent {
 
       handlers = new HandlerList();
 
+      Path warDir = Paths.get(artemisHome != null ? artemisHome : ".")
+              .resolve( webServerConfig.path ).toAbsolutePath();
+
       if (webServerConfig.apps != null) {
          for (AppDTO app : webServerConfig.apps) {
-            deployWar(app.url, app.war, artemisHome, path);
+            deployWar(app.url, app.war, warDir);
+            if (app.war.startsWith("jolokia")) {
+               jolokiaUrl = webServerConfig.bind + "/" + app.url;
+            }
          }
       }
 
       WebAppContext handler = new WebAppContext();
       handler.setContextPath("/");
-      handler.setResourceBase(artemisHome + path);
+      handler.setResourceBase(warDir.toString());
       handler.setLogUrlOnStart(true);
 
       ResourceHandler resourceHandler = new ResourceHandler();
-      resourceHandler.setResourceBase(artemisHome + path);
+      resourceHandler.setResourceBase(warDir.toString());
       resourceHandler.setDirectoriesListed(true);
       resourceHandler.setWelcomeFiles(new String[]{"index.html"});
 
@@ -74,21 +85,26 @@ public class WebServerComponent implements ExternalComponent {
       server.setHandler(handlers);
    }
 
+   @Override
    public void start() throws Exception {
       server.start();
-
-      System.out.println("HTTP Server started at " + webServerConfig.bind);
+      ActiveMQWebLogger.LOGGER.webserverStarted(webServerConfig.bind);
+      if (jolokiaUrl != null) {
+         ActiveMQWebLogger.LOGGER.jolokiaAvailable(jolokiaUrl);
+      }
    }
 
+   @Override
    public void stop() throws Exception {
       server.stop();
    }
 
+   @Override
    public boolean isStarted() {
       return server != null && server.isStarted();
    }
 
-   private void deployWar(String url, String warURL, String activeMQHome, String path) {
+   private void deployWar(String url, String warFile, Path warDirectory) throws IOException {
       WebAppContext webapp = new WebAppContext();
       if (url.startsWith("/")) {
          webapp.setContextPath(url);
@@ -96,7 +112,8 @@ public class WebServerComponent implements ExternalComponent {
       else {
          webapp.setContextPath("/" + url);
       }
-      webapp.setWar(activeMQHome + path + "/" + warURL);
+
+      webapp.setWar(warDirectory.resolve(warFile).toString());
       handlers.addHandler(webapp);
    }
 }

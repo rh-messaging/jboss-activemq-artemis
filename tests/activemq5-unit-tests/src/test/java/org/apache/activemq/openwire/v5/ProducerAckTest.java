@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class ProducerAckTest extends BaseCommandTestSupport {
 
    public static ProducerAckTest SINGLETON = new ProducerAckTest();
 
+   @Override
    public Object createObject() throws Exception {
       ProducerAck info = new ProducerAck();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       ProducerAck info = (ProducerAck) object;

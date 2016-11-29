@@ -109,14 +109,17 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
    public ActiveMQClientProtocolManager() {
    }
 
+   @Override
    public String getName() {
       return ActiveMQClient.DEFAULT_CORE_PROTOCOL;
    }
 
+   @Override
    public void setSessionFactory(ClientSessionFactory factory) {
       this.factoryInternal = (ClientSessionFactoryInternal) factory;
    }
 
+   @Override
    public ClientSessionFactory getSessionFactory() {
       return this.factoryInternal;
    }
@@ -126,6 +129,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       pipeline.addLast("activemq-decoder", new ActiveMQFrameDecoder2());
    }
 
+   @Override
    public boolean waitOnLatch(long milliseconds) throws InterruptedException {
       return waitLatch.await(milliseconds, TimeUnit.MILLISECONDS);
    }
@@ -139,6 +143,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       }
    }
 
+   @Override
    public RemotingConnection getCurrentConnection() {
       return connection;
    }
@@ -152,6 +157,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       }
    }
 
+   @Override
    public Lock lockSessionCreation() {
       try {
          Lock localFailoverLock = factoryInternal.lockFailover();
@@ -179,6 +185,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       }
    }
 
+   @Override
    public void stop() {
       alive = false;
 
@@ -196,6 +203,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
 
    }
 
+   @Override
    public boolean isAlive() {
       return alive;
    }
@@ -276,7 +284,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
 
             long sessionChannelID = connection.generateChannelID();
 
-            Packet request = new CreateSessionMessage(name, sessionChannelID, clientVersion.getIncrementingVersion(), username, password, minLargeMessageSize, xa, autoCommitSends, autoCommitAcks, preAcknowledge, confirmationWindowSize, null);
+            Packet request = newCreateSessionPacket(clientVersion, name, username, password, xa, autoCommitSends, autoCommitAcks, preAcknowledge, minLargeMessageSize, confirmationWindowSize, sessionChannelID);
 
             try {
                // channel1 reference here has to go away
@@ -325,12 +333,33 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
             inCreateSessionLatch.countDown();
          }
       } while (retry);
-
-      // these objects won't be null, otherwise it would keep retrying on the previous loop
-      return new ActiveMQSessionContext(name, connection, sessionChannel, response.getServerVersion(), confirmationWindowSize);
+      return newSessionContext(name, confirmationWindowSize, sessionChannel, response);
 
    }
 
+   protected Packet newCreateSessionPacket(Version clientVersion,
+                                           String name,
+                                           String username,
+                                           String password,
+                                           boolean xa,
+                                           boolean autoCommitSends,
+                                           boolean autoCommitAcks,
+                                           boolean preAcknowledge,
+                                           int minLargeMessageSize,
+                                           int confirmationWindowSize,
+                                           long sessionChannelID) {
+      return new CreateSessionMessage(name, sessionChannelID, clientVersion.getIncrementingVersion(), username, password, minLargeMessageSize, xa, autoCommitSends, autoCommitAcks, preAcknowledge, confirmationWindowSize, null);
+   }
+
+   protected SessionContext newSessionContext(String name,
+                                            int confirmationWindowSize,
+                                            Channel sessionChannel,
+                                            CreateSessionResponseMessage response) {
+      // these objects won't be null, otherwise it would keep retrying on the previous loop
+      return new ActiveMQSessionContext(name, connection, sessionChannel, response.getServerVersion(), confirmationWindowSize);
+   }
+
+   @Override
    public boolean cleanupBeforeFailover(ActiveMQException cause) {
 
       boolean needToInterrupt;
@@ -381,6 +410,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       return message.isOkToFailover();
    }
 
+   @Override
    public RemotingConnection connect(Connection transportConnection,
                                      long callTimeout,
                                      long callFailoverTimeout,
@@ -398,7 +428,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
       return connection;
    }
 
-   private void sendHandshake(Connection transportConnection) {
+   protected void sendHandshake(Connection transportConnection) {
       if (transportConnection.isUsingProtocolHandling()) {
          // no need to send handshake on inVM as inVM is not using the NettyProtocolHandling
          ActiveMQBuffer amqbuffer = connection.createTransportBuffer(handshake.length());
@@ -415,6 +445,7 @@ public class ActiveMQClientProtocolManager implements ClientProtocolManager {
          this.conn = conn;
       }
 
+      @Override
       public void handlePacket(final Packet packet) {
          final byte type = packet.getType();
 

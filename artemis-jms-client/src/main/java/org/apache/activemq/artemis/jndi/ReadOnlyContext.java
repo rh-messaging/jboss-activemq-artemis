@@ -74,17 +74,17 @@ public class ReadOnlyContext implements Context, Serializable {
    private String nameInNamespace = "";
 
    public ReadOnlyContext() {
-      environment = new Hashtable<String, Object>();
-      bindings = new HashMap<String, Object>();
-      treeBindings = new HashMap<String, Object>();
+      environment = new Hashtable<>();
+      bindings = new HashMap<>();
+      treeBindings = new HashMap<>();
    }
 
    public ReadOnlyContext(Hashtable env) {
       if (env == null) {
-         this.environment = new Hashtable<String, Object>();
+         this.environment = new Hashtable<>();
       }
       else {
-         this.environment = new Hashtable<String, Object>(env);
+         this.environment = new Hashtable<>(env);
       }
       this.bindings = Collections.EMPTY_MAP;
       this.treeBindings = Collections.EMPTY_MAP;
@@ -92,13 +92,13 @@ public class ReadOnlyContext implements Context, Serializable {
 
    public ReadOnlyContext(Hashtable environment, Map<String, Object> bindings) {
       if (environment == null) {
-         this.environment = new Hashtable<String, Object>();
+         this.environment = new Hashtable<>();
       }
       else {
-         this.environment = new Hashtable<String, Object>(environment);
+         this.environment = new Hashtable<>(environment);
       }
-      this.bindings = new HashMap<String, Object>();
-      treeBindings = new HashMap<String, Object>();
+      this.bindings = new HashMap<>();
+      treeBindings = new HashMap<>();
       if (bindings != null) {
          for (Map.Entry<String, Object> binding : bindings.entrySet()) {
             try {
@@ -120,7 +120,7 @@ public class ReadOnlyContext implements Context, Serializable {
    protected ReadOnlyContext(ReadOnlyContext clone, Hashtable env) {
       this.bindings = clone.bindings;
       this.treeBindings = clone.treeBindings;
-      this.environment = new Hashtable<String, Object>(env);
+      this.environment = new Hashtable<>(env);
    }
 
    protected ReadOnlyContext(ReadOnlyContext clone, Hashtable<String, Object> env, String nameInNamespace) {
@@ -155,7 +155,7 @@ public class ReadOnlyContext implements Context, Serializable {
       assert name != null && name.length() > 0;
       assert !frozen;
 
-      Map<String, Object> newBindings = new HashMap<String, Object>();
+      Map<String, Object> newBindings = new HashMap<>();
       int pos = name.indexOf('/');
       if (pos == -1) {
          if (treeBindings.put(name, value) != null) {
@@ -196,18 +196,22 @@ public class ReadOnlyContext implements Context, Serializable {
       return new ReadOnlyContext();
    }
 
+   @Override
    public Object addToEnvironment(String propName, Object propVal) throws NamingException {
       return environment.put(propName, propVal);
    }
 
+   @Override
    public Hashtable<String, Object> getEnvironment() throws NamingException {
       return (Hashtable<String, Object>) environment.clone();
    }
 
+   @Override
    public Object removeFromEnvironment(String propName) throws NamingException {
       return environment.remove(propName);
    }
 
+   @Override
    public Object lookup(String name) throws NamingException {
       if (name.length() == 0) {
          return this;
@@ -273,26 +277,31 @@ public class ReadOnlyContext implements Context, Serializable {
       return result;
    }
 
+   @Override
    public Object lookup(Name name) throws NamingException {
       return lookup(name.toString());
    }
 
+   @Override
    public Object lookupLink(String name) throws NamingException {
       return lookup(name);
    }
 
+   @Override
    public Name composeName(Name name, Name prefix) throws NamingException {
       Name result = (Name) prefix.clone();
       result.addAll(name);
       return result;
    }
 
+   @Override
    public String composeName(String name, String prefix) throws NamingException {
       CompositeName result = new CompositeName(prefix);
       result.addAll(new CompositeName(name));
       return result.toString();
    }
 
+   @Override
    public NamingEnumeration list(String name) throws NamingException {
       Object o = lookup(name);
       if (o == this) {
@@ -306,6 +315,7 @@ public class ReadOnlyContext implements Context, Serializable {
       }
    }
 
+   @Override
    public NamingEnumeration listBindings(String name) throws NamingException {
       Object o = lookup(name);
       if (o == this) {
@@ -319,78 +329,97 @@ public class ReadOnlyContext implements Context, Serializable {
       }
    }
 
+   @Override
    public Object lookupLink(Name name) throws NamingException {
       return lookupLink(name.toString());
    }
 
+   @Override
    public NamingEnumeration list(Name name) throws NamingException {
       return list(name.toString());
    }
 
+   @Override
    public NamingEnumeration listBindings(Name name) throws NamingException {
       return listBindings(name.toString());
    }
 
+   @Override
    public void bind(Name name, Object obj) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void bind(String name, Object obj) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void close() throws NamingException {
       // ignore
    }
 
+   @Override
    public Context createSubcontext(Name name) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public Context createSubcontext(String name) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void destroySubcontext(Name name) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void destroySubcontext(String name) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public String getNameInNamespace() throws NamingException {
       return nameInNamespace;
    }
 
+   @Override
    public NameParser getNameParser(Name name) throws NamingException {
       return NAME_PARSER;
    }
 
+   @Override
    public NameParser getNameParser(String name) throws NamingException {
       return NAME_PARSER;
    }
 
+   @Override
    public void rebind(Name name, Object obj) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void rebind(String name, Object obj) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void rename(Name oldName, Name newName) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void rename(String oldName, String newName) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void unbind(Name name) throws NamingException {
       throw new OperationNotSupportedException();
    }
 
+   @Override
    public void unbind(String name) throws NamingException {
       throw new OperationNotSupportedException();
    }
@@ -399,10 +428,12 @@ public class ReadOnlyContext implements Context, Serializable {
 
       private final Iterator i = bindings.entrySet().iterator();
 
+      @Override
       public boolean hasMore() throws NamingException {
          return i.hasNext();
       }
 
+      @Override
       public boolean hasMoreElements() {
          return i.hasNext();
       }
@@ -411,6 +442,7 @@ public class ReadOnlyContext implements Context, Serializable {
          return (Map.Entry) i.next();
       }
 
+      @Override
       public void close() throws NamingException {
       }
    }
@@ -420,10 +452,12 @@ public class ReadOnlyContext implements Context, Serializable {
       ListEnumeration() {
       }
 
+      @Override
       public Object next() throws NamingException {
          return nextElement();
       }
 
+      @Override
       public Object nextElement() {
          Map.Entry entry = getNext();
          return new NameClassPair((String) entry.getKey(), entry.getValue().getClass().getName());
@@ -435,10 +469,12 @@ public class ReadOnlyContext implements Context, Serializable {
       ListBindingEnumeration() {
       }
 
+      @Override
       public Object next() throws NamingException {
          return nextElement();
       }
 
+      @Override
       public Object nextElement() {
          Map.Entry entry = getNext();
          return new Binding((String) entry.getKey(), entry.getValue());

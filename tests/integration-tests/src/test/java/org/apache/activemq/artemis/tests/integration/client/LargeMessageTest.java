@@ -141,6 +141,7 @@ public class LargeMessageTest extends LargeMessageTestBase {
       consumer.setMessageHandler(new MessageHandler() {
          int counter = 0;
 
+         @Override
          public void onMessage(ClientMessage message) {
             message.getBodyBuffer().readByte();
             // System.out.println("message:" + message);
@@ -1816,7 +1817,7 @@ public class LargeMessageTest extends LargeMessageTestBase {
 
       final int PAGE_SIZE = 10 * 1024;
 
-      HashMap<String, AddressSettings> map = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> map = new HashMap<>();
 
       AddressSettings value = new AddressSettings();
       map.put(ADDRESS.toString(), value);
@@ -1943,7 +1944,7 @@ public class LargeMessageTest extends LargeMessageTestBase {
 
       final int PAGE_SIZE = 10 * 1024;
 
-      HashMap<String, AddressSettings> map = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> map = new HashMap<>();
 
       AddressSettings value = new AddressSettings();
       map.put(ADDRESS.toString(), value);
@@ -2103,6 +2104,156 @@ public class LargeMessageTest extends LargeMessageTestBase {
       }
    }
 
+   // https://issues.apache.org/jira/browse/ARTEMIS-331
+   @Test
+   public void testSendStreamingSingleEmptyMessage() throws Exception {
+      final String propertyName = "myStringPropertyName";
+      final String propertyValue = "myStringPropertyValue";
+      ClientSession session = null;
+      ActiveMQServer server = null;
+
+      final int SIZE = 0;
+      try {
+
+         server = createServer(true, isNetty());
+
+         server.start();
+
+         locator.setMinLargeMessageSize(100 * 1024);
+
+         ClientSessionFactory sf = addSessionFactory(createSessionFactory(locator));
+
+         session = sf.createSession(null, null, false, true, true, false, 0);
+
+         session.createQueue(ADDRESS, ADDRESS, null, true);
+
+         ClientMessage clientFile = session.createMessage(true);
+         clientFile.setBodyInputStream(ActiveMQTestBase.createFakeLargeStream(SIZE));
+         clientFile.putStringProperty(propertyName, propertyValue);
+
+         ClientProducer producer = session.createProducer(ADDRESS);
+
+         session.start();
+
+         log.debug("Sending");
+         producer.send(clientFile);
+
+         producer.close();
+
+         log.debug("Waiting");
+
+         ClientConsumer consumer = session.createConsumer(ADDRESS);
+
+         ClientMessage msg2 = consumer.receive(10000);
+
+         msg2.acknowledge();
+
+         msg2.setOutputStream(createFakeOutputStream());
+         Assert.assertTrue(msg2.waitOutputStreamCompletion(60000));
+         Assert.assertEquals(propertyValue, msg2.getStringProperty(propertyName));
+
+         session.commit();
+
+         Assert.assertEquals(0, ((Queue) server.getPostOffice().getBinding(ADDRESS).getBindable()).getDeliveringCount());
+         Assert.assertEquals(0, getMessageCount(((Queue) server.getPostOffice().getBinding(ADDRESS).getBindable())));
+
+      }
+      finally {
+         try {
+            session.close();
+         }
+         catch (Throwable ignored) {
+         }
+
+         try {
+            server.stop();
+         }
+         catch (Throwable ignored) {
+         }
+      }
+   }
+
+   // https://issues.apache.org/jira/browse/ARTEMIS-331
+   @Test
+   public void testSendStreamingEmptyMessagesWithRestart() throws Exception {
+      final String propertyName = "myStringPropertyName";
+      final String propertyValue = "myStringPropertyValue";
+      ClientSession session = null;
+      ActiveMQServer server = null;
+
+      final int SIZE = 0;
+      try {
+
+         server = createServer(true, isNetty());
+
+         server.start();
+
+         locator.setMinLargeMessageSize(100 * 1024);
+
+         ClientSessionFactory sf = addSessionFactory(createSessionFactory(locator));
+
+         session = sf.createSession(null, null, false, true, true, false, 0);
+
+         session.createQueue(ADDRESS, ADDRESS, null, true);
+
+         ClientProducer producer = session.createProducer(ADDRESS);
+
+         for (int i = 0; i < 10; i++) {
+            ClientMessage clientFile = session.createMessage(true);
+            clientFile.setBodyInputStream(ActiveMQTestBase.createFakeLargeStream(SIZE));
+            clientFile.putStringProperty(propertyName, propertyValue + i);
+            producer.send(clientFile);
+         }
+
+         producer.close();
+
+         session.close();
+
+         sf.close();
+
+         server.stop();
+
+         server.start();
+
+         sf = addSessionFactory(createSessionFactory(locator));
+
+         session = sf.createSession(null, null, false, true, true, false, 0);
+
+         ClientConsumer consumer = session.createConsumer(ADDRESS);
+
+         session.start();
+
+         for (int i = 0; i < 10; i++) {
+            ClientMessage msg2 = consumer.receive(10000);
+
+            msg2.acknowledge();
+
+            msg2.setOutputStream(createFakeOutputStream());
+            Assert.assertTrue(msg2.waitOutputStreamCompletion(60000));
+            Assert.assertEquals(propertyValue + i, msg2.getStringProperty(propertyName));
+
+            session.commit();
+         }
+
+         Assert.assertEquals(0, ((Queue) server.getPostOffice().getBinding(ADDRESS).getBindable()).getDeliveringCount());
+         Assert.assertEquals(0, getMessageCount(((Queue) server.getPostOffice().getBinding(ADDRESS).getBindable())));
+
+      }
+      finally {
+         try {
+            session.close();
+         }
+         catch (Throwable ignored) {
+         }
+
+         try {
+            server.stop();
+         }
+         catch (Throwable ignored) {
+         }
+      }
+   }
+
    /**
     * Receive messages but never reads them, leaving the buffer pending
     */
@@ -2237,7 +2388,7 @@ public class LargeMessageTest extends LargeMessageTestBase {
 
       final int PAGE_SIZE = 10 * 1024;
 
-      HashMap<String, AddressSettings> map = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> map = new HashMap<>();
 
       AddressSettings value = new AddressSettings();
       map.put(ADDRESS.toString(), value);

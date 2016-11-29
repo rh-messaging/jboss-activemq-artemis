@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -38,16 +39,17 @@ import org.apache.activemq.artemis.api.core.ActiveMQNotConnectedException;
 import org.apache.activemq.artemis.api.core.Interceptor;
 import org.apache.activemq.artemis.api.core.Pair;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
+import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.FailoverEventListener;
 import org.apache.activemq.artemis.api.core.client.FailoverEventType;
-import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.api.core.client.SessionFailureListener;
 import org.apache.activemq.artemis.core.client.ActiveMQClientLogger;
 import org.apache.activemq.artemis.core.client.ActiveMQClientMessageBundle;
 import org.apache.activemq.artemis.core.protocol.core.CoreRemotingConnection;
 import org.apache.activemq.artemis.core.remoting.FailureListener;
+import org.apache.activemq.artemis.core.remoting.impl.TransportConfigurationUtil;
 import org.apache.activemq.artemis.core.server.ActiveMQComponent;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.BufferHandler;
@@ -56,8 +58,8 @@ import org.apache.activemq.artemis.spi.core.remoting.Connection;
 import org.apache.activemq.artemis.spi.core.remoting.ConnectionLifeCycleListener;
 import org.apache.activemq.artemis.spi.core.remoting.Connector;
 import org.apache.activemq.artemis.spi.core.remoting.ConnectorFactory;
-import org.apache.activemq.artemis.spi.core.remoting.TopologyResponseHandler;
 import org.apache.activemq.artemis.spi.core.remoting.SessionContext;
+import org.apache.activemq.artemis.spi.core.remoting.TopologyResponseHandler;
 import org.apache.activemq.artemis.utils.ClassloadingUtil;
 import org.apache.activemq.artemis.utils.ConcurrentHashSet;
 import org.apache.activemq.artemis.utils.ConfirmationWindowWarning;
@@ -96,7 +98,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    private final long connectionTTL;
 
-   private final Set<ClientSessionInternal> sessions = new HashSet<ClientSessionInternal>();
+   private final Set<ClientSessionInternal> sessions = new HashSet<>();
 
    private final Object createSessionLock = new Object();
 
@@ -118,13 +120,15 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    private final double retryIntervalMultiplier; // For exponential backoff
 
+   private final CountDownLatch latchFinalTopology = new CountDownLatch(1);
+
    private final long maxRetryInterval;
 
    private int reconnectAttempts;
 
-   private final Set<SessionFailureListener> listeners = new ConcurrentHashSet<SessionFailureListener>();
+   private final Set<SessionFailureListener> listeners = new ConcurrentHashSet<>();
 
-   private final Set<FailoverEventListener> failoverListeners = new ConcurrentHashSet<FailoverEventListener>();
+   private final Set<FailoverEventListener> failoverListeners = new ConcurrentHashSet<>();
 
    private Connector connector;
 
@@ -146,6 +150,11 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
    private final ConfirmationWindowWarning confirmationWindowWarning;
 
    private String liveNodeID;
+
+   // We need to cache this value here since some listeners may be registered after connectionReadyForWrites was called.
+   private boolean connectionReadyForWrites;
+
+   private final Object connectionReadyLock = new Object();
 
    public ClientSessionFactoryImpl(final ServerLocatorInternal serverLocator,
                                    final TransportConfiguration connectorConfig,
@@ -214,17 +223,21 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
       confirmationWindowWarning = new ConfirmationWindowWarning(serverLocator.getConfirmationWindowSize() < 0);
 
+      connectionReadyForWrites = true;
    }
 
+   @Override
    public void disableFinalizeCheck() {
       finalizeCheck = false;
    }
 
+   @Override
    public Lock lockFailover() {
       newFailoverLock.lock();
       return newFailoverLock;
    }
 
+   @Override
    public void connect(final int initialConnectAttempts,
                        final boolean failoverOnInitialConnection) throws ActiveMQException {
       // Get the connection
@@ -240,10 +253,12 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    }
 
+   @Override
    public TransportConfiguration getConnectorConfiguration() {
       return connectorConfig;
    }
 
+   @Override
    public void setBackupConnector(final TransportConfiguration live, final TransportConfiguration backUp) {
       Connector localConnector = connector;
 
@@ -271,10 +286,12 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       }
    }
 
+   @Override
    public Object getBackupConnector() {
       return backupConfig;
    }
 
+   @Override
    public ClientSession createSession(final String username,
                                       final String password,
                                       final boolean xa,
@@ -285,35 +302,42 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       return createSessionInternal(username, password, xa, autoCommitSends, autoCommitAcks, preAcknowledge, ackBatchSize);
    }
 
+   @Override
    public ClientSession createSession(final boolean autoCommitSends,
                                       final boolean autoCommitAcks,
                                       final int ackBatchSize) throws ActiveMQException {
       return createSessionInternal(null, null, false, autoCommitSends, autoCommitAcks, serverLocator.isPreAcknowledge(), ackBatchSize);
    }
 
+   @Override
    public ClientSession createXASession() throws ActiveMQException {
       return createSessionInternal(null, null, true, false, false, serverLocator.isPreAcknowledge(), serverLocator.getAckBatchSize());
    }
 
+   @Override
    public ClientSession createTransactedSession() throws ActiveMQException {
       return createSessionInternal(null, null, false, false, false, serverLocator.isPreAcknowledge(), serverLocator.getAckBatchSize());
    }
 
+   @Override
    public ClientSession createSession() throws ActiveMQException {
       return createSessionInternal(null, null, false, true, true, serverLocator.isPreAcknowledge(), serverLocator.getAckBatchSize());
    }
 
+   @Override
    public ClientSession createSession(final boolean autoCommitSends,
                                       final boolean autoCommitAcks) throws ActiveMQException {
       return createSessionInternal(null, null, false, autoCommitSends, autoCommitAcks, serverLocator.isPreAcknowledge(), serverLocator.getAckBatchSize());
    }
 
+   @Override
    public ClientSession createSession(final boolean xa,
                                       final boolean autoCommitSends,
                                       final boolean autoCommitAcks) throws ActiveMQException {
       return createSessionInternal(null, null, xa, autoCommitSends, autoCommitAcks, serverLocator.isPreAcknowledge(), serverLocator.getAckBatchSize());
    }
 
+   @Override
    public ClientSession createSession(final boolean xa,
                                       final boolean autoCommitSends,
                                       final boolean autoCommitAcks,
@@ -323,11 +347,13 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    // ConnectionLifeCycleListener implementation --------------------------------------------------
 
+   @Override
    public void connectionCreated(final ActiveMQComponent component,
                                  final Connection connection,
                                  final String protocol) {
    }
 
+   @Override
    public void connectionDestroyed(final Object connectionID) {
       // The exception has to be created in the same thread where it's being called
       // as to avoid a different stack trace cause
@@ -336,6 +362,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       // It has to use the same executor as the disconnect message is being sent through
 
       closeExecutor.execute(new Runnable() {
+         @Override
          public void run() {
             handleConnectionFailure(connectionID, ex);
          }
@@ -343,46 +370,56 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    }
 
+   @Override
    public void connectionException(final Object connectionID, final ActiveMQException me) {
       handleConnectionFailure(connectionID, me);
    }
 
    // Must be synchronized to prevent it happening concurrently with failover which can lead to
    // inconsistencies
+   @Override
    public void removeSession(final ClientSessionInternal session, final boolean failingOver) {
       synchronized (sessions) {
          sessions.remove(session);
       }
    }
 
+   @Override
    public void connectionReadyForWrites(final Object connectionID, final boolean ready) {
    }
 
+   @Override
    public synchronized int numConnections() {
       return connection != null ? 1 : 0;
    }
 
+   @Override
    public int numSessions() {
       return sessions.size();
    }
 
+   @Override
    public void addFailureListener(final SessionFailureListener listener) {
       listeners.add(listener);
    }
 
+   @Override
    public boolean removeFailureListener(final SessionFailureListener listener) {
       return listeners.remove(listener);
    }
 
+   @Override
    public ClientSessionFactoryImpl addFailoverListener(FailoverEventListener listener) {
       failoverListeners.add(listener);
       return this;
    }
 
+   @Override
    public boolean removeFailoverListener(FailoverEventListener listener) {
       return failoverListeners.remove(listener);
    }
 
+   @Override
    public void causeExit() {
       clientProtocolManager.stop();
    }
@@ -402,7 +439,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
    private void closeCleanSessions(boolean close) {
       HashSet<ClientSessionInternal> sessionsToClose;
       synchronized (sessions) {
-         sessionsToClose = new HashSet<ClientSessionInternal>(sessions);
+         sessionsToClose = new HashSet<>(sessions);
       }
       // work on a copied set. the session will be removed from sessions when session.close() is
       // called
@@ -420,6 +457,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       checkCloseConnection();
    }
 
+   @Override
    public void close() {
       if (closed) {
          return;
@@ -429,6 +467,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       serverLocator.factoryClosed(this);
    }
 
+   @Override
    public void cleanup() {
       if (closed) {
          return;
@@ -437,6 +476,19 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       interruptConnectAndCloseAllSessions(false);
    }
 
+   @Override
+   public boolean waitForTopology(long timeout, TimeUnit unit) {
+      try {
+         return latchFinalTopology.await(timeout, unit);
+      }
+      catch (InterruptedException e) {
+         Thread.currentThread().interrupt();
+         ActiveMQClientLogger.LOGGER.warn(e.getMessage(), e);
+         return false;
+      }
+   }
+
+   @Override
    public boolean isClosed() {
       return closed || serverLocator.isClosed();
    }
@@ -576,7 +628,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
          if (connection == null) {
             synchronized (sessions) {
-               sessionsToClose = new HashSet<ClientSessionInternal>(sessions);
+               sessionsToClose = new HashSet<>(sessions);
             }
             callFailoverListeners(FailoverEventType.FAILOVER_FAILED);
             callSessionFailureListeners(me, true, false, scaleDownTargetNodeID);
@@ -616,7 +668,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
       SessionContext context = createSessionChannel(name, username, password, xa, autoCommitSends, autoCommitAcks, preAcknowledge);
 
-      ClientSessionInternal session = new ClientSessionImpl(this, name, username, password, xa, autoCommitSends, autoCommitAcks, preAcknowledge, serverLocator.isBlockOnAcknowledge(), serverLocator.isAutoGroup(), ackBatchSize, serverLocator.getConsumerWindowSize(), serverLocator.getConsumerMaxRate(), serverLocator.getConfirmationWindowSize(), serverLocator.getProducerWindowSize(), serverLocator.getProducerMaxRate(), serverLocator.isBlockOnNonDurableSend(), serverLocator.isBlockOnDurableSend(), serverLocator.isCacheLargeMessagesClient(), serverLocator.getMinLargeMessageSize(), serverLocator.isCompressLargeMessage(), serverLocator.getInitialMessagePacketSize(), serverLocator.getGroupID(), context, orderedExecutorFactory.getExecutor(), orderedExecutorFactory.getExecutor());
+      ClientSessionInternal session = new ClientSessionImpl(this, name, username, password, xa, autoCommitSends, autoCommitAcks, preAcknowledge, serverLocator.isBlockOnAcknowledge(), serverLocator.isAutoGroup(), ackBatchSize, serverLocator.getConsumerWindowSize(), serverLocator.getConsumerMaxRate(), serverLocator.getConfirmationWindowSize(), serverLocator.getProducerWindowSize(), serverLocator.getProducerMaxRate(), serverLocator.isBlockOnNonDurableSend(), serverLocator.isBlockOnDurableSend(), serverLocator.isCacheLargeMessagesClient(), serverLocator.getMinLargeMessageSize(), serverLocator.isCompressLargeMessage(), serverLocator.getInitialMessagePacketSize(), serverLocator.getGroupID(), context, orderedExecutorFactory.getExecutor(), orderedExecutorFactory.getExecutor(), orderedExecutorFactory.getExecutor());
 
       synchronized (sessions) {
          if (closed || !clientProtocolManager.isAlive()) {
@@ -626,7 +678,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
          sessions.add(session);
       }
 
-      return new DelegatingSession(session);
+      return session;
 
    }
 
@@ -640,7 +692,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
                                             final boolean afterReconnect,
                                             final boolean failedOver,
                                             final String scaleDownTargetNodeID) {
-      final List<SessionFailureListener> listenersClone = new ArrayList<SessionFailureListener>(listeners);
+      final List<SessionFailureListener> listenersClone = new ArrayList<>(listeners);
 
       for (final SessionFailureListener listener : listenersClone) {
          try {
@@ -684,7 +736,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
                                   final ActiveMQException cause) {
       HashSet<ClientSessionInternal> sessionsToFailover;
       synchronized (sessions) {
-         sessionsToFailover = new HashSet<ClientSessionInternal>(sessions);
+         sessionsToFailover = new HashSet<>(sessions);
       }
 
       for (ClientSessionInternal session : sessionsToFailover) {
@@ -806,11 +858,14 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
    }
 
    private void checkCloseConnection() {
-      if (connection != null && sessions.size() == 0) {
+      RemotingConnection connectionInUse = connection;
+      Connector connectorInUse = connector;
+
+      if (connectionInUse != null && sessions.size() == 0) {
          cancelScheduledTasks();
 
          try {
-            connection.destroy();
+            connectionInUse.destroy();
          }
          catch (Throwable ignore) {
          }
@@ -818,8 +873,8 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
          connection = null;
 
          try {
-            if (connector != null) {
-               connector.close();
+            if (connectorInUse != null) {
+               connectorInUse.close();
             }
          }
          catch (Throwable ignore) {
@@ -829,6 +884,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       }
    }
 
+   @Override
    public RemotingConnection getConnection() {
       if (closed)
          throw new IllegalStateException("ClientSessionFactory is closed!");
@@ -840,7 +896,9 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
             return connection;
          }
          else {
-            connection = establishNewConnection();
+            RemotingConnection connection = establishNewConnection();
+
+            this.connection = connection;
 
             //we check if we can actually connect.
             // we do it here as to receive the reply connection has to be not null
@@ -921,6 +979,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       // else... we will try to instantiate a new one
 
       return AccessController.doPrivileged(new PrivilegedAction<ConnectorFactory>() {
+         @Override
          public ConnectorFactory run() {
             return (ConnectorFactory) ClassloadingUtil.newInstanceFromClassLoader(connectorFactoryClassName);
          }
@@ -939,6 +998,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
       // Must be executed on new thread since cannot block the Netty thread for a long time and fail
       // can cause reconnect loop
+      @Override
       public void run() {
          try {
             CLOSE_RUNNABLES.add(this);
@@ -963,10 +1023,12 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    }
 
+   @Override
    public void setReconnectAttempts(final int attempts) {
       reconnectAttempts = attempts;
    }
 
+   @Override
    public Object getConnector() {
       return connector;
    }
@@ -1038,7 +1100,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
             transportConnection = openTransportConnection(backupConnector);
 
-            if ((transportConnection = openTransportConnection(backupConnector)) != null) {
+            if (transportConnection != null) {
             /*looks like the backup is now live, let's use that*/
 
                if (ClientSessionFactoryImpl.isDebug) {
@@ -1053,7 +1115,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
             }
             else {
                if (ClientSessionFactoryImpl.isDebug) {
-                  ActiveMQClientLogger.LOGGER.debug("Backup is not active yet");
+                  ActiveMQClientLogger.LOGGER.debug("Backup is not active.");
                }
             }
 
@@ -1090,6 +1152,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
    private class DelegatingBufferHandler implements BufferHandler {
 
+      @Override
       public void bufferReceived(final Object connectionID, final ActiveMQBuffer buffer) {
          RemotingConnection theConn = connection;
 
@@ -1132,9 +1195,10 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
       private final WeakReference<PingRunnable> pingRunnable;
 
       ActualScheduledPinger(final PingRunnable runnable) {
-         pingRunnable = new WeakReference<PingRunnable>(runnable);
+         pingRunnable = new WeakReference<>(runnable);
       }
 
+      @Override
       public void run() {
          PingRunnable runnable = pingRunnable.get();
 
@@ -1153,6 +1217,7 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
       private long lastCheck = System.currentTimeMillis();
 
+      @Override
       public synchronized void run() {
          if (cancelled || stopPingingAfterOne && !first) {
             return;
@@ -1162,8 +1227,10 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
          long now = System.currentTimeMillis();
 
-         if (clientFailureCheckPeriod != -1 && connectionTTL != -1 && now >= lastCheck + connectionTTL) {
-            if (!connection.checkDataReceived()) {
+         final RemotingConnection connectionInUse = connection;
+
+         if (connectionInUse != null && clientFailureCheckPeriod != -1 && connectionTTL != -1 && now >= lastCheck + connectionTTL) {
+            if (!connectionInUse.checkDataReceived()) {
 
                // We use a different thread to send the fail
                // but the exception has to be created here to preserve the stack trace
@@ -1173,8 +1240,9 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
 
                threadPool.execute(new Runnable() {
                   // Must be executed on different thread
+                  @Override
                   public void run() {
-                     connection.fail(me);
+                     connectionInUse.fail(me);
                   }
                });
 
@@ -1268,11 +1336,21 @@ public class ClientSessionFactoryImpl implements ClientSessionFactoryInternal, C
                                String scaleDownGroupName,
                                Pair<TransportConfiguration, TransportConfiguration> connectorPair,
                                boolean isLast) {
-         // if it is our connector then set the live id used for failover
-         if (connectorPair.getA() != null && connectorPair.getA().equals(connectorConfig)) {
-            liveNodeID = nodeID;
+
+         try {
+            // if it is our connector then set the live id used for failover
+            if (connectorPair.getA() != null && TransportConfigurationUtil.isSameHost(connectorPair.getA(), connectorConfig)) {
+               liveNodeID = nodeID;
+            }
+
+            serverLocator.notifyNodeUp(uniqueEventID, nodeID, backupGroupName, scaleDownGroupName, connectorPair, isLast);
          }
-         serverLocator.notifyNodeUp(uniqueEventID, nodeID, backupGroupName, scaleDownGroupName, connectorPair, isLast);
+         finally {
+            if (isLast) {
+               latchFinalTopology.countDown();
+            }
+         }
+
       }
 
       @Override

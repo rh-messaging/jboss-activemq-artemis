@@ -25,19 +25,21 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQExceptionType;
+import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
 import org.apache.activemq.artemis.api.core.Pair;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.client.SessionFailureListener;
-import org.apache.activemq.artemis.core.journal.EncodingSupport;
 import org.apache.activemq.artemis.core.io.SequentialFile;
+import org.apache.activemq.artemis.core.journal.EncodingSupport;
 import org.apache.activemq.artemis.core.journal.impl.JournalFile;
 import org.apache.activemq.artemis.core.paging.PagedMessage;
 import org.apache.activemq.artemis.core.persistence.OperationContext;
-import org.apache.activemq.artemis.core.persistence.impl.journal.JournalStorageManager.JournalContent;
+import org.apache.activemq.artemis.core.persistence.impl.journal.AbstractJournalStorageManager;
 import org.apache.activemq.artemis.core.persistence.impl.journal.OperationContextImpl;
 import org.apache.activemq.artemis.core.protocol.core.Channel;
 import org.apache.activemq.artemis.core.protocol.core.ChannelHandler;
@@ -58,12 +60,16 @@ import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.Replicatio
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationPageEventMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationPageWriteMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationPrepareMessage;
+import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationResponseMessageV2;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationStartSyncMessage;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.ReplicationSyncFileMessage;
 import org.apache.activemq.artemis.core.server.ActiveMQComponent;
+import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.artemis.utils.ExecutorFactory;
+import org.apache.activemq.artemis.utils.ReusableLatch;
 
 /**
  * Manages replication tasks on the live server (that is the live server side of a "remote backup"
@@ -73,7 +79,7 @@ import org.apache.activemq.artemis.utils.ExecutorFactory;
  *
  * @see ReplicationEndpoint
  */
-public final class ReplicationManager implements ActiveMQComponent {
+public final class ReplicationManager implements ActiveMQComponent, ReadyListener {
 
    public enum ADD_OPERATION_TYPE {
       UPDATE {
@@ -106,7 +112,8 @@ public final class ReplicationManager implements ActiveMQComponent {
 
    private final Object replicationLock = new Object();
 
-   private final Queue<OperationContext> pendingTokens = new ConcurrentLinkedQueue<OperationContext>();
+   private final ReusableLatch latch = new ReusableLatch();
+   private final Queue<OperationContext> pendingTokens = new ConcurrentLinkedQueue<>();
 
    private final ExecutorFactory executorFactory;
 
@@ -115,6 +122,8 @@ public final class ReplicationManager implements ActiveMQComponent {
    private CoreRemotingConnection remotingConnection;
 
    private volatile boolean inSync = true;
+
+   private final ReusableLatch synchronizationIsFinishedAcknowledgement = new ReusableLatch(0);
 
    /**
     * @param remotingConnection
@@ -250,16 +259,22 @@ public final class ReplicationManager implements ActiveMQComponent {
       enabled = true;
    }
 
+   @Override
    public synchronized void stop() throws Exception {
       if (!started) {
          return;
       }
 
+      enabled = false;
+
+      // This is to avoid the write holding a lock while we are trying to close it
+      if (replicatingChannel != null) {
+         replicatingChannel.close();
+         replicatingChannel.getConnection().getTransportConnection().fireReady(true);
+         latch.setCount(0);
+      }
+
       synchronized (replicationLock) {
-         enabled = false;
-         if (replicatingChannel != null) {
-            replicatingChannel.close();
-         }
          clearReplicationTokens();
       }
 
@@ -296,7 +311,7 @@ public final class ReplicationManager implements ActiveMQComponent {
     */
    public Set<OperationContext> getActiveTokens() {
 
-      LinkedHashSet<OperationContext> activeContexts = new LinkedHashSet<OperationContext>();
+      LinkedHashSet<OperationContext> activeContexts = new LinkedHashSet<>();
 
       // The same context will be replicated on the pending tokens...
       // as the multiple operations will be replicated on the same context
@@ -326,6 +341,16 @@ public final class ReplicationManager implements ActiveMQComponent {
       synchronized (replicationLock) {
          if (enabled) {
             pendingTokens.add(repliToken);
+            if (!replicatingChannel.getConnection().isWritable(this)) {
+               latch.countUp();
+               try {
+                  //don't wait for ever as this may hang tests etc, we've probably been closed anyway
+                  latch.await(5, TimeUnit.SECONDS);
+               }
+               catch (InterruptedException e) {
+                  throw new ActiveMQInterruptedException(e);
+               }
+            }
             replicatingChannel.send(packet);
          }
          else {
@@ -341,6 +366,11 @@ public final class ReplicationManager implements ActiveMQComponent {
       }
 
       return repliToken;
+   }
+
+   @Override
+   public void readyForWriting() {
+      latch.countDown();
    }
 
    /**
@@ -385,15 +415,23 @@ public final class ReplicationManager implements ActiveMQComponent {
          connectionFailed(me, failedOver);
       }
 
+      @Override
       public void beforeReconnect(final ActiveMQException me) {
       }
    }
 
    private final class ResponseHandler implements ChannelHandler {
 
+      @Override
       public void handlePacket(final Packet packet) {
-         if (packet.getType() == PacketImpl.REPLICATION_RESPONSE) {
+         if (packet.getType() == PacketImpl.REPLICATION_RESPONSE || packet.getType() == PacketImpl.REPLICATION_RESPONSE_V2) {
             replicated();
+            if (packet.getType() == PacketImpl.REPLICATION_RESPONSE_V2) {
+               ReplicationResponseMessageV2 replicationResponseMessage = (ReplicationResponseMessageV2) packet;
+               if (replicationResponseMessage.isSynchronizationIsFinishedAcknowledgement()) {
+                  synchronizationIsFinishedAcknowledgement.countDown();
+               }
+            }
          }
       }
 
@@ -403,12 +441,15 @@ public final class ReplicationManager implements ActiveMQComponent {
 
       static final NullEncoding instance = new NullEncoding();
 
+      @Override
       public void decode(final ActiveMQBuffer buffer) {
       }
 
+      @Override
       public void encode(final ActiveMQBuffer buffer) {
       }
 
+      @Override
       public int getEncodeSize() {
          return 0;
       }
@@ -420,7 +461,7 @@ public final class ReplicationManager implements ActiveMQComponent {
     * @throws ActiveMQException
     * @throws Exception
     */
-   public void syncJournalFile(JournalFile jf, JournalContent content) throws Exception {
+   public void syncJournalFile(JournalFile jf, AbstractJournalStorageManager.JournalContent content) throws Exception {
       if (!enabled) {
          return;
       }
@@ -456,7 +497,7 @@ public final class ReplicationManager implements ActiveMQComponent {
     * @param maxBytesToSend maximum number of bytes to read and send from the file
     * @throws Exception
     */
-   private void sendLargeFile(JournalContent content,
+   private void sendLargeFile(AbstractJournalStorageManager.JournalContent content,
                               SimpleString pageStore,
                               final long id,
                               SequentialFile file,
@@ -519,7 +560,7 @@ public final class ReplicationManager implements ActiveMQComponent {
     * @throws ActiveMQException
     */
    public void sendStartSyncMessage(JournalFile[] datafiles,
-                                    JournalContent contentType,
+                                    AbstractJournalStorageManager.JournalContent contentType,
                                     String nodeID,
                                     boolean allowsAutoFailBack) throws ActiveMQException {
       if (enabled)
@@ -534,9 +575,18 @@ public final class ReplicationManager implements ActiveMQComponent {
     *
     * @param nodeID
     */
-   public void sendSynchronizationDone(String nodeID) {
+   public void sendSynchronizationDone(String nodeID, long initialReplicationSyncTimeout) {
       if (enabled) {
+         synchronizationIsFinishedAcknowledgement.countUp();
          sendReplicatePacket(new ReplicationStartSyncMessage(nodeID));
+         try {
+            if (!synchronizationIsFinishedAcknowledgement.await(initialReplicationSyncTimeout)) {
+               throw ActiveMQMessageBundle.BUNDLE.replicationSynchronizationTimeout(initialReplicationSyncTimeout);
+            }
+         }
+         catch (InterruptedException e) {
+            ActiveMQServerLogger.LOGGER.debug(e);
+         }
          inSync = false;
       }
    }
@@ -551,7 +601,7 @@ public final class ReplicationManager implements ActiveMQComponent {
     */
    public void sendLargeMessageIdListMessage(Map<Long, Pair<String, Long>> largeMessages) {
       ArrayList<Long> idsToSend;
-      idsToSend = new ArrayList<Long>(largeMessages.keySet());
+      idsToSend = new ArrayList<>(largeMessages.keySet());
 
       if (enabled)
          sendReplicatePacket(new ReplicationStartSyncMessage(idsToSend));

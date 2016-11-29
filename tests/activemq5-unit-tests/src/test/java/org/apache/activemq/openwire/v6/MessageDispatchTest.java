@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v6;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class MessageDispatchTest extends BaseCommandTestSupport {
 
    public static MessageDispatchTest SINGLETON = new MessageDispatchTest();
 
+   @Override
    public Object createObject() throws Exception {
       MessageDispatch info = new MessageDispatch();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       MessageDispatch info = (MessageDispatch) object;

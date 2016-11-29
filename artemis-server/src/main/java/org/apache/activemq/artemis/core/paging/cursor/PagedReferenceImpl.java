@@ -48,10 +48,12 @@ public class PagedReferenceImpl implements PagedReference {
 
    private boolean alreadyAcked;
 
+   @Override
    public ServerMessage getMessage() {
       return getPagedMessage().getMessage();
    }
 
+   @Override
    public synchronized PagedMessage getPagedMessage() {
       PagedMessage returnMessage = message != null ? message.get() : null;
 
@@ -62,11 +64,12 @@ public class PagedReferenceImpl implements PagedReference {
       if (returnMessage == null) {
          // reference is gone, we will reconstruct it
          returnMessage = subscription.queryMessage(position);
-         message = new WeakReference<PagedMessage>(returnMessage);
+         message = new WeakReference<>(returnMessage);
       }
       return returnMessage;
    }
 
+   @Override
    public PagePosition getPosition() {
       return position;
    }
@@ -82,18 +85,21 @@ public class PagedReferenceImpl implements PagedReference {
       else {
          this.messageEstimate = message.getMessage().getMemoryEstimate();
       }
-      this.message = new WeakReference<PagedMessage>(message);
+      this.message = new WeakReference<>(message);
       this.subscription = subscription;
    }
 
+   @Override
    public boolean isPaged() {
       return true;
    }
 
+   @Override
    public void setPersistedCount(int count) {
       this.persistedCount = count;
    }
 
+   @Override
    public int getPersistedCount() {
       return persistedCount;
    }
@@ -101,7 +107,12 @@ public class PagedReferenceImpl implements PagedReference {
    @Override
    public int getMessageMemoryEstimate() {
       if (messageEstimate < 0) {
-         messageEstimate = getMessage().getMemoryEstimate();
+         try {
+            messageEstimate = getMessage().getMemoryEstimate();
+         }
+         catch (Throwable e) {
+            ActiveMQServerLogger.LOGGER.warn(e.getMessage(), e);
+         }
       }
       return messageEstimate;
    }
@@ -114,12 +125,18 @@ public class PagedReferenceImpl implements PagedReference {
    @Override
    public long getScheduledDeliveryTime() {
       if (deliveryTime == null) {
-         ServerMessage msg = getMessage();
-         if (msg.containsProperty(Message.HDR_SCHEDULED_DELIVERY_TIME)) {
-            deliveryTime = getMessage().getLongProperty(Message.HDR_SCHEDULED_DELIVERY_TIME);
+         try {
+            ServerMessage msg = getMessage();
+            if (msg.containsProperty(Message.HDR_SCHEDULED_DELIVERY_TIME)) {
+               deliveryTime = getMessage().getLongProperty(Message.HDR_SCHEDULED_DELIVERY_TIME);
+            }
+            else {
+               deliveryTime = 0L;
+            }
          }
-         else {
-            deliveryTime = 0L;
+         catch (Throwable e) {
+            ActiveMQServerLogger.LOGGER.warn(e.getMessage(), e);
+            return 0L;
          }
       }
       return deliveryTime;

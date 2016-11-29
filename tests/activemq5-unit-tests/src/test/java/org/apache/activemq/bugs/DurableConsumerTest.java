@@ -74,7 +74,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
 
    protected byte[] payload = new byte[1024 * 32];
    protected ConnectionFactory factory;
-   protected Vector<Exception> exceptions = new Vector<Exception>();
+   protected Vector<Exception> exceptions = new Vector<>();
 
    private static final String TOPIC_NAME = "failoverTopic";
    private static final String CONNECTION_URL = "failover:(tcp://localhost:61616,tcp://localhost:61617)";
@@ -109,6 +109,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
          }
       }
 
+      @Override
       public void onMessage(Message arg0) {
       }
 
@@ -122,6 +123,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
          }
       }
 
+      @Override
       public void onException(JMSException exception) {
          exceptions.add(exception);
       }
@@ -131,6 +133,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
 
       private final boolean shouldPublish = true;
 
+      @Override
       public void run() {
          TopicConnectionFactory topicConnectionFactory = null;
          TopicConnection topicConnection = null;
@@ -181,11 +184,12 @@ public class DurableConsumerTest extends CombinationTestSupport {
       Thread publisherThread = new Thread(new MessagePublisher());
       publisherThread.start();
       final int numSubs = 100;
-      final List<SimpleTopicSubscriber> list = new ArrayList<SimpleTopicSubscriber>(numSubs);
+      final List<SimpleTopicSubscriber> list = new ArrayList<>(numSubs);
       for (int i = 0; i < numSubs; i++) {
 
          final int id = i;
          Thread thread = new Thread(new Runnable() {
+            @Override
             public void run() {
                SimpleTopicSubscriber s = new SimpleTopicSubscriber(CONNECTION_URL, System.currentTimeMillis() + "-" + id, TOPIC_NAME);
                list.add(s);
@@ -231,6 +235,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
       final CountDownLatch counsumerStarted = new CountDownLatch(numConsumers);
       final AtomicInteger receivedCount = new AtomicInteger();
       Runnable consumer = new Runnable() {
+         @Override
          public void run() {
             final String consumerName = Thread.currentThread().getName();
             int acked = 0;
@@ -302,6 +307,7 @@ public class DurableConsumerTest extends CombinationTestSupport {
       executor.awaitTermination(30, TimeUnit.SECONDS);
 
       Wait.waitFor(new Wait.Condition() {
+         @Override
          public boolean isSatisified() throws Exception {
             LOG.info("receivedCount: " + receivedCount.get());
             return receivedCount.get() == numMessages;

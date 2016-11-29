@@ -16,9 +16,6 @@
  */
 package org.apache.activemq.broker.region;
 
-import java.io.File;
-
-import static org.junit.matchers.JUnitMatchers.containsString;
 import static org.junit.Assert.*;
 
 import javax.jms.Connection;
@@ -190,6 +187,7 @@ public class QueueResendDuringShutdownTest {
       final MessageConsumer fConsumer = consumer;
 
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message msg) {
             LOG.debug("got a message on consumer {}", fConsumer);
             messageReceived();

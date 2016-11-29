@@ -46,26 +46,23 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.MessageHandler;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
-import org.apache.activemq.artemis.core.io.IOCallback;
 import org.apache.activemq.artemis.core.client.impl.ClientConsumerInternal;
 import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.config.DivertConfiguration;
 import org.apache.activemq.artemis.core.filter.Filter;
+import org.apache.activemq.artemis.core.io.IOCallback;
+import org.apache.activemq.artemis.core.io.nio.NIOSequentialFileFactory;
 import org.apache.activemq.artemis.core.journal.PreparedTransactionInfo;
 import org.apache.activemq.artemis.core.journal.RecordInfo;
 import org.apache.activemq.artemis.core.journal.impl.JournalImpl;
-import org.apache.activemq.artemis.core.io.nio.NIOSequentialFileFactory;
-import org.apache.activemq.artemis.core.paging.PagedMessage;
 import org.apache.activemq.artemis.core.paging.PagingManager;
 import org.apache.activemq.artemis.core.paging.PagingStore;
 import org.apache.activemq.artemis.core.paging.cursor.PageCursorProvider;
-import org.apache.activemq.artemis.core.paging.cursor.impl.PagePositionImpl;
-import org.apache.activemq.artemis.core.paging.impl.Page;
 import org.apache.activemq.artemis.core.persistence.OperationContext;
+import org.apache.activemq.artemis.core.persistence.impl.journal.AckDescribe;
 import org.apache.activemq.artemis.core.persistence.impl.journal.DescribeJournal;
 import org.apache.activemq.artemis.core.persistence.impl.journal.DescribeJournal.ReferenceDescribe;
 import org.apache.activemq.artemis.core.persistence.impl.journal.JournalRecordIds;
-import org.apache.activemq.artemis.core.persistence.impl.journal.JournalStorageManager.AckDescribe;
 import org.apache.activemq.artemis.core.persistence.impl.journal.OperationContextImpl;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.Queue;
@@ -111,7 +108,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       final int PAGE_SIZE = 10 * 1024;
 
-      HashMap<String, AddressSettings> map = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> map = new HashMap<>();
 
       AddressSettings value = new AddressSettings();
       map.put(ADDRESS.toString(), value);
@@ -793,7 +790,7 @@ public class PagingTest extends ActiveMQTestBase {
       producer.close();
       session.start();
 
-      long timeout = System.currentTimeMillis() + 5000;
+      long timeout = System.currentTimeMillis() + 10000;
 
       // I want the buffer full to make sure there are pending messages on the server's side
       while (System.currentTimeMillis() < timeout && cons.getBufferSize() < 1000 && cons2.getBufferSize() < 1000) {
@@ -829,7 +826,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Pair<List<RecordInfo>, List<PreparedTransactionInfo>> journalData = loadMessageJournal(config);
 
-      HashSet<Long> deletedQueueReferences = new HashSet<Long>();
+      HashSet<Long> deletedQueueReferences = new HashSet<>();
 
       for (RecordInfo info : journalData.getA()) {
          if (info.getUserRecordType() == JournalRecordIds.ADD_REF) {
@@ -961,7 +958,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       assertEquals(numberOfMessages, getMessageCount(queue));
 
-      LinkedList<Xid> xids = new LinkedList<Xid>();
+      LinkedList<Xid> xids = new LinkedList<>();
 
       int msgReceived = 0;
       for (int i = 0; i < numberOfTX; i++) {
@@ -1492,11 +1489,11 @@ public class PagingTest extends ActiveMQTestBase {
          }
       }
 
-      ArrayList<RecordInfo> records = new ArrayList<RecordInfo>();
+      ArrayList<RecordInfo> records = new ArrayList<>();
 
-      List<PreparedTransactionInfo> list = new ArrayList<PreparedTransactionInfo>();
+      List<PreparedTransactionInfo> list = new ArrayList<>();
 
-      JournalImpl jrn = new JournalImpl(config.getJournalFileSize(), 2, 0, 0, new NIOSequentialFileFactory(server.getConfiguration().getJournalLocation(), 1), "activemq-data", "amq", 1);
+      JournalImpl jrn = new JournalImpl(config.getJournalFileSize(), 2, 2, 0, 0, new NIOSequentialFileFactory(server.getConfiguration().getJournalLocation(), 1), "activemq-data", "amq", 1);
       jrn.start();
       jrn.load(records, list, null);
 
@@ -1510,32 +1507,6 @@ public class PagingTest extends ActiveMQTestBase {
       }
 
       jrn.stop();
-
-      server = createServer(true, config, PagingTest.PAGE_SIZE, PagingTest.PAGE_MAX, new HashMap<String, AddressSettings>());
-
-      server.start();
-
-      Page pg = server.getPagingManager().getPageStore(ADDRESS).getCurrentPage();
-
-      pg.open();
-
-      List<PagedMessage> msgs = pg.read(server.getStorageManager());
-
-      assertTrue(msgs.size() > 0);
-
-      pg.close();
-
-      long[] queues = new long[]{server.locateQueue(new SimpleString("q1")).getID(), server.locateQueue(new SimpleString("q2")).getID()};
-
-      for (long q : queues) {
-         for (int i = 0; i < msgs.size(); i++) {
-            server.getStorageManager().storeCursorAcknowledge(q, new PagePositionImpl(pg.getPageId(), i));
-         }
-      }
-
-      server.stop();
-
-      locator = createInVMNonHALocator().setBlockOnNonDurableSend(true).setBlockOnDurableSend(true).setBlockOnAcknowledge(true);
 
       server = createServer(true, config, PagingTest.PAGE_SIZE, PagingTest.PAGE_MAX, new HashMap<String, AddressSettings>());
 
@@ -1556,9 +1527,6 @@ public class PagingTest extends ActiveMQTestBase {
 
       Queue q1 = server.locateQueue(new SimpleString("q1"));
       Queue q2 = server.locateQueue(new SimpleString("q2"));
-
-      System.err.println("isComplete = " + q1.getPageSubscription().isComplete(619) + " on queue " + q1.getID());
-      System.err.println("isComplete = " + q2.getPageSubscription().isComplete(619) + " on queue " + q2.getID());
 
       q1.getPageSubscription().cleanupEntries(false);
       q2.getPageSubscription().cleanupEntries(false);
@@ -3128,7 +3096,7 @@ public class PagingTest extends ActiveMQTestBase {
    public void testDropMessages() throws Exception {
       clearDataRecreateServerDirs();
 
-      HashMap<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> settings = new HashMap<>();
 
       AddressSettings set = new AddressSettings();
       set.setAddressFullMessagePolicy(AddressFullMessagePolicy.DROP);
@@ -3165,7 +3133,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       session.start();
 
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 5; i++) {
          ClientMessage message2 = consumer.receive(PagingTest.RECEIVE_TIMEOUT);
 
          Assert.assertNotNull(message2);
@@ -3186,7 +3154,7 @@ public class PagingTest extends ActiveMQTestBase {
          producer.send(message);
       }
 
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 5; i++) {
          ClientMessage message2 = consumer.receive(PagingTest.RECEIVE_TIMEOUT);
 
          Assert.assertNotNull(message2);
@@ -3217,7 +3185,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       session.start();
 
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 5; i++) {
          ClientMessage message2 = consumer.receive(PagingTest.RECEIVE_TIMEOUT);
 
          Assert.assertNotNull(message2);
@@ -3238,7 +3206,7 @@ public class PagingTest extends ActiveMQTestBase {
    public void testDropMessagesExpiring() throws Exception {
       clearDataRecreateServerDirs();
 
-      HashMap<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> settings = new HashMap<>();
 
       AddressSettings set = new AddressSettings();
       set.setAddressFullMessagePolicy(AddressFullMessagePolicy.DROP);
@@ -3268,6 +3236,7 @@ public class PagingTest extends ActiveMQTestBase {
 
          int count;
 
+         @Override
          public void onMessage(ClientMessage message1) {
             try {
                Thread.sleep(1);
@@ -3467,7 +3436,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration configuration = createDefaultInVMConfig();
 
-      Map<String, AddressSettings> addresses = new HashMap<String, AddressSettings>();
+      Map<String, AddressSettings> addresses = new HashMap<>();
 
       addresses.put("#", new AddressSettings());
 
@@ -3551,7 +3520,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration configuration = createDefaultInVMConfig();
 
-      Map<String, AddressSettings> addresses = new HashMap<String, AddressSettings>();
+      Map<String, AddressSettings> addresses = new HashMap<>();
 
       addresses.put("#", new AddressSettings());
 
@@ -3561,7 +3530,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       addresses.put(PAGED_ADDRESS_A.toString(), pagedDestinationA);
 
-      AddressSettings pagedDestinationB = new AddressSettings().setPageSizeBytes(2024).setMaxSizeBytes(25 * 1024);
+      AddressSettings pagedDestinationB = new AddressSettings().setPageSizeBytes(2024).setMaxSizeBytes(20 * 1024);
 
       addresses.put(PAGED_ADDRESS_B.toString(), pagedDestinationB);
 
@@ -4121,8 +4090,8 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration config = createDefaultInVMConfig().setThreadPoolMaxSize(5).setJournalSyncNonTransactional(false);
 
-      Map<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
-      AddressSettings dla = new AddressSettings().setMaxDeliveryAttempts(5).setDeadLetterAddress(new SimpleString("DLA"));
+      Map<String, AddressSettings> settings = new HashMap<>();
+      AddressSettings dla = new AddressSettings().setMaxDeliveryAttempts(5).setDeadLetterAddress(new SimpleString("DLA")).setRedeliveryDelay(0);
       settings.put(ADDRESS.toString(), dla);
 
       server = createServer(true, config, PagingTest.PAGE_SIZE, PagingTest.PAGE_MAX, settings);
@@ -4139,15 +4108,16 @@ public class PagingTest extends ActiveMQTestBase {
 
          locator.setBlockOnNonDurableSend(true);
          locator.setBlockOnDurableSend(true);
-         locator.setBlockOnAcknowledge(true);
 
          sf = locator.createSessionFactory();
 
          session = sf.createSession(false, false, false);
 
          session.createQueue(ADDRESS, ADDRESS, true);
-
          session.createQueue("DLA", "DLA", true);
+
+         Queue serverQueue = server.locateQueue(ADDRESS);
+         Queue serverQueueDLA = server.locateQueue(SimpleString.toSimpleString("DLA"));
 
          PagingStore pgStoreAddress = server.getPagingManager().getPageStore(ADDRESS);
          pgStoreAddress.startPaging();
@@ -4183,8 +4153,6 @@ public class PagingTest extends ActiveMQTestBase {
                assertNotNull(msg);
 
                msg.acknowledge();
-
-               assertEquals("str" + msgNr, msg.getStringProperty("id"));
 
                for (int j = 0; j < messageSize; j++) {
                   assertEquals(getSamplebyte(j), msg.getBodyBuffer().readByte());
@@ -4308,7 +4276,7 @@ public class PagingTest extends ActiveMQTestBase {
 
          pgStoreAddress = server.getPagingManager().getPageStore(ADDRESS);
 
-         pgStoreAddress.getCursorProvider().getSubscription(server.locateQueue(ADDRESS).getID()).cleanupEntries(false);
+         pgStoreAddress.getCursorProvider().getSubscription(serverQueue.getID()).cleanupEntries(false);
 
          pgStoreAddress.getCursorProvider().cleanup();
 
@@ -4338,7 +4306,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration config = createDefaultInVMConfig().setMessageExpiryScanPeriod(500).setJournalSyncNonTransactional(false);
 
-      Map<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+      Map<String, AddressSettings> settings = new HashMap<>();
       AddressSettings dla = new AddressSettings().setMaxDeliveryAttempts(5).setDeadLetterAddress(new SimpleString("DLA")).setExpiryAddress(new SimpleString("DLA"));
       settings.put(ADDRESS.toString(), dla);
 
@@ -4480,7 +4448,7 @@ public class PagingTest extends ActiveMQTestBase {
 
          Configuration config = createDefaultInVMConfig();
 
-         HashMap<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+         HashMap<String, AddressSettings> settings = new HashMap<>();
 
          AddressSettings set = new AddressSettings();
          set.setAddressFullMessagePolicy(AddressFullMessagePolicy.FAIL);
@@ -4562,7 +4530,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration config = createDefaultInVMConfig();
 
-      HashMap<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> settings = new HashMap<>();
 
       AddressSettings set = new AddressSettings();
       set.setAddressFullMessagePolicy(AddressFullMessagePolicy.FAIL);
@@ -4636,7 +4604,7 @@ public class PagingTest extends ActiveMQTestBase {
 
       Configuration config = createDefaultInVMConfig();
 
-      HashMap<String, AddressSettings> settings = new HashMap<String, AddressSettings>();
+      HashMap<String, AddressSettings> settings = new HashMap<>();
 
       AddressSettings set = new AddressSettings();
       set.setAddressFullMessagePolicy(AddressFullMessagePolicy.FAIL);
@@ -4835,6 +4803,7 @@ public class PagingTest extends ActiveMQTestBase {
 
             consumerQ3.setMessageHandler(new MessageHandler() {
 
+               @Override
                public void onMessage(ClientMessage message) {
                   System.out.println("Received an unexpected message");
                   consumerQ3Msgs.incrementAndGet();
@@ -5463,39 +5432,49 @@ public class PagingTest extends ActiveMQTestBase {
          this.pageUp = pageUp;
       }
 
+      @Override
       public void onError(int errorCode, String errorMessage) {
       }
 
+      @Override
       public void done() {
       }
 
+      @Override
       public void storeLineUp() {
       }
 
+      @Override
       public boolean waitCompletion(long timeout) throws Exception {
          return false;
       }
 
+      @Override
       public void waitCompletion() throws Exception {
 
       }
 
+      @Override
       public void replicationLineUp() {
 
       }
 
+      @Override
       public void replicationDone() {
 
       }
 
+      @Override
       public void pageSyncLineUp() {
          pageUp.countDown();
       }
 
+      @Override
       public void pageSyncDone() {
          pageDone.countDown();
       }
 
+      @Override
       public void executeOnCompletion(IOCallback runnable) {
 
       }

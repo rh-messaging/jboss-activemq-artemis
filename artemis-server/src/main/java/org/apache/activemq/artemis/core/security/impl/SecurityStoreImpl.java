@@ -16,6 +16,7 @@
  */
 package org.apache.activemq.artemis.core.security.impl;
 
+import javax.security.cert.X509Certificate;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -34,6 +35,7 @@ import org.apache.activemq.artemis.core.server.management.NotificationService;
 import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
 import org.apache.activemq.artemis.core.settings.HierarchicalRepositoryChangeListener;
 import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManager;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManager2;
 import org.apache.activemq.artemis.utils.ConcurrentHashSet;
 import org.apache.activemq.artemis.utils.TypedProperties;
 
@@ -53,7 +55,7 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
 
    private final ActiveMQSecurityManager securityManager;
 
-   private final ConcurrentMap<String, ConcurrentHashSet<SimpleString>> cache = new ConcurrentHashMap<String, ConcurrentHashSet<SimpleString>>();
+   private final ConcurrentMap<String, ConcurrentHashSet<SimpleString>> cache = new ConcurrentHashMap<>();
 
    private final long invalidationInterval;
 
@@ -96,11 +98,13 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
       return securityEnabled;
    }
 
+   @Override
    public void stop() {
       securityRepository.unRegisterListener(this);
    }
 
-   public void authenticate(final String user, final String password) throws Exception {
+   @Override
+   public void authenticate(final String user, final String password, X509Certificate[] certificates) throws Exception {
       if (securityEnabled) {
 
          if (managementClusterUser.equals(user)) {
@@ -120,22 +124,30 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
             }
          }
 
-         if (!securityManager.validateUser(user, password)) {
+         boolean userIsValid = false;
+
+         if (securityManager instanceof ActiveMQSecurityManager2) {
+            userIsValid = ((ActiveMQSecurityManager2)securityManager).validateUser(user, password, certificates);
+         }
+         else {
+            userIsValid = securityManager.validateUser(user, password);
+         }
+
+         if (!userIsValid) {
             if (notificationService != null) {
                TypedProperties props = new TypedProperties();
-
-               props.putSimpleStringProperty(ManagementHelper.HDR_USER, SimpleString.toSimpleString(user));
 
                Notification notification = new Notification(null, CoreNotificationType.SECURITY_AUTHENTICATION_VIOLATION, props);
 
                notificationService.sendNotification(notification);
             }
 
-            throw ActiveMQMessageBundle.BUNDLE.unableToValidateUser(user);
+            throw ActiveMQMessageBundle.BUNDLE.unableToValidateUser();
          }
       }
    }
 
+   @Override
    public void check(final SimpleString address,
                      final CheckType checkType,
                      final SecurityAuth session) throws Exception {
@@ -159,7 +171,16 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
             return;
          }
 
-         if (!securityManager.validateUserAndRole(user, session.getPassword(), roles, checkType)) {
+         final boolean validated;
+         if (securityManager instanceof ActiveMQSecurityManager2) {
+            final ActiveMQSecurityManager2 securityManager2 = (ActiveMQSecurityManager2) securityManager;
+            validated = securityManager2.validateUserAndRole(user, session.getPassword(), roles, checkType, saddress, session.getRemotingConnection());
+         }
+         else {
+            validated = securityManager.validateUserAndRole(user, session.getPassword(), roles, checkType);
+         }
+
+         if (!validated) {
             if (notificationService != null) {
                TypedProperties props = new TypedProperties();
 
@@ -175,7 +196,7 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
             throw ActiveMQMessageBundle.BUNDLE.userNoPermissions(session.getUsername(), checkType, saddress);
          }
          // if we get here we're granted, add to the cache
-         ConcurrentHashSet<SimpleString> set = new ConcurrentHashSet<SimpleString>();
+         ConcurrentHashSet<SimpleString> set = new ConcurrentHashSet<>();
          ConcurrentHashSet<SimpleString> act = cache.putIfAbsent(user + "." + checkType.name(), set);
          if (act != null) {
             set = act;
@@ -185,6 +206,7 @@ public class SecurityStoreImpl implements SecurityStore, HierarchicalRepositoryC
       }
    }
 
+   @Override
    public void onChange() {
       invalidateCache();
    }

@@ -16,7 +16,6 @@
  */
 package org.apache.activemq.artemis.core.protocol.core.impl;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +24,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import io.netty.channel.ChannelPipeline;
 import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
+import org.apache.activemq.artemis.api.core.ActiveMQBuffers;
 import org.apache.activemq.artemis.api.core.BaseInterceptor;
 import org.apache.activemq.artemis.api.core.Interceptor;
 import org.apache.activemq.artemis.api.core.Pair;
@@ -98,6 +98,11 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
       this.outgoingInterceptors.addAll(getFactory().filterInterceptors(outgoing));
    }
 
+   @Override
+   public boolean acceptsNoHandshake() {
+      return false;
+   }
+
    /**
     * no need to implement this now
     *
@@ -108,6 +113,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
       return null;
    }
 
+   @Override
    public ConnectionEntry createConnectionEntry(final Acceptor acceptorUsed, final Connection connection) {
       final Configuration config = server.getConfiguration();
 
@@ -138,7 +144,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
       return entry;
    }
 
-   private final Map<String, ServerSessionPacketHandler> sessionHandlers = new ConcurrentHashMap<String, ServerSessionPacketHandler>();
+   private final Map<String, ServerSessionPacketHandler> sessionHandlers = new ConcurrentHashMap<>();
 
    ServerSessionPacketHandler getSessionHandler(final String sessionName) {
       return sessionHandlers.get(sessionName);
@@ -148,10 +154,12 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
       sessionHandlers.put(name, handler);
    }
 
+   @Override
    public void removeHandler(final String name) {
       sessionHandlers.remove(name);
    }
 
+   @Override
    public void handleBuffer(RemotingConnection connection, ActiveMQBuffer buffer) {
    }
 
@@ -162,23 +170,25 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
 
    @Override
    public boolean isProtocol(byte[] array) {
-      String frameStart = new String(array, StandardCharsets.US_ASCII);
-      return frameStart.startsWith("ACTIVEMQ");
+      return isArtemis(ActiveMQBuffers.wrappedBuffer(array));
    }
 
    @Override
    public void handshake(NettyServerConnection connection, ActiveMQBuffer buffer) {
       //if we are not an old client then handshake
-      if (buffer.getByte(0) == 'A' &&
+      if (isArtemis(buffer)) {
+         buffer.readBytes(7);
+      }
+   }
+
+   private boolean isArtemis(ActiveMQBuffer buffer) {
+      return buffer.getByte(0) == 'A' &&
          buffer.getByte(1) == 'R' &&
          buffer.getByte(2) == 'T' &&
          buffer.getByte(3) == 'E' &&
          buffer.getByte(4) == 'M' &&
          buffer.getByte(5) == 'I' &&
-         buffer.getByte(6) == 'S') {
-         //todo add some handshaking
-         buffer.readBytes(7);
-      }
+         buffer.getByte(6) == 'S';
    }
 
    @Override
@@ -206,6 +216,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
          this.rc = rc;
       }
 
+      @Override
       public void handlePacket(final Packet packet) {
          if (packet.getType() == PacketImpl.PING) {
             Ping ping = (Ping) packet;
@@ -236,6 +247,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
                      // may come from a channel itself
                      // What could cause deadlocks
                      entry.connectionExecutor.execute(new Runnable() {
+                        @Override
                         public void run() {
                            if (channel0.supports(PacketImpl.CLUSTER_TOPOLOGY_V3)) {
                               channel0.send(new ClusterTopologyChangeMessage_V3(topologyMember.getUniqueEventID(), nodeID, topologyMember.getBackupGroupName(), topologyMember.getScaleDownGroupName(), connectorPair, last));
@@ -263,6 +275,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
                   // What could cause deadlocks
                   try {
                      entry.connectionExecutor.execute(new Runnable() {
+                        @Override
                         public void run() {
                            if (channel0.supports(PacketImpl.CLUSTER_TOPOLOGY_V2)) {
                               channel0.send(new ClusterTopologyChangeMessage_V2(uniqueEventID, nodeID));
@@ -289,6 +302,7 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
                acceptorUsed.getClusterConnection().addClusterTopologyListener(listener);
 
                rc.addCloseListener(new CloseListener() {
+                  @Override
                   public void connectionClosed() {
                      acceptorUsed.getClusterConnection().removeClusterTopologyListener(listener);
                   }
@@ -298,9 +312,10 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
                // if not clustered, we send a single notification to the client containing the node-id where the server is connected to
                // This is done this way so Recovery discovery could also use the node-id for non-clustered setups
                entry.connectionExecutor.execute(new Runnable() {
+                  @Override
                   public void run() {
                      String nodeId = server.getNodeID().toString();
-                     Pair<TransportConfiguration, TransportConfiguration> emptyConfig = new Pair<TransportConfiguration, TransportConfiguration>(null, null);
+                     Pair<TransportConfiguration, TransportConfiguration> emptyConfig = new Pair<>(null, null);
                      if (channel0.supports(PacketImpl.CLUSTER_TOPOLOGY_V2)) {
                         channel0.send(new ClusterTopologyChangeMessage_V2(System.currentTimeMillis(), nodeId, null, emptyConfig, true));
                      }
@@ -316,9 +331,9 @@ public class CoreProtocolManager implements ProtocolManager<Interceptor> {
       private Pair<TransportConfiguration, TransportConfiguration> getPair(TransportConfiguration conn,
                                                                            boolean isBackup) {
          if (isBackup) {
-            return new Pair<TransportConfiguration, TransportConfiguration>(null, conn);
+            return new Pair<>(null, conn);
          }
-         return new Pair<TransportConfiguration, TransportConfiguration>(conn, null);
+         return new Pair<>(conn, null);
       }
    }
 }

@@ -170,7 +170,7 @@ public final class ActiveMQRaUtils {
     * @return hash-table with configuration option pairs
     */
    public static Hashtable<String, String> parseHashtableConfig(final String config) {
-      Hashtable<String, String> hashtable = new Hashtable<String, String>();
+      Hashtable<String, String> hashtable = new Hashtable<>();
 
       String[] topElements = config.split(";");
 
@@ -188,12 +188,12 @@ public final class ActiveMQRaUtils {
    }
 
    public static List<Map<String, Object>> parseConfig(final String config) {
-      List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+      List<Map<String, Object>> result = new ArrayList<>();
 
       String[] topElements = config.split(",");
 
       for (String topElement : topElements) {
-         HashMap<String, Object> map = new HashMap<String, Object>();
+         HashMap<String, Object> map = new HashMap<>();
          result.add(map);
 
          String[] elements = topElement.split(";");
@@ -213,7 +213,7 @@ public final class ActiveMQRaUtils {
    }
 
    public static List<String> parseConnectorConnectorConfig(String config) {
-      List<String> res = new ArrayList<String>();
+      List<String> res = new ArrayList<>();
 
       String[] elements = config.split(",");
 
@@ -231,6 +231,7 @@ public final class ActiveMQRaUtils {
     */
    public static JChannel locateJGroupsChannel(final String locatorClass, final String name) {
       return AccessController.doPrivileged(new PrivilegedAction<JChannel>() {
+         @Override
          public JChannel run() {
             try {
                ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -254,6 +255,7 @@ public final class ActiveMQRaUtils {
     */
    private static Object safeInitNewInstance(final String className) {
       return AccessController.doPrivileged(new PrivilegedAction<Object>() {
+         @Override
          public Object run() {
             ClassLoader loader = getClass().getClassLoader();
             try {

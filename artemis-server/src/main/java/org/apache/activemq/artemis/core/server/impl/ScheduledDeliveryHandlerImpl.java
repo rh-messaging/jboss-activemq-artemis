@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.core.filter.Filter;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.MessageReference;
@@ -53,6 +54,7 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
       this.scheduledExecutor = scheduledExecutor;
    }
 
+   @Override
    public boolean checkAndSchedule(final MessageReference ref, final boolean tail) {
       long deliveryTime = ref.getScheduledDeliveryTime();
 
@@ -76,14 +78,16 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
       }
    }
 
+   @Override
    public int getScheduledCount() {
       synchronized (scheduledReferences) {
          return scheduledReferences.size();
       }
    }
 
+   @Override
    public List<MessageReference> getScheduledReferences() {
-      List<MessageReference> refs = new LinkedList<MessageReference>();
+      List<MessageReference> refs = new LinkedList<>();
 
       synchronized (scheduledReferences) {
          for (RefScheduled ref : scheduledReferences) {
@@ -93,8 +97,9 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
       return refs;
    }
 
-   public List<MessageReference> cancel(final Filter filter) {
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+   @Override
+   public List<MessageReference> cancel(final Filter filter) throws ActiveMQException {
+      List<MessageReference> refs = new ArrayList<>();
 
       synchronized (scheduledReferences) {
          Iterator<RefScheduled> iter = scheduledReferences.iterator();
@@ -110,7 +115,8 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
       return refs;
    }
 
-   public MessageReference removeReferenceWithID(final long id) {
+   @Override
+   public MessageReference removeReferenceWithID(final long id) throws ActiveMQException {
       synchronized (scheduledReferences) {
          Iterator<RefScheduled> iter = scheduledReferences.iterator();
          while (iter.hasNext()) {
@@ -163,8 +169,9 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
          this.deliveryTime = deliveryTime;
       }
 
+      @Override
       public void run() {
-         HashMap<Queue, LinkedList<MessageReference>> refs = new HashMap<Queue, LinkedList<MessageReference>>();
+         HashMap<Queue, LinkedList<MessageReference>> refs = new HashMap<>();
 
          runnables.remove(deliveryTime);
 
@@ -206,7 +213,7 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
                LinkedList<MessageReference> references = refs.get(reference.getQueue());
 
                if (references == null) {
-                  references = new LinkedList<MessageReference>();
+                  references = new LinkedList<>();
                   refs.put(reference.getQueue(), references);
                }
 
@@ -228,7 +235,7 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
             if (trace) {
                ActiveMQServerLogger.LOGGER.trace("Delivering " + list.size() + " elements on list to queue " + queue);
             }
-            queue.addHead(list);
+            queue.addHead(list, true);
          }
 
          // Just to speed up GC
@@ -260,6 +267,7 @@ public class ScheduledDeliveryHandlerImpl implements ScheduledDeliveryHandler {
 
    static class MessageReferenceComparator implements Comparator<RefScheduled> {
 
+      @Override
       public int compare(RefScheduled ref1, RefScheduled ref2) {
          long diff = ref1.getRef().getScheduledDeliveryTime() - ref2.getRef().getScheduledDeliveryTime();
 

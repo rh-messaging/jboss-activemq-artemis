@@ -41,7 +41,7 @@ public class KahaDBStoreTest {
    ActiveMQMessage message;
    ProducerId producerId = new ProducerId("1.1.1");
    private static final int MESSAGE_COUNT = 2000;
-   private Vector<Throwable> exceptions = new Vector<Throwable>();
+   private Vector<Throwable> exceptions = new Vector<>();
 
    @Before
    public void initStore() throws Exception {
@@ -70,6 +70,7 @@ public class KahaDBStoreTest {
       for (int i = 0; i < MESSAGE_COUNT; i++) {
          final int id = ++i;
          executor.execute(new Runnable() {
+            @Override
             public void run() {
                try {
                   Message msg = message.copy();
@@ -87,6 +88,7 @@ public class KahaDBStoreTest {
       for (int i = 0; i < MESSAGE_COUNT; i++) {
          final int id = ++i;
          executor2.execute(new Runnable() {
+            @Override
             public void run() {
                try {
                   MessageAck ack = new MessageAck();

@@ -32,7 +32,7 @@ public class SelectorTest {
 
    class MockMessage implements Filterable {
 
-      HashMap<String, Object> properties = new HashMap<String, Object>();
+      HashMap<String, Object> properties = new HashMap<>();
       private String text;
       private Object destination;
       private String messageId;
@@ -91,6 +91,7 @@ public class SelectorTest {
          properties.put(key, value);
       }
 
+      @Override
       public <T> T getBodyAs(Class<T> type) throws FilterException {
          if (type == String.class) {
             return type.cast(text);
@@ -98,6 +99,7 @@ public class SelectorTest {
          return null;
       }
 
+      @Override
       public Object getProperty(String name) {
          if ("JMSType".equals(name)) {
             return type;
@@ -112,6 +114,7 @@ public class SelectorTest {
          return destination;
       }
 
+      @Override
       public Object getLocalConnectionId() {
          return localConnectionId;
       }
@@ -446,6 +449,22 @@ public class SelectorTest {
    }
 
    @Test
+   public void testSpecialEscapeLiteral() throws Exception {
+      MockMessage message = createMessage();
+      assertSelector(message, "foo LIKE '%_%' ESCAPE '%'", true);
+      assertSelector(message, "endingUnderScore LIKE '_D7xlJIQn$_' ESCAPE '$'", true);
+      assertSelector(message, "endingUnderScore LIKE '_D7xlJIQn__' ESCAPE '_'", true);
+      assertSelector(message, "endingUnderScore LIKE '%D7xlJIQn%_' ESCAPE '%'", true);
+      assertSelector(message, "endingUnderScore LIKE '%D7xlJIQn%'  ESCAPE '%'", true);
+
+      // literal '%' at the end, no match
+      assertSelector(message, "endingUnderScore LIKE '%D7xlJIQn%%'  ESCAPE '%'", false);
+
+      assertSelector(message, "endingUnderScore LIKE '_D7xlJIQn\\_' ESCAPE '\\'", true);
+      assertSelector(message, "endingUnderScore LIKE '%D7xlJIQn\\_' ESCAPE '\\'", true);
+   }
+
+   @Test
    public void testInvalidSelector() throws Exception {
       MockMessage message = createMessage();
       assertInvalidSelector(message, "3+5");
@@ -463,16 +482,17 @@ public class SelectorTest {
       message.setByteProperty("byteProp", (byte) 123);
       message.setByteProperty("byteProp2", (byte) 33);
       message.setShortProperty("shortProp", (short) 123);
-      message.setIntProperty("intProp", (int) 123);
-      message.setLongProperty("longProp", (long) 123);
-      message.setFloatProperty("floatProp", (float) 123);
-      message.setDoubleProperty("doubleProp", (double) 123);
+      message.setIntProperty("intProp", 123);
+      message.setLongProperty("longProp", 123);
+      message.setFloatProperty("floatProp", 123);
+      message.setDoubleProperty("doubleProp", 123);
 
       message.setIntProperty("rank", 123);
       message.setIntProperty("version", 2);
       message.setStringProperty("quote", "'In God We Trust'");
       message.setStringProperty("foo", "_foo");
       message.setStringProperty("punctuation", "!#$&()*+,-./:;<=>?@[\\]^`{|}~");
+      message.setStringProperty("endingUnderScore", "XD7xlJIQn_");
       message.setBooleanProperty("trueProp", true);
       message.setBooleanProperty("falseProp", false);
       return message;

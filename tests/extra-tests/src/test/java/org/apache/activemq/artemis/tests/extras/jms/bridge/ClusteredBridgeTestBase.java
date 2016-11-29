@@ -66,7 +66,7 @@ public abstract class ClusteredBridgeTestBase extends ActiveMQTestBase {
 
    private static int index = 0;
 
-   protected Map<String, ServerGroup> groups = new HashMap<String, ServerGroup>();
+   protected Map<String, ServerGroup> groups = new HashMap<>();
 
    @Override
    @Before
@@ -137,11 +137,11 @@ public abstract class ClusteredBridgeTestBase extends ActiveMQTestBase {
       }
 
       public void create() throws Exception {
-         Map<String, Object> params0 = new HashMap<String, Object>();
+         Map<String, Object> params0 = new HashMap<>();
          params0.put(TransportConstants.SERVER_ID_PROP_NAME, id);
          liveConnector = new TransportConfiguration(INVM_CONNECTOR_FACTORY, params0, "in-vm-live");
 
-         Map<String, Object> params = new HashMap<String, Object>();
+         Map<String, Object> params = new HashMap<>();
          params.put(TransportConstants.SERVER_ID_PROP_NAME, id + ID_OFFSET);
          backupConnector = new TransportConfiguration(INVM_CONNECTOR_FACTORY, params, "in-vm-backup");
 
@@ -188,6 +188,7 @@ public abstract class ClusteredBridgeTestBase extends ActiveMQTestBase {
 
       public ConnectionFactoryFactory getConnectionFactoryFactory() {
          ConnectionFactoryFactory cff = new ConnectionFactoryFactory() {
+            @Override
             public ConnectionFactory createConnectionFactory() throws Exception {
                ActiveMQConnectionFactory cf = ActiveMQJMSClient.createConnectionFactoryWithHA(JMSFactoryType.XA_CF, liveConnector);
                cf.getServerLocator().setReconnectAttempts(-1);
@@ -201,6 +202,7 @@ public abstract class ClusteredBridgeTestBase extends ActiveMQTestBase {
       public DestinationFactory getDestinationFactory(final String queueName) {
 
          DestinationFactory destFactory = new DestinationFactory() {
+            @Override
             public Destination createDestination() throws Exception {
                return (Destination) liveContext.lookup("/queue/" + queueName);
             }

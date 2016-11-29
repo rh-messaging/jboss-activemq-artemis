@@ -52,6 +52,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.Acceptor;
 import org.apache.activemq.artemis.spi.core.remoting.Connection;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.artemis.utils.ConcurrentHashSet;
 import org.apache.activemq.command.ActiveMQDestination;
 import org.apache.activemq.command.ActiveMQMessage;
@@ -108,9 +109,9 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
 
    private final long creationTime;
 
-   private final List<FailureListener> failureListeners = new CopyOnWriteArrayList<FailureListener>();
+   private final List<FailureListener> failureListeners = new CopyOnWriteArrayList<>();
 
-   private final List<CloseListener> closeListeners = new CopyOnWriteArrayList<CloseListener>();
+   private final List<CloseListener> closeListeners = new CopyOnWriteArrayList<>();
 
    private boolean destroyed = false;
 
@@ -132,20 +133,20 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
 
    private final ReentrantReadWriteLock serviceLock = new ReentrantReadWriteLock();
 
-   protected final List<Command> dispatchQueue = new LinkedList<Command>();
+   protected final List<Command> dispatchQueue = new LinkedList<>();
 
    private boolean inServiceException;
 
    private final AtomicBoolean asyncException = new AtomicBoolean(false);
 
-   private final Map<ConsumerId, AMQConsumerBrokerExchange> consumerExchanges = new HashMap<ConsumerId, AMQConsumerBrokerExchange>();
-   private final Map<ProducerId, AMQProducerBrokerExchange> producerExchanges = new HashMap<ProducerId, AMQProducerBrokerExchange>();
+   private final Map<ConsumerId, AMQConsumerBrokerExchange> consumerExchanges = new HashMap<>();
+   private final Map<ProducerId, AMQProducerBrokerExchange> producerExchanges = new HashMap<>();
 
    private ConnectionState state;
 
-   private final Set<ActiveMQDestination> tempQueues = new ConcurrentHashSet<ActiveMQDestination>();
+   private final Set<ActiveMQDestination> tempQueues = new ConcurrentHashSet<>();
 
-   private Map<TransactionId, TransactionInfo> txMap = new ConcurrentHashMap<TransactionId, TransactionInfo>();
+   private Map<TransactionId, TransactionInfo> txMap = new ConcurrentHashMap<>();
 
    private volatile AMQSession advisorySession;
 
@@ -160,6 +161,10 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
       this.creationTime = System.currentTimeMillis();
    }
 
+   @Override
+   public boolean isWritable(ReadyListener callback) {
+      return transportConnection.isWritable(callback);
+   }
 
    // SecurityAuth implementation
    @Override
@@ -230,7 +235,7 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
             }
             else {
                try {
-                  response = ((Command) command).visit(this);
+                  response = command.visit(this);
                }
                catch (Exception e) {
                   if (responseRequired) {
@@ -341,7 +346,7 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
 
    @Override
    public List<CloseListener> removeCloseListeners() {
-      List<CloseListener> ret = new ArrayList<CloseListener>(closeListeners);
+      List<CloseListener> ret = new ArrayList<>(closeListeners);
 
       closeListeners.clear();
 
@@ -364,7 +369,7 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
 
    @Override
    public List<FailureListener> removeFailureListeners() {
-      List<FailureListener> ret = new ArrayList<FailureListener>(failureListeners);
+      List<FailureListener> ret = new ArrayList<>(failureListeners);
 
       failureListeners.clear();
 
@@ -426,6 +431,11 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
    }
 
    @Override
+   public RemotingConnection getRemotingConnection() {
+      return this;
+   }
+
+   @Override
    public Connection getTransportConnection() {
       return this.transportConnection;
    }
@@ -459,7 +469,7 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
    }
 
    private void callFailureListeners(final ActiveMQException me) {
-      final List<FailureListener> listenersClone = new ArrayList<FailureListener>(failureListeners);
+      final List<FailureListener> listenersClone = new ArrayList<>(failureListeners);
 
       for (final FailureListener listener : listenersClone) {
          try {
@@ -475,7 +485,7 @@ public class OpenWireConnection implements RemotingConnection, CommandVisitor, S
    }
 
    private void callClosingListeners() {
-      final List<CloseListener> listenersClone = new ArrayList<CloseListener>(closeListeners);
+      final List<CloseListener> listenersClone = new ArrayList<>(closeListeners);
 
       for (final CloseListener listener : listenersClone) {
          try {

@@ -22,7 +22,10 @@ import org.apache.activemq.artemis.api.core.BaseInterceptor;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.spi.core.protocol.AbstractProtocolManagerFactory;
 import org.apache.activemq.artemis.spi.core.protocol.ProtocolManager;
+import org.apache.activemq.artemis.spi.core.protocol.ProtocolManagerFactory;
+import org.osgi.service.component.annotations.Component;
 
+@Component(service = ProtocolManagerFactory.class)
 public class StompProtocolManagerFactory extends AbstractProtocolManagerFactory<StompFrameInterceptor> {
 
    public static final String STOMP_PROTOCOL_NAME = "STOMP";
@@ -31,6 +34,7 @@ public class StompProtocolManagerFactory extends AbstractProtocolManagerFactory<
 
    private static final String[] SUPPORTED_PROTOCOLS = {STOMP_PROTOCOL_NAME};
 
+   @Override
    public ProtocolManager createProtocolManager(final ActiveMQServer server,
                                                 final List<StompFrameInterceptor> incomingInterceptors,
                                                 List<StompFrameInterceptor> outgoingInterceptors) {

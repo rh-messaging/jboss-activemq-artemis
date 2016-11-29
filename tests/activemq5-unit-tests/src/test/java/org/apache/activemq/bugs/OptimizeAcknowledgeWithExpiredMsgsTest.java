@@ -114,7 +114,7 @@ public class OptimizeAcknowledgeWithExpiredMsgsTest {
       MessageConsumer consumer = session.createConsumer(destination);
 
       final MyMessageListener listener = new MyMessageListener();
-      connection.setExceptionListener((ExceptionListener) listener);
+      connection.setExceptionListener(listener);
 
       // ***** Producer Code *****
       MessageProducer producer = session.createProducer(destination);
@@ -287,6 +287,7 @@ public class OptimizeAcknowledgeWithExpiredMsgsTest {
 
       private AtomicInteger counter = new AtomicInteger(0);
 
+      @Override
       public void onMessage(final Message message) {
          try {
             LOG.trace("Got Message " + message.getJMSMessageID());
@@ -300,6 +301,7 @@ public class OptimizeAcknowledgeWithExpiredMsgsTest {
          return counter.get();
       }
 
+      @Override
       public synchronized void onException(JMSException ex) {
          LOG.error("JMS Exception occurred.  Shutting down client.");
       }

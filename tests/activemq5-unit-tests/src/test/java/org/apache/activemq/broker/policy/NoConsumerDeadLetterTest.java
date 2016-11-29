@@ -25,7 +25,6 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.jms.Topic;
 
-import org.apache.activemq.ActiveMQConnection;
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.advisory.AdvisorySupport;
 import org.apache.activemq.broker.BrokerService;
@@ -39,12 +38,15 @@ import org.apache.activemq.command.ActiveMQDestination;
 public class NoConsumerDeadLetterTest extends DeadLetterTestSupport {
 
    // lets disable the inapplicable tests
+   @Override
    public void testDurableQueueMessage() throws Exception {
    }
 
+   @Override
    public void testDurableTopicMessage() throws Exception {
    }
 
+   @Override
    protected void doTest() throws Exception {
       makeDlqConsumer();
       sendMessages();
@@ -57,8 +59,8 @@ public class NoConsumerDeadLetterTest extends DeadLetterTestSupport {
 
    public void testConsumerReceivesMessages() throws Exception {
       this.topic = false;
-      ActiveMQConnectionFactory factory = (ActiveMQConnectionFactory) createConnectionFactory();
-      connection = (ActiveMQConnection) factory.createConnection();
+      ActiveMQConnectionFactory factory = createConnectionFactory();
+      connection = factory.createConnection();
       connection.start();
 
       Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
@@ -76,8 +78,8 @@ public class NoConsumerDeadLetterTest extends DeadLetterTestSupport {
 
       Thread.sleep(1000);
 
-      factory = (ActiveMQConnectionFactory) createConnectionFactory();
-      connection = (ActiveMQConnection) factory.createConnection();
+      factory = createConnectionFactory();
+      connection = factory.createConnection();
       connection.start();
 
       session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
@@ -87,6 +89,7 @@ public class NoConsumerDeadLetterTest extends DeadLetterTestSupport {
       assertNotNull("Message not received", received);
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       BrokerService broker = super.createBroker();
 
@@ -101,6 +104,7 @@ public class NoConsumerDeadLetterTest extends DeadLetterTestSupport {
       return broker;
    }
 
+   @Override
    protected Destination createDlqDestination() {
       if (this.topic) {
          return AdvisorySupport.getNoTopicConsumersAdvisoryTopic((ActiveMQDestination) getDestination());

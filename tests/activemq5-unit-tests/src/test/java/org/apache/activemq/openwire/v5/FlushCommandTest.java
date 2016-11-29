@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class FlushCommandTest extends BaseCommandTestSupport {
 
    public static FlushCommandTest SINGLETON = new FlushCommandTest();
 
+   @Override
    public Object createObject() throws Exception {
       FlushCommand info = new FlushCommand();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       FlushCommand info = (FlushCommand) object;

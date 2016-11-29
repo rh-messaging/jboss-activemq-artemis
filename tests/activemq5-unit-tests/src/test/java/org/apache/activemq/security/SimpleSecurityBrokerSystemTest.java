@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
 import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 
@@ -148,21 +147,23 @@ public class SimpleSecurityBrokerSystemTest extends SecurityTestSupport {
 
    public static class SimpleAuthenticationFactory implements BrokerPlugin {
 
+      @Override
       public Broker installPlugin(Broker broker) {
 
-         HashMap<String, String> u = new HashMap<String, String>();
+         HashMap<String, String> u = new HashMap<>();
          u.put("system", "manager");
          u.put("user", "password");
          u.put("guest", "password");
 
-         Map<String, Set<Principal>> groups = new HashMap<String, Set<Principal>>();
-         groups.put("system", new HashSet<Principal>(Arrays.asList(new Principal[]{ADMINS, USERS})));
-         groups.put("user", new HashSet<Principal>(Arrays.asList(new Principal[]{USERS})));
-         groups.put("guest", new HashSet<Principal>(Arrays.asList(new Principal[]{GUESTS})));
+         Map<String, Set<Principal>> groups = new HashMap<>();
+         groups.put("system", new HashSet<>(Arrays.asList(new Principal[]{ADMINS, USERS})));
+         groups.put("user", new HashSet<>(Arrays.asList(new Principal[]{USERS})));
+         groups.put("guest", new HashSet<>(Arrays.asList(new Principal[]{GUESTS})));
 
          return new SimpleAuthenticationBroker(broker, u, groups);
       }
 
+      @Override
       public String toString() {
          return "SimpleAuthenticationBroker";
       }
@@ -176,6 +177,7 @@ public class SimpleSecurityBrokerSystemTest extends SecurityTestSupport {
       addCombinationValues("authenticationPlugin", new Object[]{new SimpleAuthenticationFactory(), new JaasAuthenticationPlugin()});
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       BrokerService broker = super.createBroker();
       broker.setPopulateJMSXUserID(true);

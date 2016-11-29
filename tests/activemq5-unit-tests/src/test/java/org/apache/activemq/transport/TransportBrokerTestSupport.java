@@ -25,17 +25,18 @@ import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.broker.BrokerTest;
 import org.apache.activemq.broker.StubConnection;
 import org.apache.activemq.broker.TransportConnector;
-import org.apache.activemq.broker.artemiswrapper.ArtemisBrokerWrapper;
 
 public abstract class TransportBrokerTestSupport extends BrokerTest {
 
    protected TransportConnector connector;
-   private ArrayList<StubConnection> connections = new ArrayList<StubConnection>();
+   private ArrayList<StubConnection> connections = new ArrayList<>();
 
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       BrokerService service = super.createBroker();
       connector = service.addConnector(getBindLocation());
@@ -44,6 +45,7 @@ public abstract class TransportBrokerTestSupport extends BrokerTest {
 
    protected abstract String getBindLocation();
 
+   @Override
    protected void tearDown() throws Exception {
       for (Iterator<StubConnection> iter = connections.iterator(); iter.hasNext(); ) {
          StubConnection connection = iter.next();
@@ -60,6 +62,7 @@ public abstract class TransportBrokerTestSupport extends BrokerTest {
       return new URI(getBindLocation());
    }
 
+   @Override
    protected StubConnection createConnection() throws Exception {
       URI bindURI = getBindURI();
 

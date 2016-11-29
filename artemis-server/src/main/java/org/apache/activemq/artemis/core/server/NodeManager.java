@@ -51,9 +51,11 @@ public abstract class NodeManager implements ActiveMQComponent {
 
    public abstract void awaitLiveNode() throws Exception;
 
+   public abstract void awaitLiveStatus() throws Exception;
+
    public abstract void startBackup() throws Exception;
 
-   public abstract void startLiveNode() throws Exception;
+   public abstract ActivateCallback startLiveNode() throws Exception;
 
    public abstract void pauseLiveServer() throws Exception;
 
@@ -63,10 +65,12 @@ public abstract class NodeManager implements ActiveMQComponent {
 
    // --------------------------------------------------------------------
 
+   @Override
    public synchronized void start() throws Exception {
       isStarted = true;
    }
 
+   @Override
    public boolean isStarted() {
       return isStarted;
    }
@@ -171,9 +175,6 @@ public abstract class NodeManager implements ActiveMQComponent {
             }
             ActiveMQServerLogger.LOGGER.nodeManagerCantOpenFile(e, serverLockFile);
             throw e;
-         }
-         if (!fileCreated) {
-            throw new IllegalStateException("Unable to create server lock file");
          }
       }
 

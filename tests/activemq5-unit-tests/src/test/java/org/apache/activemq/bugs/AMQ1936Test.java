@@ -33,6 +33,7 @@ import javax.jms.QueueConnectionFactory;
 import javax.jms.QueueReceiver;
 import javax.jms.QueueSender;
 import javax.jms.QueueSession;
+import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.naming.NamingException;
 
@@ -75,7 +76,6 @@ public class AMQ1936Test extends TestCase {
       broker.setDeleteAllMessagesOnStartup(true);
       broker.start();
       connectionFactory = new ActiveMQConnectionFactory("vm://test");
-      ;
    }
 
    @Override
@@ -117,7 +117,7 @@ public class AMQ1936Test extends TestCase {
          // Create the queue connection
          queueConnection = connectionFactory.createQueueConnection();
 
-         session = queueConnection.createQueueSession(false, QueueSession.AUTO_ACKNOWLEDGE);
+         session = queueConnection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
          queue = session.createQueue(TEST_QUEUE_NAME);
          sender = session.createSender(queue);
          sender.setDeliveryMode(DeliveryMode.PERSISTENT);
@@ -148,7 +148,7 @@ public class AMQ1936Test extends TestCase {
    }
 
    public void testForDuplicateMessages() throws Exception {
-      final ConcurrentHashMap<String, String> messages = new ConcurrentHashMap<String, String>();
+      final ConcurrentHashMap<String, String> messages = new ConcurrentHashMap<>();
       final Object lock = new Object();
       final CountDownLatch duplicateSignal = new CountDownLatch(1);
       final AtomicInteger messageCount = new AtomicInteger(0);
@@ -234,7 +234,7 @@ public class AMQ1936Test extends TestCase {
 
                queueConnection = connectionFactory.createQueueConnection();
                // create a transacted session
-               session = queueConnection.createQueueSession(TRANSACTED_RECEIVE, QueueSession.AUTO_ACKNOWLEDGE);
+               session = queueConnection.createQueueSession(TRANSACTED_RECEIVE, Session.AUTO_ACKNOWLEDGE);
                queue = session.createQueue(TEST_QUEUE_NAME);
                receiver = session.createReceiver(queue);
 

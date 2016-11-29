@@ -118,7 +118,7 @@ public class MessageGroupingConnectionFactoryTest extends ActiveMQTestBase {
 
    private static class DummyMessageHandler implements MessageHandler {
 
-      ArrayList<ClientMessage> list = new ArrayList<ClientMessage>();
+      ArrayList<ClientMessage> list = new ArrayList<>();
 
       private final CountDownLatch latch;
 
@@ -129,6 +129,7 @@ public class MessageGroupingConnectionFactoryTest extends ActiveMQTestBase {
          this.acknowledge = acknowledge;
       }
 
+      @Override
       public void onMessage(final ClientMessage message) {
          list.add(message);
          if (acknowledge) {

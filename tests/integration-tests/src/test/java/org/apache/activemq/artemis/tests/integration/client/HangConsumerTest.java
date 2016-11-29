@@ -35,11 +35,12 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.core.config.Configuration;
+import org.apache.activemq.artemis.core.config.impl.SecurityConfiguration;
 import org.apache.activemq.artemis.core.filter.Filter;
-import org.apache.activemq.artemis.core.journal.RecordInfo;
 import org.apache.activemq.artemis.core.io.SequentialFileFactory;
-import org.apache.activemq.artemis.core.journal.impl.JournalImpl;
 import org.apache.activemq.artemis.core.io.nio.NIOSequentialFileFactory;
+import org.apache.activemq.artemis.core.journal.RecordInfo;
+import org.apache.activemq.artemis.core.journal.impl.JournalImpl;
 import org.apache.activemq.artemis.core.paging.cursor.PageSubscription;
 import org.apache.activemq.artemis.core.persistence.OperationContext;
 import org.apache.activemq.artemis.core.persistence.StorageManager;
@@ -62,8 +63,9 @@ import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.protocol.SessionCallback;
 import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQJAASSecurityManager;
 import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManager;
-import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManagerImpl;
+import org.apache.activemq.artemis.spi.core.security.jaas.InVMLoginModule;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.utils.ExecutorFactory;
 import org.apache.activemq.artemis.utils.ReusableLatch;
@@ -93,7 +95,7 @@ public class HangConsumerTest extends ActiveMQTestBase {
 
       Configuration config = createDefaultInVMConfig().setMessageExpiryScanPeriod(10);
 
-      ActiveMQSecurityManager securityManager = new ActiveMQSecurityManagerImpl();
+      ActiveMQSecurityManager securityManager = new ActiveMQJAASSecurityManager(InVMLoginModule.class.getName(), new SecurityConfiguration());
 
       server = addServer(new MyActiveMQServer(config, ManagementFactory.getPlatformMBeanServer(), securityManager));
 
@@ -425,11 +427,11 @@ public class HangConsumerTest extends ActiveMQTestBase {
 
             SequentialFileFactory messagesFF = new NIOSequentialFileFactory(server.getConfiguration().getBindingsLocation(), null, 1);
 
-            JournalImpl messagesJournal = new JournalImpl(1024 * 1024, 2, 0, 0, messagesFF, "activemq-bindings", "bindings", 1);
+            JournalImpl messagesJournal = new JournalImpl(1024 * 1024, 2, 2, 0, 0, messagesFF, "activemq-bindings", "bindings", 1);
 
             messagesJournal.start();
 
-            LinkedList<RecordInfo> infos = new LinkedList<RecordInfo>();
+            LinkedList<RecordInfo> infos = new LinkedList<>();
 
             messagesJournal.load(infos, null, null);
 
@@ -481,6 +483,12 @@ public class HangConsumerTest extends ActiveMQTestBase {
          targetCallback.sendProducerCreditsMessage(credits, address);
       }
 
+      @Override
+      public boolean isWritable(ReadyListener callback) {
+         return true;
+      }
+
+      @Override
       public void sendProducerCreditsFailMessage(int credits, SimpleString address) {
          targetCallback.sendProducerCreditsFailMessage(credits, address);
       }
@@ -533,22 +541,6 @@ public class HangConsumerTest extends ActiveMQTestBase {
       @Override
       public void closed() {
          targetCallback.closed();
-      }
-
-      /* (non-Javadoc)
-       * @see SessionCallback#addReadyListener(ReadyListener)
-       */
-      @Override
-      public void addReadyListener(ReadyListener listener) {
-         targetCallback.addReadyListener(listener);
-      }
-
-      /* (non-Javadoc)
-       * @see SessionCallback#removeReadyListener(ReadyListener)
-       */
-      @Override
-      public void removeReadyListener(ReadyListener listener) {
-         targetCallback.removeReadyListener(listener);
       }
 
       @Override

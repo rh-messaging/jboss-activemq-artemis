@@ -32,6 +32,7 @@ public interface PageCache extends SoftValueHashMap.ValueCache {
    /**
     * @return whether this cache is still being updated
     */
+   @Override
    boolean isLive();
 
    /**
@@ -39,17 +40,6 @@ public interface PageCache extends SoftValueHashMap.ValueCache {
     * @return
     */
    PagedMessage getMessage(int messageNumber);
-
-   /**
-    * When the cache is being created,
-    * We need to first read the files before other threads can get messages from this.
-    */
-   void lock();
-
-   /**
-    * You have to call this method within the same thread you called lock
-    */
-   void unlock();
 
    void close();
 

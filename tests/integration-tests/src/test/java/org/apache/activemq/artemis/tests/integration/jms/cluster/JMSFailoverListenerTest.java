@@ -42,7 +42,7 @@ import org.apache.activemq.artemis.tests.integration.jms.server.management.JMSUt
 import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.tests.util.InVMNodeManagerServer;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -90,7 +90,7 @@ public class JMSFailoverListenerTest extends ActiveMQTestBase {
 
    protected ActiveMQServer backupServer;
 
-   protected Map<String, Object> backupParams = new HashMap<String, Object>();
+   protected Map<String, Object> backupParams = new HashMap<>();
 
    private TransportConfiguration backuptc;
 
@@ -337,6 +337,7 @@ public class JMSFailoverListenerTest extends ActiveMQTestBase {
          Assert.assertTrue(eventTypeList.size() >= elements);
       }
 
+      @Override
       public void failoverEvent(FailoverEventType eventType) {
          eventTypeList.add(eventType);
       }

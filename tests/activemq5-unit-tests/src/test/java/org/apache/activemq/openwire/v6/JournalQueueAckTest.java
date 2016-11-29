@@ -17,10 +17,6 @@
  */
 package org.apache.activemq.openwire.v6;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
 import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
@@ -37,12 +33,14 @@ public class JournalQueueAckTest extends DataFileGeneratorTestSupport {
 
    public static JournalQueueAckTest SINGLETON = new JournalQueueAckTest();
 
+   @Override
    public Object createObject() throws Exception {
       JournalQueueAck info = new JournalQueueAck();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       JournalQueueAck info = (JournalQueueAck) object;

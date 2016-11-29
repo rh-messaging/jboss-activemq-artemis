@@ -43,9 +43,9 @@ import io.netty.util.ReferenceCountUtil;
  */
 public class HttpAcceptorHandler extends ChannelDuplexHandler {
 
-   private final BlockingQueue<ResponseHolder> responses = new LinkedBlockingQueue<ResponseHolder>();
+   private final BlockingQueue<ResponseHolder> responses = new LinkedBlockingQueue<>();
 
-   private final BlockingQueue<Runnable> delayedResponses = new LinkedBlockingQueue<Runnable>();
+   private final BlockingQueue<Runnable> delayedResponses = new LinkedBlockingQueue<>();
 
    private final ExecutorService executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, delayedResponses);
 
@@ -135,6 +135,7 @@ public class HttpAcceptorHandler extends ChannelDuplexHandler {
          promise = channel.newPromise();
       }
 
+      @Override
       public void run() {
          ResponseHolder responseHolder = null;
          do {

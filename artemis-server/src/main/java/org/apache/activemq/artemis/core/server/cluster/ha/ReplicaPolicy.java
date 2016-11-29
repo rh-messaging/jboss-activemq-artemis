@@ -33,6 +33,11 @@ public class ReplicaPolicy extends BackupPolicy {
 
    private boolean restartBackup = ActiveMQDefaultConfiguration.isDefaultRestartBackup();
 
+   //used if we create a replicated policy for when we become live.
+   private boolean allowFailback = ActiveMQDefaultConfiguration.isDefaultAllowAutoFailback();
+
+   private long initialReplicationSyncTimeout = ActiveMQDefaultConfiguration.getDefaultInitialReplicationSyncTimeout();
+
    private ReplicatedPolicy replicatedPolicy;
 
    public ReplicaPolicy() {
@@ -43,15 +48,15 @@ public class ReplicaPolicy extends BackupPolicy {
                         String groupName,
                         boolean restartBackup,
                         boolean allowFailback,
-                        long failbackDelay,
+                        long initialReplicationSyncTimeout,
                         ScaleDownPolicy scaleDownPolicy) {
       this.clusterName = clusterName;
       this.maxSavedReplicatedJournalsSize = maxSavedReplicatedJournalsSize;
       this.groupName = groupName;
       this.restartBackup = restartBackup;
+      this.allowFailback = allowFailback;
+      this.initialReplicationSyncTimeout = initialReplicationSyncTimeout;
       this.scaleDownPolicy = scaleDownPolicy;
-      //todo check default settings
-      replicatedPolicy = new ReplicatedPolicy(false, allowFailback, failbackDelay, groupName, clusterName, this);
    }
 
    public ReplicaPolicy(String clusterName,
@@ -81,6 +86,9 @@ public class ReplicaPolicy extends BackupPolicy {
    }
 
    public ReplicatedPolicy getReplicatedPolicy() {
+      if (replicatedPolicy == null) {
+         replicatedPolicy = new ReplicatedPolicy(false, allowFailback, initialReplicationSyncTimeout, groupName, clusterName, this);
+      }
       return replicatedPolicy;
    }
 
@@ -91,6 +99,7 @@ public class ReplicaPolicy extends BackupPolicy {
    /*
    * these 2 methods are the same, leaving both as the second is correct but the first is needed until more refactoring is done
    * */
+   @Override
    public String getBackupGroupName() {
       return groupName;
    }
@@ -103,10 +112,12 @@ public class ReplicaPolicy extends BackupPolicy {
       this.groupName = groupName;
    }
 
+   @Override
    public boolean isRestartBackup() {
       return restartBackup;
    }
 
+   @Override
    public void setRestartBackup(boolean restartBackup) {
       this.restartBackup = restartBackup;
    }
@@ -119,6 +130,31 @@ public class ReplicaPolicy extends BackupPolicy {
    @Override
    public boolean canScaleDown() {
       return scaleDownPolicy != null;
+   }
+
+   public boolean isAllowFailback() {
+      return allowFailback;
+   }
+
+   public void setAllowFailback(boolean allowFailback) {
+      this.allowFailback = allowFailback;
+   }
+
+   @Deprecated
+   public long getFailbackDelay() {
+      return -1;
+   }
+
+   @Deprecated
+   public void setFailbackDelay(long failbackDelay) {
+   }
+
+   public long getInitialReplicationSyncTimeout() {
+      return initialReplicationSyncTimeout;
+   }
+
+   public void setInitialReplicationSyncTimeout(long initialReplicationSyncTimeout) {
+      this.initialReplicationSyncTimeout = initialReplicationSyncTimeout;
    }
 
    @Override

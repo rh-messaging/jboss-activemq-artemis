@@ -52,6 +52,7 @@ public class ConcurrentDestinationCreationTest extends org.apache.activemq.TestS
       broker.stop();
    }
 
+   @Override
    protected ActiveMQConnectionFactory createConnectionFactory() throws Exception {
       return new ActiveMQConnectionFactory(broker.getTransportConnectors().get(0).getPublishableConnectString() + "?jms.watchTopicAdvisories=false&jms.closeTimeout=35000");
    }
@@ -69,7 +70,7 @@ public class ConcurrentDestinationCreationTest extends org.apache.activemq.TestS
 
    public void testSendRateWithActivatingConsumers() throws Exception {
 
-      final Vector<Throwable> exceptions = new Vector<Throwable>();
+      final Vector<Throwable> exceptions = new Vector<>();
       final int jobs = 50;
       final int destinationCount = 10;
       final CountDownLatch allDone = new CountDownLatch(jobs);

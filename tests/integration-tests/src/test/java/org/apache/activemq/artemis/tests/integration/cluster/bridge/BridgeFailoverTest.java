@@ -18,6 +18,7 @@ package org.apache.activemq.artemis.tests.integration.cluster.bridge;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.activemq.artemis.api.core.client.ClientConsumer;
 import org.apache.activemq.artemis.api.core.client.ClientMessage;
@@ -42,7 +43,7 @@ public class BridgeFailoverTest extends MultiServerTestBase {
       String TARGET_QUEUE = "noCluster.targetQueue";
 
       bridgeConfiguration.setHA(true);
-      List<String> connectors = new ArrayList<String>();
+      List<String> connectors = new ArrayList<>();
       connectors.add("target-4");
       connectors.add("backup-4");
       bridgeConfiguration.setName("Bridge-for-test");
@@ -108,7 +109,7 @@ public class BridgeFailoverTest extends MultiServerTestBase {
       String TARGET_QUEUE = "noCluster.targetQueue";
 
       bridgeConfiguration.setHA(true);
-      List<String> connectors = new ArrayList<String>();
+      List<String> connectors = new ArrayList<>();
       connectors.add("target-4");
       connectors.add("backup-4");
       bridgeConfiguration.setName("Bridge-for-test");
@@ -177,7 +178,7 @@ public class BridgeFailoverTest extends MultiServerTestBase {
 
       locatorConsumer.close();
 
-      waitForServerToStart(backupServers[4]);
+      assertTrue("Backup server didn't activate.", backupServers[4].waitForActivation(5, TimeUnit.SECONDS));
 
       for (int i = 100; i < 200; i++) {
          ClientMessage msg = session.createMessage(true);
@@ -213,7 +214,7 @@ public class BridgeFailoverTest extends MultiServerTestBase {
       String TARGET_QUEUE = "noCluster.targetQueue";
 
       bridgeConfiguration.setHA(true);
-      List<String> connectors = new ArrayList<String>();
+      List<String> connectors = new ArrayList<>();
       connectors.add("target-4");
       connectors.add("backup-4");
       bridgeConfiguration.setName("Bridge-for-test");

@@ -155,10 +155,12 @@ public class QueueImplTest extends ActiveMQTestBase {
       Assert.assertNull(queue.getFilter());
 
       Filter filter = new Filter() {
+         @Override
          public boolean match(final ServerMessage message) {
             return false;
          }
 
+         @Override
          public SimpleString getFilterString() {
             return null;
          }
@@ -213,7 +215,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -256,7 +258,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -299,7 +301,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -357,7 +359,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs1 = new ArrayList<MessageReference>();
+      List<MessageReference> refs1 = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -367,17 +369,17 @@ public class QueueImplTest extends ActiveMQTestBase {
          queue.addTail(ref);
       }
 
-      LinkedList<MessageReference> refs2 = new LinkedList<MessageReference>();
+      LinkedList<MessageReference> refs2 = new LinkedList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i + numMessages);
 
          refs2.addFirst(ref);
 
-         queue.addHead(ref);
+         queue.addHead(ref, false);
       }
 
-      List<MessageReference> refs3 = new ArrayList<MessageReference>();
+      List<MessageReference> refs3 = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i + 2 * numMessages);
@@ -393,7 +395,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       queue.deliverNow();
 
-      List<MessageReference> allRefs = new ArrayList<MessageReference>();
+      List<MessageReference> allRefs = new ArrayList<>();
 
       allRefs.addAll(refs2);
       allRefs.addAll(refs1);
@@ -408,7 +410,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -561,7 +563,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       queue.pause();
 
@@ -614,7 +616,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -671,7 +673,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 20;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -684,7 +686,7 @@ public class QueueImplTest extends ActiveMQTestBase {
       Assert.assertEquals(numMessages, getMessageCount(queue));
 
       Iterator<MessageReference> iterator = queue.iterator();
-      List<MessageReference> list = new ArrayList<MessageReference>();
+      List<MessageReference> list = new ArrayList<>();
       while (iterator.hasNext()) {
          list.add(iterator.next());
       }
@@ -710,7 +712,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       queue.addConsumer(consumer);
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       MessageReference ref1 = generateReference(queue, 1);
 
@@ -785,7 +787,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -824,7 +826,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -887,7 +889,7 @@ public class QueueImplTest extends ActiveMQTestBase {
       QueueImpl queue = getTemporaryQueue();
 
       final int numMessages = 10;
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -954,7 +956,7 @@ public class QueueImplTest extends ActiveMQTestBase {
          queue.addConsumer(consumer);
       }
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       MessageReference ref1 = generateReference(queue, 1);
 
@@ -1037,9 +1039,9 @@ public class QueueImplTest extends ActiveMQTestBase {
       MessageReference messageReference = generateReference(queue, 1);
       MessageReference messageReference2 = generateReference(queue, 2);
       MessageReference messageReference3 = generateReference(queue, 3);
-      queue.addHead(messageReference);
+      queue.addHead(messageReference, false);
       queue.addTail(messageReference2);
-      queue.addHead(messageReference3);
+      queue.addHead(messageReference3, false);
 
       Assert.assertEquals(0, consumer.getReferences().size());
       queue.addConsumer(consumer);
@@ -1069,9 +1071,9 @@ public class QueueImplTest extends ActiveMQTestBase {
       MessageReference messageReference = generateReference(queue, 1);
       MessageReference messageReference2 = generateReference(queue, 2);
       MessageReference messageReference3 = generateReference(queue, 3);
-      queue.addHead(messageReference);
-      queue.addHead(messageReference2);
-      queue.addHead(messageReference3);
+      queue.addHead(messageReference, false);
+      queue.addHead(messageReference2, false);
+      queue.addHead(messageReference3, false);
       Assert.assertEquals(queue.getReference(2), messageReference2);
 
    }
@@ -1082,9 +1084,9 @@ public class QueueImplTest extends ActiveMQTestBase {
       MessageReference messageReference = generateReference(queue, 1);
       MessageReference messageReference2 = generateReference(queue, 2);
       MessageReference messageReference3 = generateReference(queue, 3);
-      queue.addHead(messageReference);
-      queue.addHead(messageReference2);
-      queue.addHead(messageReference3);
+      queue.addHead(messageReference, false);
+      queue.addHead(messageReference2, false);
+      queue.addHead(messageReference3, false);
       Assert.assertNull(queue.getReference(5));
 
    }
@@ -1103,7 +1105,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -1164,7 +1166,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       final int numMessages = 10;
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       for (int i = 0; i < numMessages; i++) {
          MessageReference ref = generateReference(queue, i);
@@ -1226,9 +1228,10 @@ public class QueueImplTest extends ActiveMQTestBase {
          this.first = first;
       }
 
+      @Override
       public void run() {
          if (first) {
-            queue.addHead(messageReference);
+            queue.addHead(messageReference, false);
          }
          else {
             queue.addTail(messageReference);

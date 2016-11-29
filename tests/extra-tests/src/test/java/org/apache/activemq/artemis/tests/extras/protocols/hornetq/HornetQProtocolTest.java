@@ -17,6 +17,10 @@
 
 package org.apache.activemq.artemis.tests.extras.protocols.hornetq;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
@@ -29,14 +33,12 @@ import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactor
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.hornetq.api.core.client.HornetQClient;
+import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 public class HornetQProtocolTest extends ActiveMQTestBase {
 
@@ -44,9 +46,10 @@ public class HornetQProtocolTest extends ActiveMQTestBase {
 
    private static final Logger LOG = LoggerFactory.getLogger(HornetQProtocolTest.class);
 
+   @Override
    @Before
    public void setUp() throws Exception {
-      HashMap<String, Object> params = new HashMap<String, Object>();
+      HashMap<String, Object> params = new HashMap<>();
       params.put(org.hornetq.core.remoting.impl.netty.TransportConstants.PORT_PROP_NAME, "" + 5445);
       params.put(org.hornetq.core.remoting.impl.netty.TransportConstants.PROTOCOLS_PROP_NAME, "HORNETQ");
       TransportConfiguration transportConfig = new TransportConfiguration(NETTY_ACCEPTOR_FACTORY, params);
@@ -57,6 +60,14 @@ public class HornetQProtocolTest extends ActiveMQTestBase {
       LOG.info("Added connector {} to broker", "HornetQ");
       server.start();
       waitForServerToStart(server);
+   }
+
+
+   @Override
+   @After
+   public void tearDown() throws Exception {
+      org.hornetq.core.client.impl.ServerLocatorImpl.clearThreadPools();
+      super.tearDown();
    }
 
    @Test
@@ -83,12 +94,46 @@ public class HornetQProtocolTest extends ActiveMQTestBase {
       }
 
       ClientMessage coreMessage1 = coreConsumer.receive(1000);
+      System.err.println("Messages::==" + coreMessage1);
       assertTrue(coreMessage1.containsProperty(Message.HDR_DUPLICATE_DETECTION_ID));
       coreSession.close();
 
       // Check that HornetQ Properties are correctly transformed from then to HornetQ properties
       org.hornetq.api.core.client.ClientMessage hqMessage1 = hqConsumer.receive(1000);
       assertTrue(hqMessage1.containsProperty(org.hornetq.api.core.Message.HDR_DUPLICATE_DETECTION_ID));
+
+      hqSession.close();
+   }
+
+   @Test
+   public void testLargeMessagesOverHornetQClients() throws Exception {
+      org.hornetq.api.core.client.ClientSession hqSession = createHQClientSession();
+
+      // Create Queue
+      String queueName = "test.hq.queue";
+      hqSession.createQueue(queueName, queueName, true);
+
+      // HornetQ Client Objects
+      hqSession.start();
+      org.hornetq.api.core.client.ClientProducer hqProducer = hqSession.createProducer(queueName);
+      org.hornetq.api.core.client.ClientConsumer hqConsumer = hqSession.createConsumer(queueName);
+
+      for (int i = 0; i < 2; i++) {
+         org.hornetq.api.core.client.ClientMessage hqMessage = hqSession.createMessage(true);
+         hqMessage.setBodyInputStream(ActiveMQTestBase.createFakeLargeStream(10 * 1024));
+         hqProducer.send(hqMessage);
+      }
+      hqSession.commit();
+
+      for (int i = 0; i < 2; i++) {
+         org.hornetq.api.core.client.ClientMessage coreMessage1 = hqConsumer.receive(1000);
+         coreMessage1.acknowledge();
+         System.err.println("Messages::==" + coreMessage1);
+         for (int j = 0; j < 10 * 1024; j++) {
+            Assert.assertEquals(ActiveMQTestBase.getSamplebyte(j), coreMessage1.getBodyBuffer().readByte());
+         }
+
+      }
 
       hqSession.close();
    }
@@ -158,21 +203,21 @@ public class HornetQProtocolTest extends ActiveMQTestBase {
    }
 
    private org.hornetq.api.core.client.ClientMessage createHQTestMessage(org.hornetq.api.core.client.ClientSession session) {
-      org.hornetq.api.core.client.ClientMessage message = session.createMessage(false);
+      org.hornetq.api.core.client.ClientMessage message = session.createMessage(true);
       String v = UUID.randomUUID().toString();
       message.putStringProperty(org.hornetq.api.core.Message.HDR_DUPLICATE_DETECTION_ID.toString(), v);
       return message;
    }
 
    private ClientMessage createCoreTestMessage(ClientSession session) {
-      ClientMessage message = session.createMessage(false);
+      ClientMessage message = session.createMessage(true);
       String v = UUID.randomUUID().toString();
       message.putStringProperty(org.hornetq.api.core.Message.HDR_DUPLICATE_DETECTION_ID.toString(), v);
       return message;
    }
 
    private org.hornetq.api.core.client.ClientSession createHQClientSession() throws Exception {
-      Map<String, Object> map = new HashMap<String, Object>();
+      Map<String, Object> map = new HashMap<>();
       map.put("host", "localhost");
       map.put("port", 5445);
 
@@ -183,7 +228,7 @@ public class HornetQProtocolTest extends ActiveMQTestBase {
    }
 
    private ClientSession createCoreClientSession() throws Exception {
-      Map<String, Object> map = new HashMap<String, Object>();
+      Map<String, Object> map = new HashMap<>();
       map.put("host", "localhost");
       map.put("port", 61616);
 

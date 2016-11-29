@@ -64,6 +64,7 @@ import org.apache.activemq.artemis.core.persistence.StorageManager;
 import org.apache.activemq.artemis.core.postoffice.PostOffice;
 import org.apache.activemq.artemis.core.remoting.server.RemotingService;
 import org.apache.activemq.artemis.core.security.Role;
+import org.apache.activemq.artemis.core.security.SecurityStore;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.Divert;
 import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
@@ -100,6 +101,8 @@ public class ManagementServiceImpl implements ManagementService {
 
    private PostOffice postOffice;
 
+   private SecurityStore securityStore;
+
    private PagingManager pagingManager;
 
    private StorageManager storageManager;
@@ -124,7 +127,7 @@ public class ManagementServiceImpl implements ManagementService {
 
    private boolean notificationsEnabled;
 
-   private final Set<NotificationListener> listeners = new ConcurrentHashSet<NotificationListener>();
+   private final Set<NotificationListener> listeners = new ConcurrentHashSet<>();
 
    private final ObjectNameBuilder objectNameBuilder;
 
@@ -139,29 +142,34 @@ public class ManagementServiceImpl implements ManagementService {
       managementAddress = configuration.getManagementAddress();
       managementNotificationAddress = configuration.getManagementNotificationAddress();
 
-      registry = new ConcurrentHashMap<String, Object>();
+      registry = new ConcurrentHashMap<>();
       broadcaster = new NotificationBroadcasterSupport();
       notificationsEnabled = true;
-      objectNameBuilder = ObjectNameBuilder.create(configuration.getJMXDomain());
+      objectNameBuilder = ObjectNameBuilder.create(configuration.getJMXDomain(), configuration.getName(), configuration.isJMXUseBrokerName());
    }
 
    // Public --------------------------------------------------------
 
    // ManagementService implementation -------------------------
 
+   @Override
    public ObjectNameBuilder getObjectNameBuilder() {
       return objectNameBuilder;
    }
 
+   @Override
    public MessageCounterManager getMessageCounterManager() {
       return messageCounterManager;
    }
 
+   @Override
    public void setStorageManager(final StorageManager storageManager) {
       this.storageManager = storageManager;
    }
 
+   @Override
    public ActiveMQServerControlImpl registerServer(final PostOffice postOffice,
+                                                   final SecurityStore securityStore,
                                                    final StorageManager storageManager1,
                                                    final Configuration configuration,
                                                    final HierarchicalRepository<AddressSettings> addressSettingsRepository,
@@ -174,6 +182,7 @@ public class ManagementServiceImpl implements ManagementService {
                                                    final PagingManager pagingManager,
                                                    final boolean backup) throws Exception {
       this.postOffice = postOffice;
+      this.securityStore = securityStore;
       this.addressSettingsRepository = addressSettingsRepository;
       this.securityRepository = securityRepository;
       this.storageManager = storageManager1;
@@ -192,12 +201,14 @@ public class ManagementServiceImpl implements ManagementService {
       return messagingServerControl;
    }
 
+   @Override
    public synchronized void unregisterServer() throws Exception {
       ObjectName objectName = objectNameBuilder.getActiveMQServerObjectName();
       unregisterFromJMX(objectName);
       unregisterFromRegistry(ResourceNames.CORE_SERVER);
    }
 
+   @Override
    public synchronized void registerAddress(final SimpleString address) throws Exception {
       ObjectName objectName = objectNameBuilder.getAddressObjectName(address);
       AddressControlImpl addressControl = new AddressControlImpl(address, postOffice, pagingManager, storageManager, securityRepository);
@@ -211,6 +222,7 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public synchronized void unregisterAddress(final SimpleString address) throws Exception {
       ObjectName objectName = objectNameBuilder.getAddressObjectName(address);
 
@@ -218,10 +230,11 @@ public class ManagementServiceImpl implements ManagementService {
       unregisterFromRegistry(ResourceNames.CORE_ADDRESS + address);
    }
 
+   @Override
    public synchronized void registerQueue(final Queue queue,
                                           final SimpleString address,
                                           final StorageManager storageManager) throws Exception {
-      QueueControlImpl queueControl = new QueueControlImpl(queue, address.toString(), postOffice, storageManager, addressSettingsRepository);
+      QueueControlImpl queueControl = new QueueControlImpl(queue, address.toString(), postOffice, storageManager, securityStore, addressSettingsRepository);
       if (messageCounterManager != null) {
          MessageCounter counter = new MessageCounter(queue.getName().toString(), null, queue, false, queue.isDurable(), messageCounterManager.getMaxDayCount());
          queueControl.setMessageCounter(counter);
@@ -236,6 +249,7 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public synchronized void unregisterQueue(final SimpleString name, final SimpleString address) throws Exception {
       ObjectName objectName = objectNameBuilder.getQueueObjectName(address, name);
       unregisterFromJMX(objectName);
@@ -243,6 +257,7 @@ public class ManagementServiceImpl implements ManagementService {
       messageCounterManager.unregisterMessageCounter(name.toString());
    }
 
+   @Override
    public synchronized void registerDivert(final Divert divert, final DivertConfiguration config) throws Exception {
       ObjectName objectName = objectNameBuilder.getDivertObjectName(divert.getUniqueName().toString());
       DivertControl divertControl = new DivertControlImpl(divert, storageManager, config);
@@ -254,12 +269,14 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public synchronized void unregisterDivert(final SimpleString name) throws Exception {
       ObjectName objectName = objectNameBuilder.getDivertObjectName(name.toString());
       unregisterFromJMX(objectName);
       unregisterFromRegistry(ResourceNames.CORE_DIVERT + name);
    }
 
+   @Override
    public synchronized void registerAcceptor(final Acceptor acceptor,
                                              final TransportConfiguration configuration) throws Exception {
       ObjectName objectName = objectNameBuilder.getAcceptorObjectName(configuration.getName());
@@ -268,8 +285,9 @@ public class ManagementServiceImpl implements ManagementService {
       registerInRegistry(ResourceNames.CORE_ACCEPTOR + configuration.getName(), control);
    }
 
+   @Override
    public void unregisterAcceptors() {
-      List<String> acceptors = new ArrayList<String>();
+      List<String> acceptors = new ArrayList<>();
       synchronized (this) {
          for (String resourceName : registry.keySet()) {
             if (resourceName.startsWith(ResourceNames.CORE_ACCEPTOR)) {
@@ -295,6 +313,7 @@ public class ManagementServiceImpl implements ManagementService {
       unregisterFromRegistry(ResourceNames.CORE_ACCEPTOR + name);
    }
 
+   @Override
    public synchronized void registerBroadcastGroup(final BroadcastGroup broadcastGroup,
                                                    final BroadcastGroupConfiguration configuration) throws Exception {
       broadcastGroup.setNotificationService(this);
@@ -304,12 +323,14 @@ public class ManagementServiceImpl implements ManagementService {
       registerInRegistry(ResourceNames.CORE_BROADCAST_GROUP + configuration.getName(), control);
    }
 
+   @Override
    public synchronized void unregisterBroadcastGroup(final String name) throws Exception {
       ObjectName objectName = objectNameBuilder.getBroadcastGroupObjectName(name);
       unregisterFromJMX(objectName);
       unregisterFromRegistry(ResourceNames.CORE_BROADCAST_GROUP + name);
    }
 
+   @Override
    public synchronized void registerBridge(final Bridge bridge,
                                            final BridgeConfiguration configuration) throws Exception {
       bridge.setNotificationService(this);
@@ -319,12 +340,14 @@ public class ManagementServiceImpl implements ManagementService {
       registerInRegistry(ResourceNames.CORE_BRIDGE + configuration.getName(), control);
    }
 
+   @Override
    public synchronized void unregisterBridge(final String name) throws Exception {
       ObjectName objectName = objectNameBuilder.getBridgeObjectName(name);
       unregisterFromJMX(objectName);
       unregisterFromRegistry(ResourceNames.CORE_BRIDGE + name);
    }
 
+   @Override
    public synchronized void registerCluster(final ClusterConnection cluster,
                                             final ClusterConnectionConfiguration configuration) throws Exception {
       ObjectName objectName = objectNameBuilder.getClusterConnectionObjectName(configuration.getName());
@@ -333,12 +356,14 @@ public class ManagementServiceImpl implements ManagementService {
       registerInRegistry(ResourceNames.CORE_CLUSTER_CONNECTION + configuration.getName(), control);
    }
 
+   @Override
    public synchronized void unregisterCluster(final String name) throws Exception {
       ObjectName objectName = objectNameBuilder.getClusterConnectionObjectName(name);
       unregisterFromJMX(objectName);
       unregisterFromRegistry(ResourceNames.CORE_CLUSTER_CONNECTION + name);
    }
 
+   @Override
    public ServerMessage handleMessage(final ServerMessage message) throws Exception {
       // a reply message is sent with the result stored in the message body.
       ServerMessage reply = new ServerMessageImpl(storageManager.generateID(), 512);
@@ -404,13 +429,15 @@ public class ManagementServiceImpl implements ManagementService {
       return reply;
    }
 
+   @Override
    public synchronized Object getResource(final String resourceName) {
       return registry.get(resourceName);
    }
 
+   @Override
    public synchronized Object[] getResources(final Class<?> resourceType) {
-      List<Object> resources = new ArrayList<Object>();
-      Collection<Object> clone = new ArrayList<Object>(registry.values());
+      List<Object> resources = new ArrayList<>();
+      Collection<Object> clone = new ArrayList<>(registry.values());
       for (Object entry : clone) {
          if (resourceType.isAssignableFrom(entry.getClass())) {
             resources.add(entry);
@@ -419,8 +446,9 @@ public class ManagementServiceImpl implements ManagementService {
       return resources.toArray(new Object[resources.size()]);
    }
 
-   private final Set<ObjectName> registeredNames = new HashSet<ObjectName>();
+   private final Set<ObjectName> registeredNames = new HashSet<>();
 
+   @Override
    public void registerInJMX(final ObjectName objectName, final Object managedResource) throws Exception {
       if (!jmxManagementEnabled) {
          return;
@@ -435,12 +463,14 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public synchronized void registerInRegistry(final String resourceName, final Object managedResource) {
       unregisterFromRegistry(resourceName);
 
       registry.put(resourceName, managedResource);
    }
 
+   @Override
    public synchronized void unregisterFromRegistry(final String resourceName) {
       registry.remove(resourceName);
    }
@@ -448,6 +478,7 @@ public class ManagementServiceImpl implements ManagementService {
    // the JMX unregistration is synchronized to avoid race conditions if 2 clients tries to
    // unregister the same resource (e.g. a queue) at the same time since unregisterMBean()
    // will throw an exception if the MBean has already been unregistered
+   @Override
    public void unregisterFromJMX(final ObjectName objectName) throws MBeanRegistrationException, InstanceNotFoundException {
       if (!jmxManagementEnabled) {
          return;
@@ -462,24 +493,29 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public void addNotificationListener(final NotificationListener listener) {
       listeners.add(listener);
    }
 
+   @Override
    public void removeNotificationListener(final NotificationListener listener) {
       listeners.remove(listener);
    }
 
+   @Override
    public SimpleString getManagementAddress() {
       return managementAddress;
    }
 
+   @Override
    public SimpleString getManagementNotificationAddress() {
       return managementNotificationAddress;
    }
 
    // ActiveMQComponent implementation -----------------------------
 
+   @Override
    public void start() throws Exception {
       if (messageCounterEnabled) {
          messageCounterManager.start();
@@ -488,8 +524,9 @@ public class ManagementServiceImpl implements ManagementService {
       started = true;
    }
 
+   @Override
    public synchronized void stop() throws Exception {
-      Set<String> resourceNames = new HashSet<String>(registry.keySet());
+      Set<String> resourceNames = new HashSet<>(registry.keySet());
 
       for (String resourceName : resourceNames) {
          unregisterFromRegistry(resourceName);
@@ -497,7 +534,7 @@ public class ManagementServiceImpl implements ManagementService {
 
       if (jmxManagementEnabled) {
          if (!registeredNames.isEmpty()) {
-            List<String> unexpectedResourceNames = new ArrayList<String>();
+            List<String> unexpectedResourceNames = new ArrayList<>();
             for (String name : resourceNames) {
                // only addresses and queues should still be registered
                if (!(name.startsWith(ResourceNames.CORE_ADDRESS) || name.startsWith(ResourceNames.CORE_QUEUE))) {
@@ -555,10 +592,12 @@ public class ManagementServiceImpl implements ManagementService {
       started = false;
    }
 
+   @Override
    public boolean isStarted() {
       return started;
    }
 
+   @Override
    public void sendNotification(final Notification notification) throws Exception {
       if (isTrace) {
          ActiveMQServerLogger.LOGGER.trace("Sending Notification = " + notification +
@@ -624,6 +663,7 @@ public class ManagementServiceImpl implements ManagementService {
       }
    }
 
+   @Override
    public void enableNotifications(final boolean enabled) {
       notificationsEnabled = enabled;
    }

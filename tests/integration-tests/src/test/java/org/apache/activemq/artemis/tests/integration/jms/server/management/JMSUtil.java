@@ -19,6 +19,7 @@ package org.apache.activemq.artemis.tests.integration.jms.server.management;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import javax.jms.BytesMessage;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
@@ -37,6 +38,7 @@ import java.util.Set;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.tests.integration.cluster.failover.FailoverTestBase;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
@@ -54,7 +56,6 @@ import org.apache.activemq.artemis.core.server.cluster.impl.ClusterConnectionImp
 import org.apache.activemq.artemis.jms.client.ActiveMQConnection;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQJMSConnectionFactory;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 
 public class JMSUtil {
 
@@ -156,6 +157,48 @@ public class JMSUtil {
       return message;
    }
 
+   public static BytesMessage sendByteMessage(final Session session,
+                                                    final Destination destination,
+                                                    final byte[] bytes) throws JMSException {
+      MessageProducer producer = session.createProducer(destination);
+      BytesMessage message = session.createBytesMessage();
+      message.writeBytes(bytes);
+      producer.send(message);
+      return message;
+   }
+
+   public static Message sendMessageWithProperty(final Session session,
+                                                 final Destination destination,
+                                                 final String key,
+                                                 final int value) throws JMSException {
+      MessageProducer producer = session.createProducer(destination);
+      Message message = session.createMessage();
+      message.setIntProperty(key, value);
+      producer.send(message);
+      return message;
+   }
+
+   public static Message sendMessageWithProperty(final Session session,
+                                                 final Destination destination,
+                                                 final String key,
+                                                 final String value) throws JMSException {
+      MessageProducer producer = session.createProducer(destination);
+      Message message = session.createMessage();
+      message.setStringProperty(key, value);
+      producer.send(message);
+      return message;
+   }
+
+   public static Message sendMessageWithReplyTo(final Session session,
+                                                    final Destination destination,
+                                                    final String replyTo) throws JMSException {
+      MessageProducer producer = session.createProducer(destination);
+      Message message = session.createMessage();
+      message.setJMSReplyTo(ActiveMQJMSClient.createQueue(replyTo));
+      producer.send(message);
+      return message;
+   }
+
    public static void consumeMessages(final int expected, final Destination dest) throws JMSException {
       Connection connection = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
       try {
@@ -207,6 +250,7 @@ public class JMSUtil {
             connectionFailed(me, failedOver);
          }
 
+         @Override
          public void beforeReconnect(ActiveMQException exception) {
             System.out.println("MyListener.beforeReconnect");
          }

@@ -73,6 +73,7 @@ public class ManualReconnectionToSingleServerTest extends ActiveMQTestBase {
    private static final int NUM = 20;
 
    private final ExceptionListener exceptionListener = new ExceptionListener() {
+      @Override
       public void onException(final JMSException e) {
          exceptionLatch.countDown();
          disconnect();
@@ -148,7 +149,7 @@ public class ManualReconnectionToSingleServerTest extends ActiveMQTestBase {
 
       configuration.getQueueConfigurations().add(new JMSQueueConfigurationImpl().setName(QUEUE_NAME).setBindings(QUEUE_NAME));
 
-      ArrayList<TransportConfiguration> configs = new ArrayList<TransportConfiguration>();
+      ArrayList<TransportConfiguration> configs = new ArrayList<>();
       configs.add(new TransportConfiguration(NETTY_CONNECTOR_FACTORY));
       ConnectionFactoryConfiguration cfConfig = new ConnectionFactoryConfigurationImpl().setName("cf").setConnectorNames(registerConnectors(server, configs)).setBindings("/cf").setRetryInterval(1000).setReconnectAttempts(-1);
       configuration.getConnectionFactoryConfigurations().add(cfConfig);
@@ -231,6 +232,7 @@ public class ManualReconnectionToSingleServerTest extends ActiveMQTestBase {
 
       private int count = 0;
 
+      @Override
       public void onMessage(final Message msg) {
          count++;
 

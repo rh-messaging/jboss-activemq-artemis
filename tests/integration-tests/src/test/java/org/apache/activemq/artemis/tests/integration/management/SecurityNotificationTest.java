@@ -33,9 +33,9 @@ import org.apache.activemq.artemis.core.security.CheckType;
 import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServers;
-import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManagerImpl;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQJAASSecurityManager;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -81,7 +81,6 @@ public class SecurityNotificationTest extends ActiveMQTestBase {
 
       ClientMessage[] notifications = SecurityNotificationTest.consumeMessages(1, notifConsumer);
       Assert.assertEquals(SECURITY_AUTHENTICATION_VIOLATION.toString(), notifications[0].getObjectProperty(ManagementHelper.HDR_NOTIFICATION_TYPE).toString());
-      Assert.assertEquals(unknownUser, notifications[0].getObjectProperty(ManagementHelper.HDR_USER).toString());
    }
 
    @Test
@@ -91,10 +90,10 @@ public class SecurityNotificationTest extends ActiveMQTestBase {
 
       // guest can not create queue
       Role role = new Role("roleCanNotCreateQueue", true, true, false, true, false, true, true);
-      Set<Role> roles = new HashSet<Role>();
+      Set<Role> roles = new HashSet<>();
       roles.add(role);
       server.getSecurityRepository().addMatch(address.toString(), roles);
-      ActiveMQSecurityManagerImpl securityManager = (ActiveMQSecurityManagerImpl) server.getSecurityManager();
+      ActiveMQJAASSecurityManager securityManager = (ActiveMQJAASSecurityManager) server.getSecurityManager();
       securityManager.getConfiguration().addRole("guest", "roleCanNotCreateQueue");
 
       SecurityNotificationTest.flush(notifConsumer);
@@ -134,13 +133,13 @@ public class SecurityNotificationTest extends ActiveMQTestBase {
 
       notifQueue = RandomUtil.randomSimpleString();
 
-      ActiveMQSecurityManagerImpl securityManager = (ActiveMQSecurityManagerImpl) server.getSecurityManager();
+      ActiveMQJAASSecurityManager securityManager = (ActiveMQJAASSecurityManager) server.getSecurityManager();
       securityManager.getConfiguration().addUser("admin", "admin");
       securityManager.getConfiguration().addUser("guest", "guest");
       securityManager.getConfiguration().setDefaultUser("guest");
 
       Role role = new Role("notif", true, true, true, true, true, true, true);
-      Set<Role> roles = new HashSet<Role>();
+      Set<Role> roles = new HashSet<>();
       roles.add(role);
       server.getSecurityRepository().addMatch(ActiveMQDefaultConfiguration.getDefaultManagementNotificationAddress().toString(), roles);
 

@@ -191,10 +191,10 @@ public class JournalCrashTest extends ActiveMQTestBase {
     */
    private void printJournal() throws Exception {
       NIOSequentialFileFactory factory = new NIOSequentialFileFactory(new File(getJournalDir()), 100);
-      JournalImpl journal = new JournalImpl(ActiveMQDefaultConfiguration.getDefaultJournalFileSize(), 2, 0, 0, factory, "activemq-data", "amq", 100);
+      JournalImpl journal = new JournalImpl(ActiveMQDefaultConfiguration.getDefaultJournalFileSize(), 2, 2, 0, 0, factory, "activemq-data", "amq", 100);
 
-      ArrayList<RecordInfo> records = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> transactions = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> records = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> transactions = new ArrayList<>();
 
       journal.start();
       journal.load(records, transactions, null);

@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v4;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class RemoveSubscriptionInfoTest extends BaseCommandTestSupport {
 
    public static RemoveSubscriptionInfoTest SINGLETON = new RemoveSubscriptionInfoTest();
 
+   @Override
    public Object createObject() throws Exception {
       RemoveSubscriptionInfo info = new RemoveSubscriptionInfo();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       RemoveSubscriptionInfo info = (RemoveSubscriptionInfo) object;

@@ -173,9 +173,9 @@ public class JournalAsyncTest extends ActiveMQTestBase {
    public void setUp() throws Exception {
       super.setUp();
 
-      records = new ArrayList<RecordInfo>();
+      records = new ArrayList<>();
 
-      transactions = new ArrayList<PreparedTransactionInfo>();
+      transactions = new ArrayList<>();
 
       factory = null;
 
@@ -209,7 +209,7 @@ public class JournalAsyncTest extends ActiveMQTestBase {
          journalImpl.stop();
       }
 
-      journalImpl = new JournalImpl(journalSize, numberOfMinimalFiles, 0, 0, factory, "tt", "tt", 1000);
+      journalImpl = new JournalImpl(journalSize, numberOfMinimalFiles, numberOfMinimalFiles, 0, 0, factory, "tt", "tt", 1000);
 
       journalImpl.start();
 

@@ -49,7 +49,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
    /**
     * all the matches
     */
-   private final Map<String, Match<T>> matches = new HashMap<String, Match<T>>();
+   private final Map<String, Match<T>> matches = new HashMap<>();
 
    /**
     * Certain values cannot be removed after installed.
@@ -58,7 +58,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     * this could cause issues on shutdown.
     * Notice you can still change these values. You just can't remove them.
     */
-   private final Set<String> immutables = new HashSet<String>();
+   private final Set<String> immutables = new HashSet<>();
 
    /**
     * a regex comparator
@@ -68,7 +68,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
    /**
     * a cache
     */
-   private final Map<String, T> cache = new ConcurrentHashMap<String, T>();
+   private final Map<String, T> cache = new ConcurrentHashMap<>();
 
    /**
     * Need a lock instead of using multiple {@link ConcurrentHashMap}s.
@@ -89,7 +89,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
    /**
     * any registered listeners, these get fired on changes to the repository
     */
-   private final ArrayList<HierarchicalRepositoryChangeListener> listeners = new ArrayList<HierarchicalRepositoryChangeListener>();
+   private final ArrayList<HierarchicalRepositoryChangeListener> listeners = new ArrayList<>();
 
    @Override
    public void disableListeners() {
@@ -114,14 +114,16 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
       onChange();
    }
 
+   @Override
    public void addMatch(final String match, final T value) {
       addMatch(match, value, false);
    }
 
+   @Override
    public List<T> values() {
       lock.readLock().lock();
       try {
-         ArrayList<T> values = new ArrayList<T>(matches.size());
+         ArrayList<T> values = new ArrayList<>(matches.size());
 
          for (Match<T> matchValue : matches.values()) {
             values.add(matchValue.getValue());
@@ -140,6 +142,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     * @param match The regex to use to match against
     * @param value the value to hold against the match
     */
+   @Override
    public void addMatch(final String match, final T value, final boolean immutableMatch) {
       lock.writeLock().lock();
       try {
@@ -149,7 +152,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
             immutables.add(match);
          }
          Match.verify(match);
-         Match<T> match1 = new Match<T>(match);
+         Match<T> match1 = new Match<>(match);
          match1.setValue(value);
          matches.put(match, match1);
       }
@@ -161,6 +164,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
       onChange();
    }
 
+   @Override
    public int getCacheSize() {
       return cache.size();
    }
@@ -171,6 +175,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     * @param match the match to look for
     * @return the value
     */
+   @Override
    public T getMatch(final String match) {
       T cacheResult = cache.get(match);
       if (cacheResult != null) {
@@ -223,9 +228,9 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     * @return
     */
    private List<Match<T>> sort(final Map<String, Match<T>> possibleMatches) {
-      List<String> keys = new ArrayList<String>(possibleMatches.keySet());
+      List<String> keys = new ArrayList<>(possibleMatches.keySet());
       Collections.sort(keys, matchComparator);
-      List<Match<T>> matches1 = new ArrayList<Match<T>>(possibleMatches.size());
+      List<Match<T>> matches1 = new ArrayList<>(possibleMatches.size());
       for (String key : keys) {
          matches1.add(possibleMatches.get(key));
       }
@@ -237,6 +242,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     *
     * @param match the match to remove
     */
+   @Override
    public void removeMatch(final String match) {
       lock.writeLock().lock();
       try {
@@ -259,6 +265,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
       }
    }
 
+   @Override
    public void registerListener(final HierarchicalRepositoryChangeListener listener) {
       lock.writeLock().lock();
       try {
@@ -272,6 +279,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
       }
    }
 
+   @Override
    public void unRegisterListener(final HierarchicalRepositoryChangeListener listener) {
       lock.writeLock().lock();
       try {
@@ -287,11 +295,13 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     *
     * @param defaultValue the value
     */
+   @Override
    public void setDefault(final T defaultValue) {
       clearCache();
       defaultmatch = defaultValue;
    }
 
+   @Override
    public void clear() {
       lock.writeLock().lock();
       try {
@@ -304,10 +314,12 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
       }
    }
 
+   @Override
    public void clearListeners() {
       listeners.clear();
    }
 
+   @Override
    public void clearCache() {
       cache.clear();
    }
@@ -338,7 +350,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
     * @return
     */
    private Map<String, Match<T>> getPossibleMatches(final String match) {
-      HashMap<String, Match<T>> possibleMatches = new HashMap<String, Match<T>>();
+      HashMap<String, Match<T>> possibleMatches = new HashMap<>();
 
       for (Entry<String, Match<T>> entry : matches.entrySet()) {
          Match<T> entryMatch = entry.getValue();
@@ -356,6 +368,7 @@ public class HierarchicalObjectRepository<T> implements HierarchicalRepository<T
 
       private static final long serialVersionUID = -6182535107518999740L;
 
+      @Override
       public int compare(final String o1, final String o2) {
          if (o1.contains(Match.WILDCARD) && !o2.contains(Match.WILDCARD)) {
             return +1;

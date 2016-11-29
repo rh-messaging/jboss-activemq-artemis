@@ -25,6 +25,8 @@ import javax.jms.JMSRuntimeException;
 import javax.jms.Message;
 import javax.jms.MessageFormatException;
 import javax.jms.MessageNotWriteableException;
+import javax.management.openmbean.CompositeData;
+import javax.management.openmbean.CompositeDataSupport;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
@@ -57,7 +59,7 @@ public class ActiveMQMessage implements javax.jms.Message {
    public static final byte TYPE = org.apache.activemq.artemis.api.core.Message.DEFAULT_TYPE;
 
    public static Map<String, Object> coreMaptoJMSMap(final Map<String, Object> coreMessage) {
-      Map<String, Object> jmsMessage = new HashMap<String, Object>();
+      Map<String, Object> jmsMessage = new HashMap<>();
 
       String deliveryMode = (Boolean) coreMessage.get("durable") ? "PERSISTENT" : "NON_PERSISTENT";
       byte priority = (Byte) coreMessage.get("priority");
@@ -93,9 +95,16 @@ public class ActiveMQMessage implements javax.jms.Message {
       return jmsMessage;
    }
 
+
+
+   public static CompositeData coreCompositeTypeToJMSCompositeType(CompositeDataSupport data) throws Exception {
+      CompositeData jmsdata = new CompositeDataSupport(data.getCompositeType(), new HashMap<String, Object>());
+      return jmsdata;
+   }
+
    // Static --------------------------------------------------------
 
-   private static final HashSet<String> reservedIdentifiers = new HashSet<String>();
+   private static final HashSet<String> reservedIdentifiers = new HashSet<>();
 
    static {
       ActiveMQMessage.reservedIdentifiers.add("NULL");
@@ -277,6 +286,7 @@ public class ActiveMQMessage implements javax.jms.Message {
 
    // javax.jmx.Message implementation ------------------------------
 
+   @Override
    public String getJMSMessageID() {
       if (msgID == null) {
          UUID uid = message.getUserID();
@@ -286,6 +296,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       return msgID;
    }
 
+   @Override
    public void setJMSMessageID(final String jmsMessageID) throws JMSException {
       if (jmsMessageID != null && !jmsMessageID.startsWith("ID:")) {
          throw new JMSException("JMSMessageID must start with ID:");
@@ -296,18 +307,22 @@ public class ActiveMQMessage implements javax.jms.Message {
       msgID = jmsMessageID;
    }
 
+   @Override
    public long getJMSTimestamp() throws JMSException {
       return message.getTimestamp();
    }
 
+   @Override
    public void setJMSTimestamp(final long timestamp) throws JMSException {
       message.setTimestamp(timestamp);
    }
 
+   @Override
    public byte[] getJMSCorrelationIDAsBytes() throws JMSException {
       return MessageUtil.getJMSCorrelationIDAsBytes(message);
    }
 
+   @Override
    public void setJMSCorrelationIDAsBytes(final byte[] correlationID) throws JMSException {
       try {
          MessageUtil.setJMSCorrelationIDAsBytes(message, correlationID);
@@ -319,11 +334,13 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public void setJMSCorrelationID(final String correlationID) throws JMSException {
       MessageUtil.setJMSCorrelationID(message, correlationID);
       jmsCorrelationID = correlationID;
    }
 
+   @Override
    public String getJMSCorrelationID() throws JMSException {
       if (jmsCorrelationID == null) {
          jmsCorrelationID = MessageUtil.getJMSCorrelationID(message);
@@ -332,6 +349,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       return jmsCorrelationID;
    }
 
+   @Override
    public Destination getJMSReplyTo() throws JMSException {
       if (replyTo == null) {
 
@@ -344,6 +362,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       return replyTo;
    }
 
+   @Override
    public void setJMSReplyTo(final Destination dest) throws JMSException {
 
       if (dest == null) {
@@ -363,6 +382,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public Destination getJMSDestination() throws JMSException {
       if (dest == null) {
          SimpleString sdest = message.getAddress();
@@ -373,14 +393,17 @@ public class ActiveMQMessage implements javax.jms.Message {
       return dest;
    }
 
+   @Override
    public void setJMSDestination(final Destination destination) throws JMSException {
       dest = destination;
    }
 
+   @Override
    public int getJMSDeliveryMode() throws JMSException {
       return message.isDurable() ? DeliveryMode.PERSISTENT : DeliveryMode.NON_PERSISTENT;
    }
 
+   @Override
    public void setJMSDeliveryMode(final int deliveryMode) throws JMSException {
       if (deliveryMode == DeliveryMode.PERSISTENT) {
          message.setDurable(true);
@@ -393,10 +416,12 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public boolean getJMSRedelivered() throws JMSException {
       return message.getDeliveryCount() > 1;
    }
 
+   @Override
    public void setJMSRedelivered(final boolean redelivered) throws JMSException {
       if (!redelivered) {
          message.setDeliveryCount(1);
@@ -411,6 +436,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public void setJMSType(final String type) throws JMSException {
       if (type != null) {
          MessageUtil.setJMSType(message, type);
@@ -419,6 +445,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public String getJMSType() throws JMSException {
       if (jmsType == null) {
          jmsType = MessageUtil.getJMSType(message);
@@ -426,24 +453,29 @@ public class ActiveMQMessage implements javax.jms.Message {
       return jmsType;
    }
 
+   @Override
    public long getJMSExpiration() throws JMSException {
       return message.getExpiration();
    }
 
+   @Override
    public void setJMSExpiration(final long expiration) throws JMSException {
       message.setExpiration(expiration);
    }
 
+   @Override
    public int getJMSPriority() throws JMSException {
       return message.getPriority();
    }
 
+   @Override
    public void setJMSPriority(final int priority) throws JMSException {
       checkPriority(priority);
 
       message.setPriority((byte) priority);
    }
 
+   @Override
    public void clearProperties() throws JMSException {
 
       MessageUtil.clearProperties(message);
@@ -451,14 +483,17 @@ public class ActiveMQMessage implements javax.jms.Message {
       propertiesReadOnly = false;
    }
 
+   @Override
    public void clearBody() throws JMSException {
       readOnly = false;
    }
 
+   @Override
    public boolean propertyExists(final String name) throws JMSException {
       return MessageUtil.propertyExists(message, name);
    }
 
+   @Override
    public boolean getBooleanProperty(final String name) throws JMSException {
       try {
          return message.getBooleanProperty(new SimpleString(name));
@@ -468,6 +503,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public byte getByteProperty(final String name) throws JMSException {
       try {
          return message.getByteProperty(new SimpleString(name));
@@ -477,6 +513,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public short getShortProperty(final String name) throws JMSException {
       try {
          return message.getShortProperty(new SimpleString(name));
@@ -486,6 +523,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public int getIntProperty(final String name) throws JMSException {
       if (MessageUtil.JMSXDELIVERYCOUNT.equals(name)) {
          return message.getDeliveryCount();
@@ -499,6 +537,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public long getLongProperty(final String name) throws JMSException {
       if (MessageUtil.JMSXDELIVERYCOUNT.equals(name)) {
          return message.getDeliveryCount();
@@ -512,6 +551,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public float getFloatProperty(final String name) throws JMSException {
       try {
          return message.getFloatProperty(new SimpleString(name));
@@ -521,6 +561,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public double getDoubleProperty(final String name) throws JMSException {
       try {
          return message.getDoubleProperty(new SimpleString(name));
@@ -530,6 +571,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public String getStringProperty(final String name) throws JMSException {
       if (MessageUtil.JMSXDELIVERYCOUNT.equals(name)) {
          return String.valueOf(message.getDeliveryCount());
@@ -548,6 +590,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public Object getObjectProperty(final String name) throws JMSException {
       if (MessageUtil.JMSXDELIVERYCOUNT.equals(name)) {
          return String.valueOf(message.getDeliveryCount());
@@ -566,42 +609,50 @@ public class ActiveMQMessage implements javax.jms.Message {
       return Collections.enumeration(MessageUtil.getPropertyNames(message));
    }
 
+   @Override
    public void setBooleanProperty(final String name, final boolean value) throws JMSException {
       checkProperty(name);
 
       message.putBooleanProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setByteProperty(final String name, final byte value) throws JMSException {
       checkProperty(name);
       message.putByteProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setShortProperty(final String name, final short value) throws JMSException {
       checkProperty(name);
       message.putShortProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setIntProperty(final String name, final int value) throws JMSException {
       checkProperty(name);
       message.putIntProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setLongProperty(final String name, final long value) throws JMSException {
       checkProperty(name);
       message.putLongProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setFloatProperty(final String name, final float value) throws JMSException {
       checkProperty(name);
       message.putFloatProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setDoubleProperty(final String name, final double value) throws JMSException {
       checkProperty(name);
       message.putDoubleProperty(new SimpleString(name), value);
    }
 
+   @Override
    public void setStringProperty(final String name, final String value) throws JMSException {
       checkProperty(name);
 
@@ -613,6 +664,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public void setObjectProperty(final String name, final Object value) throws JMSException {
       if (ActiveMQJMSConstants.JMS_ACTIVEMQ_OUTPUT_STREAM.equals(name)) {
          setOutputStream((OutputStream) value);
@@ -641,6 +693,7 @@ public class ActiveMQMessage implements javax.jms.Message {
       }
    }
 
+   @Override
    public void acknowledge() throws JMSException {
       if (session != null) {
          try {

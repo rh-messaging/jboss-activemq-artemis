@@ -24,6 +24,7 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.SendAcknowledgementHandler;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.ConsumerContext;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 
 public interface ClientSessionInternal extends ClientSession {
 
@@ -92,6 +93,8 @@ public interface ClientSessionInternal extends ClientSession {
 
    void resetIfNeeded() throws ActiveMQException;
 
+   void markRollbackOnly();
+
    /**
     * This is used internally to control and educate the user
     * about using the thread boundaries properly.
@@ -122,4 +125,6 @@ public interface ClientSessionInternal extends ClientSession {
    boolean isClosing();
 
    String getNodeId();
+
+   boolean isWritable(ReadyListener callback);
 }

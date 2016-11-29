@@ -57,10 +57,10 @@ public class StompSession implements SessionCallback {
 
    private final OperationContext sessionContext;
 
-   private final Map<Long, StompSubscription> subscriptions = new ConcurrentHashMap<Long, StompSubscription>();
+   private final Map<Long, StompSubscription> subscriptions = new ConcurrentHashMap<>();
 
    // key = message ID, value = consumer ID
-   private final Map<Long, Pair<Long, Integer>> messagesToAck = new ConcurrentHashMap<Long, Pair<Long, Integer>>();
+   private final Map<Long, Pair<Long, Integer>> messagesToAck = new ConcurrentHashMap<>();
 
    private volatile boolean noLocal = false;
 
@@ -71,6 +71,11 @@ public class StompSession implements SessionCallback {
       this.manager = manager;
       this.sessionContext = sessionContext;
       this.consumerCredits = ConfigurationHelper.getIntProperty(TransportConstants.STOMP_CONSUMERS_CREDIT, TransportConstants.STOMP_DEFAULT_CONSUMERS_CREDIT, connection.getAcceptorUsed().getConfiguration());
+   }
+
+   @Override
+   public boolean isWritable(ReadyListener callback) {
+      return connection.isWritable(callback);
    }
 
    void setServerSession(ServerSession session) {
@@ -86,12 +91,15 @@ public class StompSession implements SessionCallback {
       return true;
    }
 
+   @Override
    public void sendProducerCreditsMessage(int credits, SimpleString address) {
    }
 
+   @Override
    public void sendProducerCreditsFailMessage(int credits, SimpleString address) {
    }
 
+   @Override
    public int sendMessage(ServerMessage serverMessage, ServerConsumer consumer, int deliveryCount) {
       LargeServerMessageImpl largeMessage = null;
       ServerMessage newServerMessage = serverMessage;
@@ -142,7 +150,7 @@ public class StompSession implements SessionCallback {
             }
          }
          else {
-            messagesToAck.put(newServerMessage.getMessageID(), new Pair<Long, Integer>(consumer.getID(), length));
+            messagesToAck.put(newServerMessage.getMessageID(), new Pair<>(consumer.getID(), length));
             // Must send AFTER adding to messagesToAck - or could get acked from client BEFORE it's been added!
             manager.send(connection, frame);
          }
@@ -161,6 +169,7 @@ public class StompSession implements SessionCallback {
 
    }
 
+   @Override
    public int sendLargeMessageContinuation(ServerConsumer consumer,
                                            byte[] body,
                                            boolean continues,
@@ -168,19 +177,13 @@ public class StompSession implements SessionCallback {
       return 0;
    }
 
+   @Override
    public int sendLargeMessage(ServerMessage msg, ServerConsumer consumer, long bodySize, int deliveryCount) {
       return 0;
    }
 
+   @Override
    public void closed() {
-   }
-
-   public void addReadyListener(final ReadyListener listener) {
-      connection.getTransportConnection().addReadyListener(listener);
-   }
-
-   public void removeReadyListener(final ReadyListener listener) {
-      connection.getTransportConnection().removeReadyListener(listener);
    }
 
    @Override

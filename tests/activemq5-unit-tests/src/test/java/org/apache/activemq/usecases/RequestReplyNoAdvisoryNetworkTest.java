@@ -53,7 +53,7 @@ public class RequestReplyNoAdvisoryNetworkTest extends JmsMultipleBrokersTestSup
 
    private static final transient Logger LOG = LoggerFactory.getLogger(RequestReplyNoAdvisoryNetworkTest.class);
 
-   Vector<BrokerService> brokers = new Vector<BrokerService>();
+   Vector<BrokerService> brokers = new Vector<>();
    BrokerService a, b;
    ActiveMQQueue sendQ = new ActiveMQQueue("sendQ");
    static final String connectionIdMarker = "ID:marker.";
@@ -267,7 +267,7 @@ public class RequestReplyNoAdvisoryNetworkTest extends JmsMultipleBrokersTestSup
       tempReplyQPolicy.setOptimizedDispatch(true);
       tempReplyQPolicy.setGcInactiveDestinations(true);
       tempReplyQPolicy.setGcWithNetworkConsumers(true);
-      tempReplyQPolicy.setInactiveTimoutBeforeGC(1000);
+      tempReplyQPolicy.setInactiveTimeoutBeforeGC(1000);
       map.put(replyQWildcard, tempReplyQPolicy);
       broker.setDestinationPolicy(map);
 

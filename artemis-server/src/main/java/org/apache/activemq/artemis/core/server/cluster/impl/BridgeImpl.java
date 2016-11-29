@@ -18,9 +18,10 @@ package org.apache.activemq.artemis.core.server.cluster.impl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.ListIterator;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -28,11 +29,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQExceptionType;
+import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.ClientProducer;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
+import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.ClusterTopologyListener;
 import org.apache.activemq.artemis.api.core.client.SendAcknowledgementHandler;
 import org.apache.activemq.artemis.api.core.client.SessionFailureListener;
@@ -57,6 +60,7 @@ import org.apache.activemq.artemis.core.server.impl.QueueImpl;
 import org.apache.activemq.artemis.core.server.management.Notification;
 import org.apache.activemq.artemis.core.server.management.NotificationService;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 import org.apache.activemq.artemis.utils.FutureLatch;
 import org.apache.activemq.artemis.utils.ReusableLatch;
 import org.apache.activemq.artemis.utils.TypedProperties;
@@ -66,7 +70,7 @@ import org.apache.activemq.artemis.utils.UUID;
  * A Core BridgeImpl
  */
 
-public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowledgementHandler {
+public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowledgementHandler, ReadyListener {
    // Constants -----------------------------------------------------
 
    private static final boolean isTrace = ActiveMQServerLogger.LOGGER.isTraceEnabled();
@@ -95,7 +99,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    private final SimpleString forwardingAddress;
 
-   private final java.util.Queue<MessageReference> refs = new ConcurrentLinkedQueue<MessageReference>();
+   private final java.util.Map<Long, MessageReference> refs = new LinkedHashMap<>();
 
    private final Transformer transformer;
 
@@ -123,6 +127,9 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
    protected ScheduledFuture<?> futureScheduledReconnection;
 
    protected volatile ClientSessionInternal session;
+
+   // on cases where sub-classes need a consumer
+   protected volatile ClientSessionInternal sessionConsumer;
 
    protected String targetNodeID;
 
@@ -217,13 +224,18 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       return bytes;
    }
 
+   // for tests
+   public ClientSessionFactory getSessionFactory() {
+      return csf;
+   }
+
    /* (non-Javadoc)
     * @see org.apache.activemq.artemis.core.server.Consumer#getDeliveringMessages()
     */
    @Override
    public List<MessageReference> getDeliveringMessages() {
-      synchronized (this) {
-         return new ArrayList<MessageReference>(refs);
+      synchronized (refs) {
+         return new ArrayList<>(refs.values());
       }
    }
 
@@ -232,10 +244,12 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
          factory.cleanup();
    }
 
+   @Override
    public void setNotificationService(final NotificationService notificationService) {
       this.notificationService = notificationService;
    }
 
+   @Override
    public synchronized void start() throws Exception {
       if (started) {
          return;
@@ -255,43 +269,54 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       }
    }
 
+   @Override
    public String debug() {
       return toString();
    }
 
    private void cancelRefs() {
-      MessageReference ref;
+      LinkedList<MessageReference> list = new LinkedList<>();
 
-      LinkedList<MessageReference> list = new LinkedList<MessageReference>();
+      synchronized (refs) {
+         list.addAll(refs.values());
+         refs.clear();
+      }
 
-      while ((ref = refs.poll()) != null) {
-         if (isTrace) {
-            ActiveMQServerLogger.LOGGER.trace("Cancelling reference " + ref + " on bridge " + this);
-         }
-         list.addFirst(ref);
+      if (isTrace) {
+         ActiveMQServerLogger.LOGGER.trace("BridgeImpl::cancelRefs cancelling " + list.size() + " references");
       }
 
       if (isTrace && list.isEmpty()) {
          ActiveMQServerLogger.LOGGER.trace("didn't have any references to cancel on bridge " + this);
+         return;
       }
 
-      Queue refqueue = null;
+      ListIterator<MessageReference> listIterator = list.listIterator(list.size());
+
+      Queue refqueue;
 
       long timeBase = System.currentTimeMillis();
 
-      for (MessageReference ref2 : list) {
-         refqueue = ref2.getQueue();
+      while (listIterator.hasPrevious()) {
+         MessageReference ref = listIterator.previous();
+
+         if (isTrace) {
+            ActiveMQServerLogger.LOGGER.trace("BridgeImpl::cancelRefs Cancelling reference " + ref + " on bridge " + this);
+         }
+
+         refqueue = ref.getQueue();
 
          try {
-            refqueue.cancel(ref2, timeBase);
+            refqueue.cancel(ref, timeBase);
          }
          catch (Exception e) {
             // There isn't much we can do besides log an error
-            ActiveMQServerLogger.LOGGER.errorCancellingRefOnBridge(e, ref2);
+            ActiveMQServerLogger.LOGGER.errorCancellingRefOnBridge(e, ref);
          }
       }
    }
 
+   @Override
    public void flushExecutor() {
       // Wait for any create objects runnable to complete
       FutureLatch future = new FutureLatch();
@@ -305,8 +330,10 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       }
    }
 
+   @Override
    public void disconnect() {
       executor.execute(new Runnable() {
+         @Override
          public void run() {
             if (session != null) {
                try {
@@ -317,10 +344,20 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                }
                session = null;
             }
+            if (sessionConsumer != null) {
+               try {
+                  sessionConsumer.cleanUp(false);
+               }
+               catch (Exception dontcare) {
+                  ActiveMQServerLogger.LOGGER.debug(dontcare.getMessage(), dontcare);
+               }
+               sessionConsumer = null;
+            }
          }
       });
    }
 
+   @Override
    public boolean isConnected() {
       return session != null;
    }
@@ -333,6 +370,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       return executor;
    }
 
+   @Override
    public void stop() throws Exception {
       if (stopping) {
          return;
@@ -363,6 +401,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       }
    }
 
+   @Override
    public void pause() throws Exception {
       if (ActiveMQServerLogger.LOGGER.isDebugEnabled()) {
          ActiveMQServerLogger.LOGGER.debug("Bridge " + this.name + " being paused");
@@ -383,11 +422,13 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       }
    }
 
+   @Override
    public void resume() throws Exception {
       queue.addConsumer(BridgeImpl.this);
       queue.deliverAsync();
    }
 
+   @Override
    public boolean isStarted() {
       return started;
    }
@@ -396,25 +437,30 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       executor.execute(new ConnectRunnable(this));
    }
 
+   @Override
    public SimpleString getName() {
       return name;
    }
 
+   @Override
    public Queue getQueue() {
       return queue;
    }
 
+   @Override
    public Filter getFilter() {
       return filter;
    }
 
    // SendAcknowledgementHandler implementation ---------------------
 
+   @Override
    public SimpleString getForwardingAddress() {
       return forwardingAddress;
    }
 
    // For testing only
+   @Override
    public RemotingConnection getForwardingConnection() {
       if (session == null) {
          return null;
@@ -426,17 +472,31 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    // Consumer implementation ---------------------------------------
 
+   @Override
    public void sendAcknowledged(final Message message) {
+      if (ActiveMQServerLogger.LOGGER.isTraceEnabled()) {
+         ActiveMQServerLogger.LOGGER.trace("BridgeImpl::sendAcknowledged received confirmation for message " + message);
+      }
       if (active) {
          try {
-            final MessageReference ref = refs.poll();
+
+            final MessageReference ref;
+
+            synchronized (refs) {
+               ref = refs.remove(message.getMessageID());
+            }
 
             if (ref != null) {
                if (isTrace) {
-                  ActiveMQServerLogger.LOGGER.trace(this + " Acking " + ref + " on queue " + ref.getQueue());
+                  ActiveMQServerLogger.LOGGER.trace("BridgeImpl::sendAcknowledged bridge " + this + " Acking " + ref + " on queue " + ref.getQueue());
                }
                ref.getQueue().acknowledge(ref);
                pendingAcks.countDown();
+            }
+            else {
+               if (isTrace) {
+                  ActiveMQServerLogger.LOGGER.trace("BridgeImpl::sendAcknowledged bridge " + this + " could not find reference for message " + message);
+               }
             }
          }
          catch (Exception e) {
@@ -475,13 +535,19 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       }
    }
 
+   @Override
+   public void readyForWriting() {
+      queue.deliverAsync();
+   }
+
+   @Override
    public HandleStatus handle(final MessageReference ref) throws Exception {
       if (filter != null && !filter.match(ref.getMessage())) {
          return HandleStatus.NO_MATCH;
       }
 
       synchronized (this) {
-         if (!active) {
+         if (!active || !session.isWritable(this)) {
             if (ActiveMQServerLogger.LOGGER.isDebugEnabled()) {
                ActiveMQServerLogger.LOGGER.debug(this + "::Ignoring reference on bridge as it is set to inactive ref=" + ref);
             }
@@ -498,7 +564,9 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
          ref.handled();
 
-         refs.add(ref);
+         synchronized (refs) {
+            refs.put(ref.getMessage().getMessageID(), ref);
+         }
 
          final ServerMessage message = beforeForward(ref.getMessage());
 
@@ -534,16 +602,19 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    // FailureListener implementation --------------------------------
 
+   @Override
    public void proceedDeliver(MessageReference ref) {
       // no op
    }
 
+   @Override
    public void connectionFailed(final ActiveMQException me, boolean failedOver) {
       connectionFailed(me, failedOver, null);
    }
 
+   @Override
    public void connectionFailed(final ActiveMQException me, boolean failedOver, String scaleDownTargetNodeID) {
-      ActiveMQServerLogger.LOGGER.bridgeConnectionFailed(me, failedOver);
+      ActiveMQServerLogger.LOGGER.bridgeConnectionFailed(failedOver);
 
       synchronized (connectionGuard) {
          keepConnecting = true;
@@ -597,6 +668,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       scheduleRetryConnect();
    }
 
+   @Override
    public void beforeReconnect(final ActiveMQException exception) {
       // log.warn(name + "::Connection failed before reconnect ", exception);
       // fail(false);
@@ -606,6 +678,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                                     final MessageReference ref,
                                     final LargeServerMessage message) {
       executor.execute(new Runnable() {
+         @Override
          public void run() {
             try {
                producer.send(dest, message);
@@ -650,9 +723,11 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
       catch (final ActiveMQException e) {
          ActiveMQServerLogger.LOGGER.bridgeUnableToSendMessage(e, ref);
 
-         // We remove this reference as we are returning busy which means the reference will never leave the Queue.
-         // because of this we have to remove the reference here
-         refs.remove(ref);
+         synchronized (refs) {
+            // We remove this reference as we are returning busy which means the reference will never leave the Queue.
+            // because of this we have to remove the reference here
+            refs.remove(message.getMessageID());
+         }
 
          connectionFailed(e, false);
 
@@ -804,6 +879,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                }
                // Session is pre-acknowledge
                session = (ClientSessionInternal) csf.createSession(user, password, false, true, true, true, 1);
+               sessionConsumer = (ClientSessionInternal) csf.createSession(user, password, false, true, true, true, 1);
             }
 
             if (forwardingAddress != null) {
@@ -876,8 +952,24 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                scheduleRetryConnect();
             }
          }
+         catch (ActiveMQInterruptedException e) {
+            ActiveMQServerLogger.LOGGER.errorConnectingBridge(e, this);
+         }
+         catch (InterruptedException e) {
+            ActiveMQServerLogger.LOGGER.errorConnectingBridge(e, this);
+         }
          catch (Exception e) {
             ActiveMQServerLogger.LOGGER.errorConnectingBridge(e, this);
+            if (csf != null) {
+               try {
+                  csf.close();
+                  csf = null;
+               }
+               catch (Throwable ignored) {
+               }
+            }
+            fail(false);
+            scheduleRetryConnect();
          }
       }
    }
@@ -964,6 +1056,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
          this.bridge = bridge;
       }
 
+      @Override
       public void run() {
          if (bridge.isStarted())
             executor.execute(new ConnectRunnable(bridge));
@@ -978,6 +1071,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
          bridge = bridge2;
       }
 
+      @Override
       public void run() {
          bridge.connect();
       }
@@ -985,6 +1079,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    private class StopRunnable implements Runnable {
 
+      @Override
       public void run() {
          try {
             ActiveMQServerLogger.LOGGER.debug("stopping bridge " + BridgeImpl.this);
@@ -1003,8 +1098,6 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
             }
 
-            internalCancelReferences();
-
             if (session != null) {
                ActiveMQServerLogger.LOGGER.debug("Cleaning up session " + session);
                session.removeFailureListener(BridgeImpl.this);
@@ -1015,6 +1108,18 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
                catch (ActiveMQException dontcare) {
                }
             }
+
+            if (sessionConsumer != null) {
+               ActiveMQServerLogger.LOGGER.debug("Cleaning up session " + session);
+               try {
+                  sessionConsumer.close();
+                  sessionConsumer = null;
+               }
+               catch (ActiveMQException dontcare) {
+               }
+            }
+
+            internalCancelReferences();
 
             if (csf != null) {
                csf.cleanup();
@@ -1040,6 +1145,7 @@ public class BridgeImpl implements Bridge, SessionFailureListener, SendAcknowled
 
    private class PauseRunnable implements Runnable {
 
+      @Override
       public void run() {
          try {
             queue.removeConsumer(BridgeImpl.this);

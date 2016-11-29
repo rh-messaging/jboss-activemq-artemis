@@ -36,6 +36,7 @@ public interface ServerSession extends SecurityAuth {
 
    Object getConnectionID();
 
+   @Override
    RemotingConnection getRemotingConnection();
 
    boolean removeConsumer(long consumerID) throws Exception;
@@ -71,6 +72,8 @@ public interface ServerSession extends SecurityAuth {
    void xaFailed(Xid xid) throws Exception;
 
    void xaSuspend() throws Exception;
+
+   void markTXFailed(Throwable e);
 
    QueueCreator getQueueCreator();
 

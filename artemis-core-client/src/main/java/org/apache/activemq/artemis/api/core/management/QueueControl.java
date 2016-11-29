@@ -17,6 +17,7 @@
 package org.apache.activemq.artemis.api.core.management;
 
 import javax.management.MBeanOperationInfo;
+import javax.management.openmbean.CompositeData;
 import java.util.Map;
 
 /**
@@ -216,6 +217,28 @@ public interface QueueControl {
    @Operation(desc = "Remove the message corresponding to the given messageID", impact = MBeanOperationInfo.ACTION)
    boolean expireMessage(@Parameter(name = "messageID", desc = "A message ID") long messageID) throws Exception;
 
+
+   /**
+    * Retries the message corresponding to the given messageID to the original queue.
+    * This is appropriate on dead messages on Dead letter queues only.
+    *
+    * @param messageID
+    * @return {@code true} if the message was retried, {@code false} else
+    * @throws Exception
+    */
+   @Operation(desc = "Retry the message corresponding to the given messageID to the original queue", impact = MBeanOperationInfo.ACTION)
+   boolean retryMessage(@Parameter(name = "messageID", desc = "A message ID") long messageID) throws Exception;
+
+   /**
+    * Retries all messages on a DLQ to their respective original queues.
+    * This is appropriate on dead messages on Dead letter queues only.
+    *
+    * @return the number of retried messages.
+    * @throws Exception
+    */
+   @Operation(desc = "Retry all messages on a DLQ to their respective original queues", impact = MBeanOperationInfo.ACTION)
+   int retryMessages() throws Exception;
+
    /**
     * Moves the message corresponding to the specified message ID to the specified other queue.
     *
@@ -282,6 +305,27 @@ public interface QueueControl {
     */
    @Operation(desc = "Send the messages corresponding to the given filter to this queue's Dead Letter Address", impact = MBeanOperationInfo.ACTION)
    int sendMessagesToDeadLetterAddress(@Parameter(name = "filter", desc = "A message filter (can be empty)") String filterStr) throws Exception;
+
+   /**
+    *
+    * @param headers the message headers and properties to set. Can only
+    *                container Strings maped to primitive types.
+    * @param body the text to send
+    * @param userID
+    * @param durable
+    *@param user
+    * @param password   @return
+    * @throws Exception
+    */
+   @Operation(desc = "Sends a TextMessage to a password-protected destination.", impact = MBeanOperationInfo.ACTION)
+   String sendMessage(@Parameter(name = "headers", desc = "The headers to add to the message") Map<String, String> headers,
+                      @Parameter(name = "headers", desc = "A type for the message") final int type,
+                      @Parameter(name = "body", desc = "The body (byte[]) of the message encoded as a string using Base64") String body,
+                      @Parameter(name = "body", desc = "The user ID to set on the message") String userID,
+                      @Parameter(name = "durable", desc = "Whether the message is durable") boolean durable,
+                      @Parameter(name = "user", desc = "The user to authenticate with") String user,
+                      @Parameter(name = "password", desc = "The users password to authenticate with") String password) throws Exception;
+
 
    /**
     * Changes the message's priority corresponding to the specified message ID to the specified priority.
@@ -354,6 +398,12 @@ public interface QueueControl {
     */
    @Operation(desc = "Inspects if the queue is paused", impact = MBeanOperationInfo.INFO)
    boolean isPaused() throws Exception;
+
+   /**
+    * Resets the MessagesAdded property
+    */
+   @Operation(desc = "Browse Messages", impact = MBeanOperationInfo.ACTION)
+   CompositeData[] browse(String filter) throws Exception;
 
    /**
     * Resets the MessagesAdded property

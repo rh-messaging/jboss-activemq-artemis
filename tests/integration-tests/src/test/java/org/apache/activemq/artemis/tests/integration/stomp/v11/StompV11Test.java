@@ -35,6 +35,7 @@ import org.apache.activemq.artemis.tests.integration.stomp.util.ClientStompFrame
 import org.apache.activemq.artemis.tests.integration.stomp.util.StompClientConnection;
 import org.apache.activemq.artemis.tests.integration.stomp.util.StompClientConnectionFactory;
 import org.apache.activemq.artemis.tests.integration.stomp.util.StompClientConnectionV11;
+import org.apache.activemq.artemis.core.protocol.stomp.Stomp;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.junit.After;
 import org.junit.Assert;
@@ -1258,6 +1259,7 @@ public class StompV11Test extends StompV11TestBase {
       final CountDownLatch latch = new CountDownLatch(1);
 
       Thread thr = new Thread() {
+         @Override
          public void run() {
             ClientStompFrame sendFrame = connV11.createFrame("SEND");
             sendFrame.addHeader("destination", getQueuePrefix() + getQueueName());
@@ -1449,6 +1451,7 @@ public class StompV11Test extends StompV11TestBase {
       int count = 1000;
       final CountDownLatch latch = new CountDownLatch(count);
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message arg0) {
             latch.countDown();
          }
@@ -2312,9 +2315,48 @@ public class StompV11Test extends StompV11TestBase {
 
       connV11.disconnect();
    }
+
+   @Test
+   public void testReceiveContentType() throws Exception {
+      MessageConsumer consumer = session.createConsumer(queue);
+
+      connV11.connect(defUser, defPass);
+
+      ClientStompFrame frame = connV11.createFrame("SEND");
+      frame.addHeader("destination", getQueuePrefix() + getQueueName());
+      frame.addHeader(Stomp.Headers.CONTENT_TYPE, "text/plain");
+      frame.setBody("Hello World");
+
+      connV11.sendFrame(frame);
+
+      TextMessage message = (TextMessage) consumer.receive(1000);
+      Assert.assertNotNull(message);
+      Assert.assertEquals(
+         "text/plain",
+         message.getStringProperty(
+            org.apache.activemq.artemis.api.core.Message.HDR_CONTENT_TYPE.toString()));
+   }
+
+   @Test
+   public void testSendContentType() throws Exception {
+      connV11.connect(defUser, defPass);
+
+      this.subscribe(connV11, "sub1", "auto");
+
+      MessageProducer producer = session.createProducer(queue);
+      BytesMessage message = session.createBytesMessage();
+      message.setStringProperty(
+         org.apache.activemq.artemis.api.core.Message.HDR_CONTENT_TYPE.toString(),
+         "text/plain");
+      message.writeBytes("Hello World".getBytes(StandardCharsets.UTF_8));
+      producer.send(message);
+
+      ClientStompFrame frame = connV11.receiveFrame();
+      Assert.assertNotNull(frame);
+
+      Assert.assertEquals("text/plain", frame.getHeader(Stomp.Headers.CONTENT_TYPE));
+
+      connV11.disconnect();
+   }
+
 }
-
-
-
-
-

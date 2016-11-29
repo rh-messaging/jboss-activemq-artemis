@@ -101,6 +101,7 @@ public abstract class ActiveMQRATestBase extends JMSTestBase {
          return endpoint;
       }
 
+      @Override
       public boolean isDeliveryTransacted(Method method) throws NoSuchMethodException {
          return isDeliveryTransacted;
       }
@@ -122,23 +123,26 @@ public abstract class ActiveMQRATestBase extends JMSTestBase {
          this.latch = latch;
       }
 
+      @Override
       public void beforeDelivery(Method method) throws NoSuchMethodException, ResourceException {
 
       }
 
+      @Override
       public void afterDelivery() throws ResourceException {
          if (latch != null) {
             latch.countDown();
          }
       }
 
+      @Override
       public void release() {
          released = true;
       }
 
+      @Override
       public void onMessage(Message message) {
          lastMessage = (ActiveMQMessage) message;
-         System.err.println(message);
       }
 
       public void reset(CountDownLatch latch) {
@@ -155,6 +159,7 @@ public abstract class ActiveMQRATestBase extends JMSTestBase {
 
       WorkManager workManager = new DummyWorkManager();
 
+      @Override
       public Timer createTimer() throws UnavailableException {
          return null;
       }

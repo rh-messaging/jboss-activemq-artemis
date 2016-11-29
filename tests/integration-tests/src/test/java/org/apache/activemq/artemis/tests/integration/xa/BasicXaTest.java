@@ -19,6 +19,8 @@ package org.apache.activemq.artemis.tests.integration.xa;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +36,7 @@ import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.MessageHandler;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.core.config.Configuration;
+import org.apache.activemq.artemis.core.config.StoreConfiguration;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.core.transaction.impl.XidImpl;
@@ -44,12 +47,15 @@ import org.apache.activemq.artemis.utils.UUIDGenerator;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class BasicXaTest extends ActiveMQTestBase {
 
    private static IntegrationTestLogger log = IntegrationTestLogger.LOGGER;
 
-   private final Map<String, AddressSettings> addressSettings = new HashMap<String, AddressSettings>();
+   private final Map<String, AddressSettings> addressSettings = new HashMap<>();
 
    private ActiveMQServer messagingService;
 
@@ -63,13 +69,31 @@ public class BasicXaTest extends ActiveMQTestBase {
 
    private ServerLocator locator;
 
+   private StoreConfiguration.StoreType storeType;
+
+   public BasicXaTest(StoreConfiguration.StoreType storeType) {
+      this.storeType = storeType;
+   }
+
+   @Parameterized.Parameters(name = "storeType={0}")
+   public static Collection<Object[]> data() {
+      Object[][] params = new Object[][] {{StoreConfiguration.StoreType.FILE}, {StoreConfiguration.StoreType.DATABASE}};
+      return Arrays.asList(params);
+   }
+
    @Override
    @Before
    public void setUp() throws Exception {
       super.setUp();
 
       addressSettings.clear();
-      configuration = createDefaultNettyConfig();
+
+      if (storeType == StoreConfiguration.StoreType.DATABASE) {
+         configuration = createDefaultJDBCConfig();
+      }
+      else {
+         configuration = createDefaultNettyConfig();
+      }
 
       messagingService = createServer(false, configuration, -1, -1, addressSettings);
 
@@ -852,6 +876,7 @@ public class BasicXaTest extends ActiveMQTestBase {
          this.session = session;
       }
 
+      @Override
       public void onMessage(final ClientMessage message) {
          Xid xid = new XidImpl(UUIDGenerator.getInstance().generateStringUUID().getBytes(), 1, UUIDGenerator.getInstance().generateStringUUID().getBytes());
          try {

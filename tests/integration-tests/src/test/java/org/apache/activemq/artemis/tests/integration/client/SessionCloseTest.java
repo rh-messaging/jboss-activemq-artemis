@@ -16,6 +16,8 @@
  */
 package org.apache.activemq.artemis.tests.integration.client;
 
+import static org.apache.activemq.artemis.tests.util.RandomUtil.randomXid;
+
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQExceptionType;
 import org.apache.activemq.artemis.api.core.SimpleString;
@@ -27,7 +29,7 @@ import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServers;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -61,60 +63,70 @@ public class SessionCloseTest extends ActiveMQTestBase {
       Assert.assertTrue(session.isClosed());
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.createProducer();
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.createConsumer(RandomUtil.randomSimpleString());
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.createQueue(RandomUtil.randomSimpleString(), RandomUtil.randomSimpleString(), RandomUtil.randomBoolean());
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.createTemporaryQueue(RandomUtil.randomSimpleString(), RandomUtil.randomSimpleString());
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.start();
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.stop();
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.commit();
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.rollback();
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.queueQuery(RandomUtil.randomSimpleString());
          }
       });
 
       ActiveMQTestBase.expectActiveMQException(ActiveMQExceptionType.OBJECT_CLOSED, new ActiveMQAction() {
+         @Override
          public void run() throws ActiveMQException {
             session.addressQuery(RandomUtil.randomSimpleString());
          }
@@ -133,44 +145,51 @@ public class SessionCloseTest extends ActiveMQTestBase {
       Assert.assertTrue(session.isClosed());
 
       ActiveMQTestBase.expectXAException(XAException.XA_RETRY, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.commit(RandomUtil.randomXid(), RandomUtil.randomBoolean());
+            session.commit(randomXid(), RandomUtil.randomBoolean());
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.end(RandomUtil.randomXid(), XAResource.TMSUCCESS);
+            session.end(randomXid(), XAResource.TMSUCCESS);
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.forget(RandomUtil.randomXid());
+            session.forget(randomXid());
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.prepare(RandomUtil.randomXid());
+            session.prepare(randomXid());
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
             session.recover(XAResource.TMSTARTRSCAN);
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.rollback(RandomUtil.randomXid());
+            session.rollback(randomXid());
          }
       });
 
       ActiveMQTestBase.expectXAException(XAException.XAER_RMFAIL, new ActiveMQAction() {
+         @Override
          public void run() throws XAException {
-            session.start(RandomUtil.randomXid(), XAResource.TMNOFLAGS);
+            session.start(randomXid(), XAResource.TMNOFLAGS);
          }
       });
 

@@ -49,9 +49,9 @@ import org.apache.activemq.artemis.core.server.cluster.ClusterConnection;
 import org.apache.activemq.artemis.core.server.cluster.ha.ReplicatedPolicy;
 import org.apache.activemq.artemis.spi.core.remoting.Acceptor;
 
-import java.lang.reflect.Array;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class SharedNothingLiveActivation extends LiveActivation {
@@ -82,6 +82,7 @@ public class SharedNothingLiveActivation extends LiveActivation {
       }
    }
 
+   @Override
    public void run() {
       try {
          if (replicatedPolicy.isCheckForLiveServer() && isNodeIdUsed()) {
@@ -155,9 +156,10 @@ public class SharedNothingLiveActivation extends LiveActivation {
          replicationManager = new ReplicationManager(rc, activeMQServer.getExecutorFactory());
          replicationManager.start();
          Thread t = new Thread(new Runnable() {
+            @Override
             public void run() {
                try {
-                  activeMQServer.getStorageManager().startReplication(replicationManager, activeMQServer.getPagingManager(), activeMQServer.getNodeID().toString(), isFailBackRequest && replicatedPolicy.isAllowAutoFailBack());
+                  activeMQServer.getStorageManager().startReplication(replicationManager, activeMQServer.getPagingManager(), activeMQServer.getNodeID().toString(), isFailBackRequest && replicatedPolicy.isAllowAutoFailBack(), replicatedPolicy.getInitialReplicationSyncTimeout());
 
                   clusterConnection.nodeAnnounced(System.currentTimeMillis(), activeMQServer.getNodeID().toString(), replicatedPolicy.getGroupName(), replicatedPolicy.getScaleDownGroupName(), pair, true);
 
@@ -168,13 +170,7 @@ public class SharedNothingLiveActivation extends LiveActivation {
                      BackupTopologyListener listener1 = new BackupTopologyListener(activeMQServer.getNodeID().toString(), clusterConnection.getConnector());
                      clusterConnection.addClusterTopologyListener(listener1);
                      if (listener1.waitForBackup()) {
-                        try {
-                           Thread.sleep(replicatedPolicy.getFailbackDelay());
-                        }
-                        catch (InterruptedException e) {
-                           //
-                        }
-                        //if we have to many backups kept or arent configured to restart just stop, otherwise restart as a backup
+                        //if we have to many backups kept or are not configured to restart just stop, otherwise restart as a backup
                         if (!replicatedPolicy.getReplicaPolicy().isRestartBackup() && activeMQServer.countNumberOfCopiedJournals() >= replicatedPolicy.getReplicaPolicy().getMaxSavedReplicatedJournalsSize() && replicatedPolicy.getReplicaPolicy().getMaxSavedReplicatedJournalsSize() >= 0) {
                            activeMQServer.stop(true);
                            ActiveMQServerLogger.LOGGER.stopReplicatedBackupAfterFailback();
@@ -234,16 +230,20 @@ public class SharedNothingLiveActivation extends LiveActivation {
 
       @Override
       public void connectionClosed() {
-         activeMQServer.getThreadPool().execute(new Runnable() {
-            public void run() {
-               synchronized (replicationLock) {
-                  if (replicationManager != null) {
-                     activeMQServer.getStorageManager().stopReplication();
-                     replicationManager = null;
+         ExecutorService executorService = activeMQServer.getThreadPool();
+         if (executorService != null) {
+            executorService.execute(new Runnable() {
+               @Override
+               public void run() {
+                  synchronized (replicationLock) {
+                     if (replicationManager != null) {
+                        activeMQServer.getStorageManager().stopReplication();
+                        replicationManager = null;
+                     }
                   }
                }
-            }
-         });
+            });
+         }
       }
    }
 
@@ -306,6 +306,7 @@ public class SharedNothingLiveActivation extends LiveActivation {
       }
    }
 
+   @Override
    public void close(boolean permanently, boolean restarting) throws Exception {
 
       replicationManager = null;
@@ -340,6 +341,7 @@ public class SharedNothingLiveActivation extends LiveActivation {
       }
    }
 
+   @Override
    public ReplicationManager getReplicationManager() {
       synchronized (replicationLock) {
          return replicationManager;
@@ -393,20 +395,6 @@ public class SharedNothingLiveActivation extends LiveActivation {
    }
 
    private TransportConfiguration[] connectorNameListToArray(final List<String> connectorNames) {
-      TransportConfiguration[] tcConfigs = (TransportConfiguration[]) Array.newInstance(TransportConfiguration.class, connectorNames.size());
-      int count = 0;
-      for (String connectorName : connectorNames) {
-         TransportConfiguration connector = activeMQServer.getConfiguration().getConnectorConfigurations().get(connectorName);
-
-         if (connector == null) {
-            ActiveMQServerLogger.LOGGER.bridgeNoConnector(connectorName);
-
-            return null;
-         }
-
-         tcConfigs[count++] = connector;
-      }
-
-      return tcConfigs;
+      return activeMQServer.getConfiguration().getTransportConfigurations(connectorNames);
    }
 }

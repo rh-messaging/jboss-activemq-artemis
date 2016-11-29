@@ -49,7 +49,7 @@ public class QueueMbeanRestartTest extends TestSupport {
       TestSupport.PersistenceAdapterChoice[] kahaDb = {TestSupport.PersistenceAdapterChoice.KahaDB};
       TestSupport.PersistenceAdapterChoice[] levelDb = {TestSupport.PersistenceAdapterChoice.LevelDB};
       TestSupport.PersistenceAdapterChoice[] jdbc = {TestSupport.PersistenceAdapterChoice.JDBC};
-      List<TestSupport.PersistenceAdapterChoice[]> choices = new ArrayList<TestSupport.PersistenceAdapterChoice[]>();
+      List<TestSupport.PersistenceAdapterChoice[]> choices = new ArrayList<>();
       choices.add(kahaDb);
       choices.add(levelDb);
       choices.add(jdbc);
@@ -61,12 +61,14 @@ public class QueueMbeanRestartTest extends TestSupport {
       this.persistenceAdapterChoice = choice;
    }
 
+   @Override
    @Before
    public void setUp() throws Exception {
       topic = false;
       super.setUp();
    }
 
+   @Override
    @After
    public void tearDown() throws Exception {
       super.tearDown();

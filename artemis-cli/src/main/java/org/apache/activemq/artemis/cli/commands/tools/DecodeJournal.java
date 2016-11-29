@@ -54,6 +54,7 @@ public class DecodeJournal extends LockAbstract {
    @Option(name = "--input", description = "The input file name (default=exp.dmp)", required = true)
    public String input = "exp.dmp";
 
+   @Override
    public Object execute(ActionContext context) throws Exception {
       super.execute(context);
       try {
@@ -106,7 +107,7 @@ public class DecodeJournal extends LockAbstract {
 
       NIOSequentialFileFactory nio = new NIOSequentialFileFactory(new File(directory), null, 1);
 
-      JournalImpl journal = new JournalImpl(fileSize, minFiles, 0, 0, nio, journalPrefix, journalSuffix, 1);
+      JournalImpl journal = new JournalImpl(fileSize, minFiles, minFiles, 0, 0, nio, journalPrefix, journalSuffix, 1);
 
       if (journal.orderFiles().size() != 0) {
          throw new IllegalStateException("Import needs to create a brand new journal");
@@ -121,7 +122,7 @@ public class DecodeJournal extends LockAbstract {
 
       String line;
 
-      HashMap<Long, AtomicInteger> txCounters = new HashMap<Long, AtomicInteger>();
+      HashMap<Long, AtomicInteger> txCounters = new HashMap<>();
 
       long lineNumber = 0;
 

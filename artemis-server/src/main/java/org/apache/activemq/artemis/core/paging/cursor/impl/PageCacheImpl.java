@@ -16,9 +16,6 @@
  */
 package org.apache.activemq.artemis.core.paging.cursor.impl;
 
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.activemq.artemis.core.paging.PagedMessage;
 import org.apache.activemq.artemis.core.paging.cursor.PageCache;
 import org.apache.activemq.artemis.core.paging.impl.Page;
@@ -31,8 +28,6 @@ class PageCacheImpl implements PageCache {
    // Constants -----------------------------------------------------
 
    // Attributes ----------------------------------------------------
-
-   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
    private PagedMessage[] messages;
 
@@ -50,46 +45,30 @@ class PageCacheImpl implements PageCache {
 
    @Override
    public PagedMessage getMessage(final int messageNumber) {
-      lock.readLock().lock();
-      try {
-         if (messageNumber < messages.length) {
-            return messages[messageNumber];
-         }
-         else {
-            return null;
-         }
+      if (messageNumber < messages.length) {
+         return messages[messageNumber];
       }
-      finally {
-         lock.readLock().unlock();
+      else {
+         return null;
       }
    }
 
+   @Override
    public long getPageId() {
       return page.getPageId();
    }
 
-   public void lock() {
-      lock.writeLock().lock();
-   }
-
-   public void unlock() {
-      lock.writeLock().unlock();
-   }
-
+   @Override
    public void setMessages(final PagedMessage[] messages) {
       this.messages = messages;
    }
 
+   @Override
    public int getNumberOfMessages() {
-      lock.readLock().lock();
-      try {
-         return messages.length;
-      }
-      finally {
-         lock.readLock().unlock();
-      }
+      return messages.length;
    }
 
+   @Override
    public void close() {
    }
 

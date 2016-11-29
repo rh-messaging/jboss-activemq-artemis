@@ -25,7 +25,7 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.tests.util.SingleServerTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Test;
 
 public class TransientQueueTest extends SingleServerTestBase {
@@ -200,6 +200,7 @@ public class TransientQueueTest extends SingleServerTestBase {
       assertTrue(exHappened);
    }
 
+   @Override
    protected ServerLocator createLocator() {
       return super.createLocator().setConsumerWindowSize(0).setBlockOnAcknowledge(true).setBlockOnDurableSend(false).setBlockOnNonDurableSend(false);
    }

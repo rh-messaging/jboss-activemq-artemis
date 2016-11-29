@@ -46,6 +46,7 @@ public class SlowConnectionTest extends TestCase {
       final Connection connection = cf.createConnection();
 
       new Thread(new Runnable() {
+         @Override
          public void run() {
             try {
                connection.start();
@@ -57,6 +58,7 @@ public class SlowConnectionTest extends TestCase {
 
       int count = 0;
       assertTrue("Transport count: " + count + ", expected <= 1", Wait.waitFor(new Wait.Condition() {
+         @Override
          public boolean isSatisified() throws Exception {
             int count = 0;
             for (Thread thread : Thread.getAllStackTraces().keySet()) {
@@ -80,9 +82,10 @@ public class SlowConnectionTest extends TestCase {
          super("MockBroker");
       }
 
+      @Override
       public void run() {
 
-         List<Socket> inProgress = new ArrayList<Socket>();
+         List<Socket> inProgress = new ArrayList<>();
          ServerSocketFactory factory = ServerSocketFactory.getDefault();
 
          try {

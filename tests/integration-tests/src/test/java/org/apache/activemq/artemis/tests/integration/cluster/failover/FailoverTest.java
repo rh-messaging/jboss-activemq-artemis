@@ -57,8 +57,8 @@ import org.apache.activemq.artemis.core.server.impl.InVMNodeManager;
 import org.apache.activemq.artemis.core.transaction.impl.XidImpl;
 import org.apache.activemq.artemis.jms.client.ActiveMQTextMessage;
 import org.apache.activemq.artemis.tests.util.CountDownSessionFailureListener;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.tests.util.TransportConfigurationUtils;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -122,6 +122,7 @@ public class FailoverTest extends FailoverTestBase {
       final CountDownLatch latchFailed = new CountDownLatch(1);
 
       Runnable r = new Runnable() {
+         @Override
          public void run() {
             for (int i = 0; i < 500; i++) {
                ClientMessage message = session.createMessage(true);
@@ -196,10 +197,11 @@ public class FailoverTest extends FailoverTestBase {
       final ClientConsumer consumer = session.createConsumer(FailoverTestBase.ADDRESS);
       session.start();
 
-      final Map<Integer, ClientMessage> received = new HashMap<Integer, ClientMessage>();
+      final Map<Integer, ClientMessage> received = new HashMap<>();
 
       consumer.setMessageHandler(new MessageHandler() {
 
+         @Override
          public void onMessage(ClientMessage message) {
             Integer counter = message.getIntProperty("counter");
             received.put(counter, message);
@@ -258,7 +260,7 @@ public class FailoverTest extends FailoverTestBase {
       final ClientConsumer consumer = session.createConsumer(FailoverTestBase.ADDRESS);
       session.start();
 
-      final Map<Integer, ClientMessage> received = new HashMap<Integer, ClientMessage>();
+      final Map<Integer, ClientMessage> received = new HashMap<>();
 
       Thread t = new Thread() {
          @Override
@@ -453,6 +455,7 @@ public class FailoverTest extends FailoverTestBase {
 
       consumer.setMessageHandler(new MessageHandler() {
 
+         @Override
          public void onMessage(ClientMessage message) {
             latch.countDown();
          }
@@ -463,7 +466,7 @@ public class FailoverTest extends FailoverTestBase {
 
       crash(session);
 
-      Assert.assertTrue(latch.await(1, TimeUnit.SECONDS));
+      Assert.assertTrue(latch.await(10, TimeUnit.SECONDS));
 
    }
 
@@ -1170,7 +1173,7 @@ public class FailoverTest extends FailoverTestBase {
       crash(session);
 
       try {
-         session.commit(xid, true);
+         session.commit(xid, false);
 
          Assert.fail("Should throw exception");
       }
@@ -1374,7 +1377,7 @@ public class FailoverTest extends FailoverTestBase {
       crash(session2);
 
       try {
-         session2.commit(xid, true);
+         session2.commit(xid, false);
 
          Assert.fail("Should throw exception");
       }
@@ -1390,7 +1393,6 @@ public class FailoverTest extends FailoverTestBase {
 
    @Test
    public void testCreateNewFactoryAfterFailover() throws Exception {
-      this.disableCheckThread();
       locator.setBlockOnNonDurableSend(true).setBlockOnDurableSend(true).setFailoverOnInitialConnection(true);
       sf = createSessionFactoryAndWaitForTopology(locator, 2);
 
@@ -1424,12 +1426,12 @@ public class FailoverTest extends FailoverTestBase {
 
       final int numConsumersPerSession = 5;
 
-      Map<ClientSession, List<ClientConsumer>> sessionConsumerMap = new HashMap<ClientSession, List<ClientConsumer>>();
+      Map<ClientSession, List<ClientConsumer>> sessionConsumerMap = new HashMap<>();
 
       for (int i = 0; i < numSessions; i++) {
          ClientSession session = createSession(sf, true, true);
 
-         List<ClientConsumer> consumers = new ArrayList<ClientConsumer>();
+         List<ClientConsumer> consumers = new ArrayList<>();
 
          for (int j = 0; j < numConsumersPerSession; j++) {
             SimpleString queueName = new SimpleString("queue" + i + "-" + j);

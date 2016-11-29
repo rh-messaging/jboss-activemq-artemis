@@ -33,8 +33,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.apache.activemq.transport.tcp.TcpTransport;
-import org.apache.activemq.transport.vm.VMTransport;
 import org.apache.activemq.util.Wait;
 
 /**
@@ -49,6 +47,7 @@ public class JmsRedeliveredTest extends TestCase {
     *
     * @see junit.framework.TestCase#setUp()
     */
+   @Override
    protected void setUp() throws Exception {
       connection = createConnection();
    }
@@ -56,6 +55,7 @@ public class JmsRedeliveredTest extends TestCase {
    /**
     * @see junit.framework.TestCase#tearDown()
     */
+   @Override
    protected void tearDown() throws Exception {
       if (connection != null) {
          connection.close();
@@ -533,6 +533,7 @@ public class JmsRedeliveredTest extends TestCase {
        *
        * @return int - persistent delivery mode.
        */
+      @Override
       protected int getDeliveryMode() {
          return DeliveryMode.PERSISTENT;
       }
@@ -548,6 +549,7 @@ public class JmsRedeliveredTest extends TestCase {
        *
        * @return int - non-persistent delivery mode.
        */
+      @Override
       protected int getDeliveryMode() {
          return DeliveryMode.NON_PERSISTENT;
       }

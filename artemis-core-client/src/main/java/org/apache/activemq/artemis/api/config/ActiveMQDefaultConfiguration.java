@@ -16,8 +16,8 @@
  */
 package org.apache.activemq.artemis.api.config;
 
+import org.apache.activemq.artemis.ArtemisConstants;
 import org.apache.activemq.artemis.api.core.SimpleString;
-import org.apache.activemq.artemis.core.journal.impl.JournalConstants;
 
 /**
  * Default values of ActiveMQ Artemis configuration parameters.
@@ -99,11 +99,12 @@ public final class ActiveMQDefaultConfiguration {
    // These defaults are applied depending on whether the journal type
    // is NIO or AIO.
    private static int DEFAULT_JOURNAL_MAX_IO_AIO = 500;
-   private static int DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO = JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO;
-   private static int DEFAULT_JOURNAL_BUFFER_SIZE_AIO = JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO;
+   private static int DEFAULT_JOURNAL_POOL_FILES = -1;
+   private static int DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO = ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO;
+   private static int DEFAULT_JOURNAL_BUFFER_SIZE_AIO = ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO;
    private static int DEFAULT_JOURNAL_MAX_IO_NIO = 1;
-   private static int DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO = JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO;
-   private static int DEFAULT_JOURNAL_BUFFER_SIZE_NIO = JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO;
+   private static int DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO = ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO;
+   private static int DEFAULT_JOURNAL_BUFFER_SIZE_NIO = ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO;
 
    // XXX not on schema.
    //properties passed to acceptor/connectors.
@@ -159,6 +160,9 @@ public final class ActiveMQDefaultConfiguration {
    // the name of the address that consumers bind to receive management notifications
    private static SimpleString DEFAULT_MANAGEMENT_NOTIFICATION_ADDRESS = new SimpleString("activemq.notifications");
 
+   // The default address used for clustering
+   private static String DEFAULT_CLUSTER_ADDRESS = "jms";
+
    // Cluster username. It applies to all cluster configurations.
    private static String DEFAULT_CLUSTER_USER = "ACTIVEMQ.CLUSTER.ADMIN.USER";
 
@@ -173,6 +177,9 @@ public final class ActiveMQDefaultConfiguration {
 
    // the JMX domain used to registered ActiveMQ Artemis MBeans in the MBeanServer
    private static String DEFAULT_JMX_DOMAIN = "org.apache.activemq.artemis";
+
+   // the JMX domain used to registered ActiveMQ Artemis MBeans in the MBeanServer
+   private static boolean DEFAULT_JMX_IS_USE_BROKER_NAME = true;
 
    // true means that message counters are enabled
    private static boolean DEFAULT_MESSAGE_COUNTER_ENABLED = false;
@@ -369,13 +376,13 @@ public final class ActiveMQDefaultConfiguration {
    private static int DEFAULT_MAX_SAVED_REPLICATED_JOURNALS_SIZE = 2;
 
    // Will this server, if a backup, restart once it has been stopped because of failback or scaling down.
-   private static boolean DEFAULT_RESTART_BACKUP = false;
+   private static boolean DEFAULT_RESTART_BACKUP = true;
 
    // Whether a server will automatically stop when another places a request to take over its place. The use case is when a regular server stops and its backup takes over its duties, later the main server restarts and requests the server (the former backup) to stop operating.
    private static boolean DEFAULT_ALLOW_AUTO_FAILBACK = true;
 
-   // if we have to start as a replicated server this is the delay to wait before fail-back occurs
-   private static long DEFAULT_FAILBACK_DELAY = 5000;
+   // When a replica comes online this is how long the replicating server will wait for a confirmation from the replica that the replication synchronization process is complete
+   private static long DEFAULT_INITIAL_REPLICATION_SYNC_TIMEOUT = 30000;
 
    // Will this backup server come live on a normal server shutdown
    private static boolean DEFAULT_FAILOVER_ON_SERVER_SHUTDOWN = false;
@@ -391,6 +398,18 @@ public final class ActiveMQDefaultConfiguration {
 
    // How often the reaper will be run to check for timed out group bindings. Only valid for LOCAL handlers
    private static long DEFAULT_GROUPING_HANDLER_REAPER_PERIOD = 30000;
+
+   // Which store type to use, options are FILE or DATABASE, FILE is default.
+   private static String DEFAULT_STORE_TYPE = "FILE";
+
+   // Default database url.  Derby database is used by default.
+   private static String DEFAULT_DATABASE_URL = "jdbc:derby:data/derby;create=true";
+
+   // Default message table name, used with Database storage type
+   private static String DEFAULT_MESSAGE_TABLE_NAME = "MESSAGES";
+
+   // Default bindings table name, used with Database storage type
+   private static String DEFAULT_BINDINGS_TABLE_NAME = "BINDINGS";
 
    /**
     * If true then the ActiveMQ Artemis Server will make use of any Protocol Managers that are in available on the classpath. If false then only the core protocol will be available, unless in Embedded mode where users can inject their own Protocol Managers.
@@ -483,6 +502,11 @@ public final class ActiveMQDefaultConfiguration {
       return DEFAULT_MANAGEMENT_NOTIFICATION_ADDRESS;
    }
 
+   /** The default Cluster address for the Cluster connection*/
+   public static String getDefaultClusterAddress() {
+      return DEFAULT_CLUSTER_ADDRESS;
+   }
+
    /**
     * Cluster username. It applies to all cluster configurations.
     */
@@ -516,6 +540,10 @@ public final class ActiveMQDefaultConfiguration {
     */
    public static String getDefaultJmxDomain() {
       return DEFAULT_JMX_DOMAIN;
+   }
+
+   public static boolean isDefaultJMXUseBrokerName() {
+      return DEFAULT_JMX_IS_USE_BROKER_NAME;
    }
 
    /**
@@ -677,6 +705,14 @@ public final class ActiveMQDefaultConfiguration {
     */
    public static int getDefaultJournalMinFiles() {
       return DEFAULT_JOURNAL_MIN_FILES;
+   }
+
+   /**
+    * How many journal files can be resued
+    * @return
+    */
+   public static int getDefaultJournalPoolFiles() {
+      return DEFAULT_JOURNAL_POOL_FILES;
    }
 
    /**
@@ -987,9 +1023,19 @@ public final class ActiveMQDefaultConfiguration {
    /**
     * if we have to start as a replicated server this is the delay to wait before fail-back occurs
     */
-   public static long getDefaultFailbackDelay() {
-      return DEFAULT_FAILBACK_DELAY;
+   public static long getDefaultInitialReplicationSyncTimeout() {
+      return DEFAULT_INITIAL_REPLICATION_SYNC_TIMEOUT;
    }
+
+   /**
+    * if we have to start as a replicated server this is the delay to wait before fail-back occurs
+    * @deprecated  use getDefaultInitialReplicationSyncTimeout()
+    */
+   @Deprecated
+   public static long getDefaultFailbackDelay() {
+      return 5000;
+   }
+
 
    /**
     * Will this backup server come live on a normal server shutdown
@@ -1026,4 +1072,28 @@ public final class ActiveMQDefaultConfiguration {
       return DEFAULT_GROUPING_HANDLER_REAPER_PERIOD;
    }
 
+   /**
+    * The default storage type.  Options are FILE and DATABASE.
+    */
+   public static String getDefaultStoreType() {
+      return DEFAULT_STORE_TYPE;
+   }
+
+   /**
+    * The default database URL, used with DATABASE store type.
+    */
+   public static String getDefaultDatabaseUrl() {
+      return DEFAULT_DATABASE_URL;
+   }
+
+   /**
+    * The default Message Journal table name, used with DATABASE store.
+    */
+   public static String getDefaultMessageTableName() {
+      return DEFAULT_MESSAGE_TABLE_NAME;
+   }
+
+   public static String getDefaultBindingsTableName() {
+      return DEFAULT_BINDINGS_TABLE_NAME;
+   }
 }

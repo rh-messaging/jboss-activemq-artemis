@@ -52,6 +52,7 @@ public class AMQ4351Test extends BrokerTestSupport {
       junit.textui.TestRunner.run(suite());
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       BrokerService broker = new BrokerService();
 
@@ -228,7 +229,7 @@ public class AMQ4351Test extends BrokerTestSupport {
          listener2.start();
          listener3.start();
 
-         List<ConsumingClient> subscribers = new ArrayList<ConsumingClient>(subs);
+         List<ConsumingClient> subscribers = new ArrayList<>(subs);
          for (int i = 4; i < subs; i++) {
             ConsumingClient client = new ConsumingClient("subscriber-" + i, startedLatch, shutdownLatch);
             subscribers.add(client);

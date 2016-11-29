@@ -17,10 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
 import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
@@ -37,12 +33,14 @@ public class BrokerIdTest extends DataFileGeneratorTestSupport {
 
    public static BrokerIdTest SINGLETON = new BrokerIdTest();
 
+   @Override
    public Object createObject() throws Exception {
       BrokerId info = new BrokerId();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       BrokerId info = (BrokerId) object;

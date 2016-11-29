@@ -22,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Executor;
 
 import io.netty.channel.ChannelPipeline;
@@ -31,20 +30,13 @@ import org.apache.activemq.artemis.api.core.ActiveMQExceptionType;
 import org.apache.activemq.artemis.api.core.BaseInterceptor;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
-import org.apache.activemq.artemis.api.core.management.CoreNotificationType;
-import org.apache.activemq.artemis.api.core.management.ManagementHelper;
 import org.apache.activemq.artemis.core.io.IOCallback;
-import org.apache.activemq.artemis.core.postoffice.BindingType;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyServerConnection;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
-import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.ServerSession;
 import org.apache.activemq.artemis.core.server.impl.ServerMessageImpl;
-import org.apache.activemq.artemis.core.server.management.ManagementService;
-import org.apache.activemq.artemis.core.server.management.Notification;
-import org.apache.activemq.artemis.core.server.management.NotificationListener;
 import org.apache.activemq.artemis.spi.core.protocol.ConnectionEntry;
 import org.apache.activemq.artemis.spi.core.protocol.MessageConverter;
 import org.apache.activemq.artemis.spi.core.protocol.ProtocolManager;
@@ -53,8 +45,6 @@ import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.Acceptor;
 import org.apache.activemq.artemis.spi.core.remoting.Connection;
 import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManager;
-import org.apache.activemq.artemis.utils.ConcurrentHashSet;
-import org.apache.activemq.artemis.utils.TypedProperties;
 import org.apache.activemq.artemis.utils.UUIDGenerator;
 
 import static org.apache.activemq.artemis.core.protocol.stomp.ActiveMQStompProtocolMessageBundle.BUNDLE;
@@ -62,7 +52,7 @@ import static org.apache.activemq.artemis.core.protocol.stomp.ActiveMQStompProto
 /**
  * StompProtocolManager
  */
-class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, NotificationListener {
+class StompProtocolManager implements ProtocolManager<StompFrameInterceptor> {
    // Constants -----------------------------------------------------
 
    // Attributes ----------------------------------------------------
@@ -73,12 +63,10 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
 
    private final Executor executor;
 
-   private final Map<String, StompSession> transactedSessions = new HashMap<String, StompSession>();
+   private final Map<String, StompSession> transactedSessions = new HashMap<>();
 
    // key => connection ID, value => Stomp session
-   private final Map<Object, StompSession> sessions = new HashMap<Object, StompSession>();
-
-   private final Set<String> destinations = new ConcurrentHashSet<String>();
+   private final Map<Object, StompSession> sessions = new HashMap<>();
 
    private final List<StompFrameInterceptor> incomingInterceptors;
    private final List<StompFrameInterceptor> outgoingInterceptors;
@@ -94,14 +82,13 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
       this.factory = factory;
       this.server = server;
       this.executor = server.getExecutorFactory().getExecutor();
-      ManagementService service = server.getManagementService();
-      if (service != null) {
-         //allow management message to pass
-         destinations.add(service.getManagementAddress().toString());
-         service.addNotificationListener(this);
-      }
       this.incomingInterceptors = incomingInterceptors;
       this.outgoingInterceptors = outgoingInterceptors;
+   }
+
+   @Override
+   public boolean acceptsNoHandshake() {
+      return false;
    }
 
    @Override
@@ -125,6 +112,7 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
 
    // ProtocolManager implementation --------------------------------
 
+   @Override
    public ConnectionEntry createConnectionEntry(final Acceptor acceptorUsed, final Connection connection) {
       StompConnection conn = new StompConnection(acceptorUsed, connection, this);
 
@@ -152,9 +140,11 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
       }
    }
 
+   @Override
    public void removeHandler(String name) {
    }
 
+   @Override
    public void handleBuffer(final RemotingConnection connection, final ActiveMQBuffer buffer) {
       StompConnection conn = (StompConnection) connection;
 
@@ -262,6 +252,7 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
 
       // Close the session outside of the lock on the StompConnection, otherwise it could dead lock
       this.executor.execute(new Runnable() {
+         @Override
          public void run() {
             StompSession session = sessions.remove(connection.getID());
             if (session != null) {
@@ -297,6 +288,7 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
 
    public void sendReply(final StompConnection connection, final StompFrame frame) {
       server.getStorageManager().afterCompleteOperations(new IOCallback() {
+         @Override
          public void onError(final int errorCode, final String errorMessage) {
             ActiveMQServerLogger.LOGGER.errorProcessingIOCallback(errorCode, errorMessage);
 
@@ -306,6 +298,7 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
             send(connection, error);
          }
 
+         @Override
          public void done() {
             send(connection, frame);
          }
@@ -411,45 +404,7 @@ class StompProtocolManager implements ProtocolManager<StompFrameInterceptor>, No
    }
 
    public boolean destinationExists(String destination) {
-      return destinations.contains(destination);
-   }
-
-   @Override
-   public void onNotification(Notification notification) {
-      if (!(notification.getType() instanceof CoreNotificationType))
-         return;
-
-      CoreNotificationType type = (CoreNotificationType) notification.getType();
-
-      TypedProperties props = notification.getProperties();
-
-      switch (type) {
-         case BINDING_ADDED: {
-            if (!props.containsProperty(ManagementHelper.HDR_BINDING_TYPE)) {
-               throw ActiveMQMessageBundle.BUNDLE.bindingTypeNotSpecified();
-            }
-
-            Integer bindingType = props.getIntProperty(ManagementHelper.HDR_BINDING_TYPE);
-
-            if (bindingType == BindingType.DIVERT_INDEX) {
-               return;
-            }
-
-            SimpleString address = props.getSimpleStringProperty(ManagementHelper.HDR_ADDRESS);
-
-            destinations.add(address.toString());
-
-            break;
-         }
-         case BINDING_REMOVED: {
-            SimpleString address = props.getSimpleStringProperty(ManagementHelper.HDR_ADDRESS);
-            destinations.remove(address.toString());
-            break;
-         }
-         default:
-            //ignore all others
-            break;
-      }
+      return server.getPostOffice().getAddresses().contains(SimpleString.toSimpleString(destination));
    }
 
    public ActiveMQServer getServer() {

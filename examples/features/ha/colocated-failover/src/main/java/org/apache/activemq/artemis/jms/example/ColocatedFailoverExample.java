@@ -16,8 +16,6 @@
  */
 package org.apache.activemq.artemis.jms.example;
 
-import org.apache.activemq.artemis.util.ServerUtil;
-
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.MessageConsumer;
@@ -27,6 +25,8 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.naming.InitialContext;
 import java.util.Hashtable;
+
+import org.apache.activemq.artemis.util.ServerUtil;
 
 /**
  * A simple example that demonstrates a colocated server
@@ -50,14 +50,16 @@ public class ColocatedFailoverExample {
          server0 = ServerUtil.startServer(args[0], ColocatedFailoverExample.class.getSimpleName() + "0", 0, 5000);
          server1 = ServerUtil.startServer(args[1], ColocatedFailoverExample.class.getSimpleName() + "1", 1, 5000);
 
+         Thread.sleep(3000);
+
          // Step 1. Get an initial context for looking up JNDI for both servers
-         Hashtable<String, Object> properties = new Hashtable<String, Object>();
+         Hashtable<String, Object> properties = new Hashtable<>();
          properties.put("java.naming.factory.initial", "org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory");
          properties.put("connectionFactory.ConnectionFactory", "tcp://localhost:61616?ha=true&retryInterval=1000&retryIntervalMultiplier=1.0&reconnectAttempts=-1");
          properties.put("queue.queue/exampleQueue", "exampleQueue");
          initialContext = new InitialContext(properties);
 
-         properties = new Hashtable<String, Object>();
+         properties = new Hashtable<>();
          properties.put("java.naming.factory.initial", "org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory");
          properties.put("connectionFactory.ConnectionFactory", "tcp://localhost:61617");
          initialContext1 = new InitialContext(properties);

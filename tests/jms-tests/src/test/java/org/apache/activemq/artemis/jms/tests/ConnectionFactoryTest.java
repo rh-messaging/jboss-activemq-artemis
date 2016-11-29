@@ -184,7 +184,7 @@ public class ConnectionFactoryTest extends JMSTestCase {
 
    @Test
    public void testSlowConsumers() throws Exception {
-      ArrayList<String> bindings = new ArrayList<String>();
+      ArrayList<String> bindings = new ArrayList<>();
       bindings.add("TestSlowConsumersCF");
       ActiveMQServerTestCase.deployConnectionFactory(0, "TestSlowConsumersCF", 1, "TestSlowConsumersCF");
 
@@ -207,6 +207,7 @@ public class ConnectionFactoryTest extends JMSTestCase {
 
             int processed;
 
+            @Override
             public void onMessage(final Message msg) {
                processed++;
 
@@ -224,6 +225,7 @@ public class ConnectionFactoryTest extends JMSTestCase {
 
             int processed;
 
+            @Override
             public void onMessage(final Message msg) {
                processed++;
 

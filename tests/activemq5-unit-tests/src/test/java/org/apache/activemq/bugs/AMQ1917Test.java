@@ -61,6 +61,7 @@ public class AMQ1917Test extends TestCase {
    final Session[] sessions = new Session[NUM_THREADS];
    final MessageProducer[] producers = new MessageProducer[NUM_THREADS];
 
+   @Override
    public void setUp() throws Exception {
       broker = new BrokerService();
       broker.setPersistent(false);
@@ -69,12 +70,13 @@ public class AMQ1917Test extends TestCase {
 
       connectionUri = broker.getTransportConnectors().get(0).getPublishableConnectString();
 
-      BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(10000);
+      BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(10000);
       tpe = new ThreadPoolExecutor(NUM_THREADS, NUM_THREADS, 60000, TimeUnit.MILLISECONDS, queue);
       ThreadFactory limitedthreadFactory = new LimitedThreadFactory(tpe.getThreadFactory());
       tpe.setThreadFactory(limitedthreadFactory);
    }
 
+   @Override
    public void tearDown() throws Exception {
       broker.stop();
       tpe.shutdown();
@@ -118,6 +120,7 @@ public class AMQ1917Test extends TestCase {
       connection.start();
 
       new Thread() {
+         @Override
          public void run() {
             while (working) {
                // wait for messages in infinitive loop
@@ -169,6 +172,7 @@ public class AMQ1917Test extends TestCase {
          return idx;
       }
 
+      @Override
       public void run() {
          try {
             // get thread session and producer from pool
@@ -212,6 +216,7 @@ public class AMQ1917Test extends TestCase {
          this.factory = threadFactory;
       }
 
+      @Override
       public Thread newThread(Runnable arg0) {
          if (++threadCount > NUM_THREADS) {
             errorLatch.countDown();

@@ -44,10 +44,10 @@ public class MessageGroupCloseTest extends TestCase {
 
    private int messagesSent, messagesRecvd1, messagesRecvd2, messageGroupCount, errorCountFirstForConsumer, errorCountWrongConsumerClose, errorCountDuplicateClose;
    // groupID, count
-   private HashMap<String, Integer> messageGroups1 = new HashMap<String, Integer>();
-   private HashMap<String, Integer> messageGroups2 = new HashMap<String, Integer>();
-   private HashSet<String> closedGroups1 = new HashSet<String>();
-   private HashSet<String> closedGroups2 = new HashSet<String>();
+   private HashMap<String, Integer> messageGroups1 = new HashMap<>();
+   private HashMap<String, Integer> messageGroups2 = new HashMap<>();
+   private HashSet<String> closedGroups1 = new HashSet<>();
+   private HashSet<String> closedGroups2 = new HashSet<>();
    // with the prefetch too high, this bug is not realized
    private static final String connStr = "vm://localhost?broker.persistent=false&broker.useJmx=false&jms.prefetchPolicy.all=1";
 
@@ -57,6 +57,7 @@ public class MessageGroupCloseTest extends TestCase {
       connection.start();
       final String queueName = this.getClass().getSimpleName();
       final Thread producerThread = new Thread() {
+         @Override
          public void run() {
             try {
                Session session = connection.createSession(true, Session.SESSION_TRANSACTED);
@@ -91,6 +92,7 @@ public class MessageGroupCloseTest extends TestCase {
          }
       };
       final Thread consumerThread1 = new Thread() {
+         @Override
          public void run() {
             try {
                latchMessagesCreated.await();
@@ -122,6 +124,7 @@ public class MessageGroupCloseTest extends TestCase {
          }
       };
       final Thread consumerThread2 = new Thread() {
+         @Override
          public void run() {
             try {
                latchMessagesCreated.await();

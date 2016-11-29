@@ -53,7 +53,7 @@ public class VerifyNetworkConsumersDisconnectTest extends JmsMultipleBrokersTest
    public static final int TIMEOUT = 30000;
 
    protected Map<String, MessageConsumer> consumerMap;
-   final Map<Thread, Throwable> unhandledExceptions = new HashMap<Thread, Throwable>();
+   final Map<Thread, Throwable> unhandledExceptions = new HashMap<>();
 
    private void assertNoUnhandledExceptions() {
       for (Entry<Thread, Throwable> e : unhandledExceptions.entrySet()) {
@@ -220,7 +220,7 @@ public class VerifyNetworkConsumersDisconnectTest extends JmsMultipleBrokersTest
                QueueViewMBean queueViewMBean = (QueueViewMBean) context.newProxyInstance(brokers.get(brokerName).broker.getAdminView().getQueues()[0], QueueViewMBean.class, false);
                long currentCount = queueViewMBean.getConsumerCount();
                LOG.info("On " + brokerName + " current consumer count for " + queueViewMBean + ", " + currentCount);
-               LinkedList<String> consumerIds = new LinkedList<String>();
+               LinkedList<String> consumerIds = new LinkedList<>();
                for (ObjectName objectName : queueViewMBean.getSubscriptions()) {
                   consumerIds.add(objectName.getKeyProperty("consumerId"));
                }
@@ -241,6 +241,7 @@ public class VerifyNetworkConsumersDisconnectTest extends JmsMultipleBrokersTest
       }, timeout));
    }
 
+   @Override
    public void setUp() throws Exception {
       super.setAutoFail(true);
       super.setUp();
@@ -253,7 +254,7 @@ public class VerifyNetworkConsumersDisconnectTest extends JmsMultipleBrokersTest
          createBroker(new URI("broker:(tcp://localhost:6161" + i + ")/Broker" + i + "?persistent=false&useJmx=true&brokerId=Broker" + i));
       }
 
-      consumerMap = new LinkedHashMap<String, MessageConsumer>();
+      consumerMap = new LinkedHashMap<>();
    }
 
    @Override
@@ -265,6 +266,7 @@ public class VerifyNetworkConsumersDisconnectTest extends JmsMultipleBrokersTest
       brokerService.setDestinationPolicy(policyMap);
    }
 
+   @Override
    public void uncaughtException(Thread t, Throwable e) {
       synchronized (unhandledExceptions) {
          unhandledExceptions.put(t, e);

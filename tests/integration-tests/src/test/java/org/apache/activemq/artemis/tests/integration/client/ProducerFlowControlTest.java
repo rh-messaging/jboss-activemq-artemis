@@ -34,8 +34,8 @@ import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
 import org.apache.activemq.artemis.core.settings.impl.AddressFullMessagePolicy;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -226,6 +226,7 @@ public class ProducerFlowControlTest extends ActiveMQTestBase {
 
          volatile Exception exception;
 
+         @Override
          public void onMessage(final ClientMessage message) {
             try {
                byte[] bytesRead = new byte[messageSize];
@@ -341,6 +342,7 @@ public class ProducerFlowControlTest extends ActiveMQTestBase {
       final AtomicBoolean closed = new AtomicBoolean(false);
 
       Thread t = new Thread(new Runnable() {
+         @Override
          public void run() {
             try {
                Thread.sleep(500);
@@ -609,7 +611,7 @@ public class ProducerFlowControlTest extends ActiveMQTestBase {
 
       ClientProducerCredits credits = null;
 
-      List<ClientProducerCredits> creditsList = new ArrayList<ClientProducerCredits>();
+      List<ClientProducerCredits> creditsList = new ArrayList<>();
 
       for (int i = 0; i < ClientProducerCreditManagerImpl.MAX_UNREFERENCED_CREDITS_CACHE_SIZE; i++) {
          ClientProducer prod = session.createProducer("address" + i);

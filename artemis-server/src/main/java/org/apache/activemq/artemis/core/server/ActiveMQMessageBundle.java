@@ -149,8 +149,8 @@ public interface ActiveMQMessageBundle {
    @Message(id = 119030, value = "large-message not initialized on server")
    ActiveMQIllegalStateException largeMessageNotInitialised();
 
-   @Message(id = 119031, value = "Unable to validate user: {0}", format = Message.Format.MESSAGE_FORMAT)
-   ActiveMQSecurityException unableToValidateUser(String user);
+   @Message(id = 119031, value = "Unable to validate user", format = Message.Format.MESSAGE_FORMAT)
+   ActiveMQSecurityException unableToValidateUser();
 
    @Message(id = 119032, value = "User: {0} does not have permission=''{1}'' on address {2}", format = Message.Format.MESSAGE_FORMAT)
    ActiveMQSecurityException userNoPermissions(String username, CheckType checkType, String saddress);
@@ -359,4 +359,10 @@ public interface ActiveMQMessageBundle {
 
    @Message(id = 119113, value = "Invalid message load balancing type {0}", format = Message.Format.MESSAGE_FORMAT)
    IllegalArgumentException invalidMessageLoadBalancingType(String val);
+
+   @Message(id = 119114, value = "Replication synchronization process timed out after waiting {0} milliseconds", format = Message.Format.MESSAGE_FORMAT)
+   IllegalStateException replicationSynchronizationTimeout(long timeout);
+
+   @Message(id = 119115, value = "Colocated Policy hasn't different type live and backup", format = Message.Format.MESSAGE_FORMAT)
+   ActiveMQIllegalStateException liveBackupMismatch();
 }

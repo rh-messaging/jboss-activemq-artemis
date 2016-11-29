@@ -18,6 +18,7 @@ package org.apache.activemq.artemis.tests.integration.cluster.failover;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.activemq.artemis.api.core.ActiveMQDuplicateIdException;
 import org.apache.activemq.artemis.api.core.ActiveMQException;
@@ -32,11 +33,10 @@ import org.apache.activemq.artemis.api.core.client.ClientMessage;
 import org.apache.activemq.artemis.api.core.client.ClientProducer;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
-import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionFactoryInternal;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
-import org.apache.activemq.artemis.core.client.impl.DelegatingSession;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
+import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.CountDownSessionFailureListener;
 import org.apache.activemq.artemis.tests.util.TransportConfigurationUtils;
 import org.junit.Assert;
@@ -60,6 +60,7 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
    @Test
    public void testNonTransactional() throws Throwable {
       runTest(new TestRunner() {
+         @Override
          public void run() {
             try {
                doTestNonTransactional(this);
@@ -77,6 +78,7 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
       runTest(new TestRunner() {
          volatile boolean running = false;
 
+         @Override
          public void run() {
             try {
                assertFalse(running);
@@ -100,7 +102,7 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
 
       volatile boolean failed;
 
-      ArrayList<Throwable> errors = new ArrayList<Throwable>();
+      ArrayList<Throwable> errors = new ArrayList<>();
 
       boolean isFailed() {
          return failed;
@@ -134,8 +136,6 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
 
    private void runTest(final TestRunner runnable) throws Throwable {
       final int numIts = 1;
-
-      DelegatingSession.debug = true;
 
       try {
          for (int i = 0; i < numIts; i++) {
@@ -183,15 +183,16 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
 
                AsynchronousFailoverTest.log.info("Fail complete");
 
-               t.join();
+               t.join(TimeUnit.SECONDS.toMillis(20));
+               if (t.isAlive()) {
+                  System.out.println(threadDump("Thread still running from the test"));
+                  t.interrupt();
+                  fail("Test didn't complete successful, thread still running");
+               }
 
                runnable.checkForExceptions();
 
                createSession.close();
-
-               if (sf.numSessions() != 0) {
-                  DelegatingSession.dumpSessionCreationStacks();
-               }
 
                Assert.assertEquals(0, sf.numSessions());
 
@@ -212,7 +213,6 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
          }
       }
       finally {
-         DelegatingSession.debug = false;
       }
    }
 
@@ -285,7 +285,7 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
 
          session.start();
 
-         List<Integer> counts = new ArrayList<Integer>(1000);
+         List<Integer> counts = new ArrayList<>(1000);
          int lastCount = -1;
          boolean counterGap = false;
          while (true) {
@@ -406,7 +406,7 @@ public class AsynchronousFailoverTest extends FailoverTestBase {
 
             ClientConsumer consumer = null;
             do {
-               ArrayList<Integer> msgs = new ArrayList<Integer>();
+               ArrayList<Integer> msgs = new ArrayList<>();
                try {
                   if (consumer == null) {
                      consumer = session.createConsumer(FailoverTestBase.ADDRESS);

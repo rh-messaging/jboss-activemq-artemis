@@ -160,6 +160,7 @@ public class PerDestinationStoreLimitTest extends JmsTestSupport {
       }
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       BrokerService service = new BrokerService();
       service.setDeleteAllMessagesOnStartup(true);
@@ -180,20 +181,23 @@ public class PerDestinationStoreLimitTest extends JmsTestSupport {
       return service;
    }
 
+   @Override
    public void setUp() throws Exception {
       setAutoFail(true);
       super.setUp();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       if (connection != null) {
-         TcpTransport t = (TcpTransport) connection.getTransport().narrow(TcpTransport.class);
+         TcpTransport t = connection.getTransport().narrow(TcpTransport.class);
          t.getTransportListener().onException(new IOException("Disposed."));
          connection.getTransport().stop();
          super.tearDown();
       }
    }
 
+   @Override
    protected ConnectionFactory createConnectionFactory() throws Exception {
       return new ActiveMQConnectionFactory(connector.getConnectUri());
    }

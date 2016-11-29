@@ -16,6 +16,19 @@
  */
 package org.apache.activemq.artemis.core.deployers.impl;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.activemq.artemis.ArtemisConstants;
 import org.apache.activemq.artemis.api.config.ActiveMQDefaultConfiguration;
 import org.apache.activemq.artemis.api.core.BroadcastEndpointFactory;
 import org.apache.activemq.artemis.api.core.BroadcastGroupConfiguration;
@@ -41,11 +54,13 @@ import org.apache.activemq.artemis.core.config.ha.SharedStoreMasterPolicyConfigu
 import org.apache.activemq.artemis.core.config.ha.SharedStoreSlavePolicyConfiguration;
 import org.apache.activemq.artemis.core.config.impl.ConfigurationImpl;
 import org.apache.activemq.artemis.core.config.impl.Validators;
+import org.apache.activemq.artemis.core.config.storage.DatabaseStorageConfiguration;
+import org.apache.activemq.artemis.core.config.storage.FileStorageConfiguration;
 import org.apache.activemq.artemis.core.io.aio.AIOSequentialFileFactory;
-import org.apache.activemq.artemis.core.journal.impl.JournalConstants;
 import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.JournalType;
+import org.apache.activemq.artemis.core.server.SecuritySettingPlugin;
 import org.apache.activemq.artemis.core.server.cluster.impl.MessageLoadBalancingType;
 import org.apache.activemq.artemis.core.server.group.impl.GroupingHandlerConfiguration;
 import org.apache.activemq.artemis.core.settings.impl.AddressFullMessagePolicy;
@@ -54,6 +69,7 @@ import org.apache.activemq.artemis.core.settings.impl.ResourceLimitSettings;
 import org.apache.activemq.artemis.core.settings.impl.SlowConsumerPolicy;
 import org.apache.activemq.artemis.uri.AcceptorTransportConfigurationParser;
 import org.apache.activemq.artemis.uri.ConnectorTransportConfigurationParser;
+import org.apache.activemq.artemis.utils.ClassloadingUtil;
 import org.apache.activemq.artemis.utils.DefaultSensitiveStringCodec;
 import org.apache.activemq.artemis.utils.PasswordMaskingUtil;
 import org.apache.activemq.artemis.utils.SensitiveDataCodec;
@@ -64,16 +80,6 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * Parses an XML document according to the {@literal artemis-configuration.xsd} schema.
  */
@@ -82,11 +88,19 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
    // Security Parsing
    public static final String SECURITY_ELEMENT_NAME = "security-setting";
 
+   public static final String SECURITY_PLUGIN_ELEMENT_NAME = "security-setting-plugin";
+
    private static final String PERMISSION_ELEMENT_NAME = "permission";
+
+   private static final String SETTING_ELEMENT_NAME = "setting";
 
    private static final String TYPE_ATTR_NAME = "type";
 
    private static final String ROLES_ATTR_NAME = "roles";
+
+   private static final String NAME_ATTR_NAME = "name";
+
+   private static final String VALUE_ATTR_NAME = "value";
 
    static final String CREATEDURABLEQUEUE_NAME = "createDurableQueue";
 
@@ -149,6 +163,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
    private static final String AUTO_DELETE_JMS_QUEUES = "auto-delete-jms-queues";
 
+   private static final String MANAGEMENT_BROWSE_PAGE_SIZE = "management-browse-page-size";
+
    private static final String MAX_CONNECTIONS_NODE_NAME = "max-connections";
 
    private static final String MAX_QUEUES_NODE_NAME = "max-queues";
@@ -200,6 +216,12 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
          config.setHAPolicyConfiguration(new LiveOnlyPolicyConfiguration());
       }
 
+      NodeList storeTypeNodes = e.getElementsByTagName("store");
+
+      if (storeTypeNodes.getLength() > 0) {
+         parseStoreConfiguration((Element) storeTypeNodes.item(0), config);
+      }
+
       config.setResolveProtocols(getBoolean(e, "resolve-protocols", config.isResolveProtocols()));
 
       config.setPersistenceEnabled(getBoolean(e, "persistence-enabled", config.isPersistenceEnabled()));
@@ -219,6 +241,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       config.setJMXManagementEnabled(getBoolean(e, "jmx-management-enabled", config.isJMXManagementEnabled()));
 
       config.setJMXDomain(getString(e, "jmx-domain", config.getJMXDomain(), Validators.NOT_NULL_OR_EMPTY));
+
+      config.setJMXUseBrokerName(getBoolean(e, "jmx-use-broker-name", config.isJMXUseBrokerName()));
 
       config.setSecurityInvalidationInterval(getLong(e, "security-invalidation-interval", config.getSecurityInvalidationInterval(), Validators.GT_ZERO));
 
@@ -265,7 +289,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       NodeList interceptorNodes = e.getElementsByTagName("remoting-interceptors");
 
-      ArrayList<String> incomingInterceptorList = new ArrayList<String>();
+      ArrayList<String> incomingInterceptorList = new ArrayList<>();
 
       if (interceptorNodes.getLength() > 0) {
          NodeList interceptors = interceptorNodes.item(0).getChildNodes();
@@ -297,7 +321,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       NodeList outgoingInterceptorNodes = e.getElementsByTagName("remoting-outgoing-interceptors");
 
-      ArrayList<String> outgoingInterceptorList = new ArrayList<String>();
+      ArrayList<String> outgoingInterceptorList = new ArrayList<>();
 
       if (outgoingInterceptorNodes.getLength() > 0) {
          NodeList interceptors = outgoingInterceptorNodes.item(0).getChildNodes();
@@ -385,6 +409,14 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
          parseClusterConnectionConfiguration(ccNode, config);
       }
 
+      NodeList ccNodesURI = e.getElementsByTagName("cluster-connection-uri");
+
+      for (int i = 0; i < ccNodesURI.getLength(); i++) {
+         Element ccNode = (Element) ccNodesURI.item(i);
+
+         parseClusterConnectionConfigurationURI(ccNode, config);
+      }
+
       NodeList dvNodes = e.getElementsByTagName("divert");
 
       for (int i = 0; i < dvNodes.getLength(); i++) {
@@ -439,9 +471,9 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       config.setJournalFileSize(getInteger(e, "journal-file-size", config.getJournalFileSize(), Validators.GT_ZERO));
 
-      int journalBufferTimeout = getInteger(e, "journal-buffer-timeout", config.getJournalType() == JournalType.ASYNCIO ? JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO : JournalConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, Validators.GT_ZERO);
+      int journalBufferTimeout = getInteger(e, "journal-buffer-timeout", config.getJournalType() == JournalType.ASYNCIO ? ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_AIO : ArtemisConstants.DEFAULT_JOURNAL_BUFFER_TIMEOUT_NIO, Validators.GT_ZERO);
 
-      int journalBufferSize = getInteger(e, "journal-buffer-size", config.getJournalType() == JournalType.ASYNCIO ? JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO : JournalConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, Validators.GT_ZERO);
+      int journalBufferSize = getInteger(e, "journal-buffer-size", config.getJournalType() == JournalType.ASYNCIO ? ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_AIO : ArtemisConstants.DEFAULT_JOURNAL_BUFFER_SIZE_NIO, Validators.GT_ZERO);
 
       int journalMaxIO = getInteger(e, "journal-max-io", config.getJournalType() == JournalType.ASYNCIO ? ActiveMQDefaultConfiguration.getDefaultJournalMaxIoAio() : ActiveMQDefaultConfiguration.getDefaultJournalMaxIoNio(), Validators.GT_ZERO);
 
@@ -457,6 +489,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       }
 
       config.setJournalMinFiles(getInteger(e, "journal-min-files", config.getJournalMinFiles(), Validators.GT_ZERO));
+
+      config.setJournalPoolFiles(getInteger(e, "journal-pool-files", config.getJournalPoolFiles(), Validators.MINUS_ONE_OR_GT_ZERO));
 
       config.setJournalCompactMinFiles(getInteger(e, "journal-compact-min-files", config.getJournalCompactMinFiles(), Validators.GE_ZERO));
 
@@ -492,7 +526,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       NodeList connectorServiceConfigs = e.getElementsByTagName("connector-service");
 
-      ArrayList<ConnectorServiceConfiguration> configs = new ArrayList<ConnectorServiceConfiguration>();
+      ArrayList<ConnectorServiceConfiguration> configs = new ArrayList<>();
 
       for (int i = 0; i < connectorServiceConfigs.getLength(); i++) {
          Element node = (Element) connectorServiceConfigs.item(i);
@@ -515,7 +549,12 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
          NodeList list = node.getElementsByTagName(SECURITY_ELEMENT_NAME);
          for (int i = 0; i < list.getLength(); i++) {
             Pair<String, Set<Role>> securityItem = parseSecurityRoles(list.item(i));
-            config.getSecurityRoles().put(securityItem.getA(), securityItem.getB());
+            config.putSecurityRoles(securityItem.getA(), securityItem.getB());
+         }
+         list = node.getElementsByTagName(SECURITY_PLUGIN_ELEMENT_NAME);
+         for (int i = 0; i < list.getLength(); i++) {
+            Pair<SecuritySettingPlugin, Map<String, String>> securityItem = parseSecuritySettingPlugins(list.item(i));
+            config.addSecuritySettingPlugin(securityItem.getA().init(securityItem.getB()));
          }
       }
    }
@@ -577,18 +616,18 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
    protected Pair<String, Set<Role>> parseSecurityRoles(final Node node) {
       final String match = node.getAttributes().getNamedItem("match").getNodeValue();
 
-      HashSet<Role> securityRoles = new HashSet<Role>();
+      HashSet<Role> securityRoles = new HashSet<>();
 
       Pair<String, Set<Role>> securityMatch = new Pair<String, Set<Role>>(match, securityRoles);
 
-      ArrayList<String> send = new ArrayList<String>();
-      ArrayList<String> consume = new ArrayList<String>();
-      ArrayList<String> createDurableQueue = new ArrayList<String>();
-      ArrayList<String> deleteDurableQueue = new ArrayList<String>();
-      ArrayList<String> createNonDurableQueue = new ArrayList<String>();
-      ArrayList<String> deleteNonDurableQueue = new ArrayList<String>();
-      ArrayList<String> manageRoles = new ArrayList<String>();
-      ArrayList<String> allRoles = new ArrayList<String>();
+      ArrayList<String> send = new ArrayList<>();
+      ArrayList<String> consume = new ArrayList<>();
+      ArrayList<String> createDurableQueue = new ArrayList<>();
+      ArrayList<String> deleteDurableQueue = new ArrayList<>();
+      ArrayList<String> createNonDurableQueue = new ArrayList<>();
+      ArrayList<String> deleteNonDurableQueue = new ArrayList<>();
+      ArrayList<String> manageRoles = new ArrayList<>();
+      ArrayList<String> allRoles = new ArrayList<>();
       NodeList children = node.getChildNodes();
       for (int i = 0; i < children.getLength(); i++) {
          Node child = children.item(i);
@@ -643,6 +682,30 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       return securityMatch;
    }
 
+   private Pair<SecuritySettingPlugin, Map<String, String>> parseSecuritySettingPlugins(Node item) {
+      final String clazz = item.getAttributes().getNamedItem("class-name").getNodeValue();
+      final Map<String, String> settings = new HashMap<>();
+      NodeList children = item.getChildNodes();
+      for (int j = 0; j < children.getLength(); j++) {
+         Node child = children.item(j);
+         final String nodeName = child.getNodeName();
+         if (SETTING_ELEMENT_NAME.equalsIgnoreCase(nodeName)) {
+            final String settingName = getAttributeValue(child, NAME_ATTR_NAME);
+            final String settingValue = getAttributeValue(child, VALUE_ATTR_NAME);
+            settings.put(settingName, settingValue);
+         }
+      }
+
+      SecuritySettingPlugin securitySettingPlugin = AccessController.doPrivileged(new PrivilegedAction<SecuritySettingPlugin>() {
+         @Override
+         public SecuritySettingPlugin run() {
+            return (SecuritySettingPlugin) ClassloadingUtil.newInstanceFromClassLoader(clazz);
+         }
+      });
+
+      return new Pair<>(securitySettingPlugin, settings);
+   }
+
    /**
     * @param node
     * @return
@@ -654,7 +717,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       AddressSettings addressSettings = new AddressSettings();
 
-      Pair<String, AddressSettings> setting = new Pair<String, AddressSettings>(match, addressSettings);
+      Pair<String, AddressSettings> setting = new Pair<>(match, addressSettings);
 
       for (int i = 0; i < children.getLength(); i++) {
          final Node child = children.item(i);
@@ -732,6 +795,9 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
          }
          else if (AUTO_DELETE_JMS_QUEUES.equalsIgnoreCase(name)) {
             addressSettings.setAutoDeleteJmsQueues(XMLUtil.parseBoolean(child));
+         }
+         else if (MANAGEMENT_BROWSE_PAGE_SIZE.equalsIgnoreCase(name)) {
+            addressSettings.setManagementBrowsePageSize(XMLUtil.parseInt(child));
          }
       }
       return setting;
@@ -855,6 +921,28 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       HA_LIST.add("replication");
    }
 
+   private static final ArrayList<String> STORE_TYPE_LIST = new ArrayList<>();
+
+   static {
+      STORE_TYPE_LIST.add("database-store");
+      STORE_TYPE_LIST.add("file-store");
+   }
+
+   private void parseStoreConfiguration(final Element e, final Configuration mainConfig) {
+      for (String storeType : STORE_TYPE_LIST) {
+         NodeList storeNodeList = e.getElementsByTagName(storeType);
+         if (storeNodeList.getLength() > 0) {
+            Element storeNode = (Element) storeNodeList.item(0);
+            if (storeNode.getTagName().equals("database-store")) {
+               mainConfig.setStoreConfiguration(createDatabaseStoreConfig(storeNode));
+            }
+            else if (storeNode.getTagName().equals("file-store")) {
+               mainConfig.setStoreConfiguration(createFileStoreConfig(storeNode));
+            }
+         }
+      }
+   }
+
    private void parseHAPolicyConfiguration(final Element e, final Configuration mainConfig) {
       for (String haType : HA_LIST) {
          NodeList haNodeList = e.getElementsByTagName(haType);
@@ -920,6 +1008,8 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       configuration.setClusterName(getString(policyNode, "cluster-name", configuration.getClusterName(), Validators.NO_CHECK));
 
+      configuration.setInitialReplicationSyncTimeout(getLong(policyNode, "initial-replication-sync-timeout", configuration.getInitialReplicationSyncTimeout(), Validators.GT_ZERO));
+
       return configuration;
    }
 
@@ -932,7 +1022,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       configuration.setAllowFailBack(getBoolean(policyNode, "allow-failback", configuration.isAllowFailBack()));
 
-      configuration.setFailbackDelay(getLong(policyNode, "failback-delay", configuration.getFailbackDelay(), Validators.GT_ZERO));
+      configuration.setInitialReplicationSyncTimeout(getLong(policyNode, "initial-replication-sync-timeout", configuration.getInitialReplicationSyncTimeout(), Validators.GT_ZERO));
 
       configuration.setClusterName(getString(policyNode, "cluster-name", configuration.getClusterName(), Validators.NO_CHECK));
 
@@ -948,8 +1038,6 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       configuration.setFailoverOnServerShutdown(getBoolean(policyNode, "failover-on-shutdown", configuration.isFailoverOnServerShutdown()));
 
-      configuration.setFailbackDelay(getLong(policyNode, "failback-delay", configuration.getFailbackDelay(), Validators.GT_ZERO));
-
       return configuration;
    }
 
@@ -959,8 +1047,6 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       configuration.setAllowFailBack(getBoolean(policyNode, "allow-failback", configuration.isAllowFailBack()));
 
       configuration.setFailoverOnServerShutdown(getBoolean(policyNode, "failover-on-shutdown", configuration.isFailoverOnServerShutdown()));
-
-      configuration.setFailbackDelay(getLong(policyNode, "failback-delay", configuration.getFailbackDelay(), Validators.GT_ZERO));
 
       configuration.setRestartBackup(getBoolean(policyNode, "restart-backup", configuration.isRestartBackup()));
 
@@ -1057,10 +1143,24 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       return null;
    }
 
+   private DatabaseStorageConfiguration createDatabaseStoreConfig(Element storeNode) {
+      NodeList databaseStoreNode = storeNode.getElementsByTagName("database-store");
+
+      DatabaseStorageConfiguration conf = new DatabaseStorageConfiguration();
+      conf.setBindingsTableName(getString(storeNode, "bindings-table-name", conf.getBindingsTableName(), Validators.NO_CHECK));
+      conf.setMessageTableName(getString(storeNode, "message-table-name", conf.getMessageTableName(), Validators.NO_CHECK));
+      conf.setJdbcConnectionUrl(getString(storeNode, "jdbc-connection-url", conf.getJdbcConnectionUrl(), Validators.NO_CHECK));
+      return conf;
+   }
+
+   private FileStorageConfiguration createFileStoreConfig(Element storeNode) {
+      return new FileStorageConfiguration();
+   }
+
    private void parseBroadcastGroupConfiguration(final Element e, final Configuration mainConfig) {
       String name = e.getAttribute("name");
 
-      List<String> connectorNames = new ArrayList<String>();
+      List<String> connectorNames = new ArrayList<>();
 
       NodeList children = e.getChildNodes();
 
@@ -1144,7 +1244,18 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
       }
    }
 
-   private void parseClusterConnectionConfiguration(final Element e, final Configuration mainConfig) {
+   private void parseClusterConnectionConfigurationURI(final Element e, final Configuration mainConfig) throws Exception {
+      String name = e.getAttribute("name");
+
+
+      String uri = e.getAttribute("address");
+
+      ClusterConnectionConfiguration config = mainConfig.addClusterConfiguration(name, uri);
+
+      System.out.println("Adding cluster connection :: " + config);
+   }
+
+   private void parseClusterConnectionConfiguration(final Element e, final Configuration mainConfig) throws Exception {
       String name = e.getAttribute("name");
 
       String address = getString(e, "address", null, Validators.NOT_NULL_OR_EMPTY);
@@ -1201,7 +1312,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       String discoveryGroupName = null;
 
-      List<String> staticConnectorNames = new ArrayList<String>();
+      List<String> staticConnectorNames = new ArrayList<>();
 
       boolean allowDirectConnectionsOnly = false;
 
@@ -1303,7 +1414,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       String filterString = null;
 
-      List<String> staticConnectorNames = new ArrayList<String>();
+      List<String> staticConnectorNames = new ArrayList<>();
 
       String discoveryGroupName = null;
 
@@ -1384,7 +1495,7 @@ public final class FileConfigurationParser extends XMLConfigurationUtil {
 
       String clazz = getString(e, "factory-class", null, Validators.NOT_NULL_OR_EMPTY);
 
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
 
       NodeList paramsNodes = e.getElementsByTagName("param");
 

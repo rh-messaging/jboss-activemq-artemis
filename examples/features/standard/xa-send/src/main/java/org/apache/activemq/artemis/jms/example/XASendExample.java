@@ -43,7 +43,7 @@ public class XASendExample {
 
    public static void main(final String[] args) throws Exception {
       AtomicBoolean result = new AtomicBoolean(true);
-      final ArrayList<String> receiveHolder = new ArrayList<String>();
+      final ArrayList<String> receiveHolder = new ArrayList<>();
       XAConnection connection = null;
       InitialContext initialContext = null;
       try {
@@ -178,6 +178,7 @@ class SimpleMessageListener implements MessageListener {
       this.result = result;
    }
 
+   @Override
    public void onMessage(final Message message) {
       try {
          System.out.println("Message received: " + message);

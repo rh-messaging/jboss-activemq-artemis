@@ -39,6 +39,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.net.URI;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
 import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
@@ -50,8 +52,10 @@ import org.apache.activemq.artemis.api.jms.JMSFactoryType;
 import org.apache.activemq.artemis.core.client.impl.ServerLocatorImpl;
 import org.apache.activemq.artemis.jms.referenceable.ConnectionFactoryObjectFactory;
 import org.apache.activemq.artemis.jms.referenceable.SerializableObjectRefAddr;
+import org.apache.activemq.artemis.spi.core.remoting.ClientProtocolManagerFactory;
 import org.apache.activemq.artemis.uri.ConnectionFactoryParser;
 import org.apache.activemq.artemis.uri.ServerLocatorParser;
+import org.apache.activemq.artemis.utils.ClassloadingUtil;
 
 /**
  * <p>ActiveMQ Artemis implementation of a JMS ConnectionFactory.</p>
@@ -73,6 +77,9 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
 
    private String password;
 
+   private String protocolManagerFactoryStr;
+
+   @Override
    public void writeExternal(ObjectOutput out) throws IOException {
       URI uri = toURI();
 
@@ -121,6 +128,29 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
       return uri;
    }
 
+   public String getProtocolManagerFactoryStr() {
+      return protocolManagerFactoryStr;
+   }
+
+   public void setProtocolManagerFactoryStr(final String protocolManagerFactoryStr) {
+
+      if (protocolManagerFactoryStr != null && !protocolManagerFactoryStr.trim().isEmpty()) {
+         AccessController.doPrivileged(new PrivilegedAction<Object>() {
+            @Override
+            public Object run() {
+
+               ClientProtocolManagerFactory protocolManagerFactory =
+                  (ClientProtocolManagerFactory) ClassloadingUtil.newInstanceFromClassLoader(protocolManagerFactoryStr);
+               serverLocator.setProtocolManagerFactory(protocolManagerFactory);
+               return null;
+            }
+         });
+
+         this.protocolManagerFactoryStr = protocolManagerFactoryStr;
+      }
+   }
+
+   @Override
    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
       String url = in.readUTF();
       ConnectionFactoryParser parser = new ConnectionFactoryParser();
@@ -198,10 +228,12 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
       serverLocator.disableFinalizeCheck();
    }
 
+   @Override
    public Connection createConnection() throws JMSException {
       return createConnection(user, password);
    }
 
+   @Override
    public Connection createConnection(final String username, final String password) throws JMSException {
       return createConnectionInternal(username, password, false, ActiveMQConnection.TYPE_GENERIC_CONNECTION);
    }
@@ -269,10 +301,12 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
 
    // XAConnectionFactory implementation -----------------------------------------------------------
 
+   @Override
    public XAConnection createXAConnection() throws JMSException {
       return createXAConnection(null, null);
    }
 
+   @Override
    public XAConnection createXAConnection(final String username, final String password) throws JMSException {
       return (XAConnection) createConnectionInternal(username, password, true, ActiveMQConnection.TYPE_GENERIC_CONNECTION);
    }
@@ -606,6 +640,31 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
       serverLocator.setInitialMessagePacketSize(size);
    }
 
+   /**
+    * @param interceptorList a comma separated string of incoming interceptor class names to be used. Each interceptor needs a default Constructor to be used with this method.
+    * @return this
+    */
+   public void setIncomingInterceptorList(String interceptorList) {
+      checkWrite();
+      serverLocator.setIncomingInterceptorList(interceptorList);
+   }
+
+   public String getIncomingInterceptorList() {
+      return serverLocator.getIncomingInterceptorList();
+   }
+
+   /**
+    * @param interceptorList a comma separated string of incoming interceptor class names to be used. Each interceptor needs a default Constructor to be used with this method.
+    * @return this
+    */
+   public void setOutgoingInterceptorList(String interceptorList) {
+      serverLocator.setOutgoingInterceptorList(interceptorList);
+   }
+
+   public String getOutgoingInterceptorList() {
+      return serverLocator.getOutgoingInterceptorList();
+   }
+
    public ActiveMQConnectionFactory setUser(String user) {
       checkWrite();
       this.user = user;
@@ -642,6 +701,7 @@ public class ActiveMQConnectionFactory implements Externalizable, Referenceable,
       serverLocator.setCompressLargeMessage(avoidLargeMessages);
    }
 
+   @Override
    public void close() {
       ServerLocator locator0 = serverLocator;
       if (locator0 != null)

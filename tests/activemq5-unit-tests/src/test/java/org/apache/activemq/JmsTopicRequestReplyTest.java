@@ -48,7 +48,7 @@ public class JmsTopicRequestReplyTest extends TestSupport implements MessageList
    private MessageProducer replyProducer;
    private Session serverSession;
    private Destination requestDestination;
-   private List<JMSException> failures = new Vector<JMSException>();
+   private List<JMSException> failures = new Vector<>();
    private boolean dynamicallyCreateProducer;
    private String clientSideClientID;
 
@@ -109,6 +109,7 @@ public class JmsTopicRequestReplyTest extends TestSupport implements MessageList
    /**
     * Use the asynchronous subscription mechanism
     */
+   @Override
    public void onMessage(Message message) {
       try {
          TextMessage requestMessage = (TextMessage) message;
@@ -163,6 +164,7 @@ public class JmsTopicRequestReplyTest extends TestSupport implements MessageList
       }
    }
 
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
 
@@ -181,6 +183,7 @@ public class JmsTopicRequestReplyTest extends TestSupport implements MessageList
       }
       else {
          Thread thread = new Thread(new Runnable() {
+            @Override
             public void run() {
                syncConsumeLoop(requestConsumer);
             }
@@ -190,6 +193,7 @@ public class JmsTopicRequestReplyTest extends TestSupport implements MessageList
       serverConnection.start();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       super.tearDown();
 

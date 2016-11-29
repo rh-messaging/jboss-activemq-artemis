@@ -75,6 +75,7 @@ public class MultiBrokersMultiClientsUsingTcpTest extends MultiBrokersMultiClien
       }
    }
 
+   @Override
    public void setUp() throws Exception {
       super.setUp();
 
@@ -84,6 +85,6 @@ public class MultiBrokersMultiClientsUsingTcpTest extends MultiBrokersMultiClien
          i.next().broker.addConnector("tcp://localhost:" + (61616 + j++));
       }
 
-      bridges = new ArrayList<DemandForwardingBridge>();
+      bridges = new ArrayList<>();
    }
 }

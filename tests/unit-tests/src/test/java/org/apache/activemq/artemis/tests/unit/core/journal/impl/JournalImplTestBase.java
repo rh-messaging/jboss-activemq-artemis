@@ -42,17 +42,19 @@ import org.junit.Before;
 
 public abstract class JournalImplTestBase extends ActiveMQTestBase {
 
-   protected List<RecordInfo> records = new LinkedList<RecordInfo>();
+   protected List<RecordInfo> records = new LinkedList<>();
 
    protected TestableJournal journal;
 
    protected int recordLength = 1024;
 
-   protected Map<Long, TransactionHolder> transactions = new LinkedHashMap<Long, TransactionHolder>();
+   protected Map<Long, TransactionHolder> transactions = new LinkedHashMap<>();
 
    protected int maxAIO;
 
    protected int minFiles;
+
+   protected int poolSize;
 
    protected int fileSize;
 
@@ -122,7 +124,16 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
    // ---------------------------------------------------------------------------------
 
    protected void setup(final int minFreeFiles, final int fileSize, final boolean sync, final int maxAIO) {
+      this.minFiles = minFreeFiles;
+      this.poolSize = minFreeFiles;
+      this.fileSize = fileSize;
+      this.sync = sync;
+      this.maxAIO = maxAIO;
+   }
+
+   protected void setup(final int minFreeFiles, final int poolSize, final int fileSize, final boolean sync, final int maxAIO) {
       minFiles = minFreeFiles;
+      this.poolSize = poolSize;
       this.fileSize = fileSize;
       this.sync = sync;
       this.maxAIO = maxAIO;
@@ -130,13 +141,14 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
 
    protected void setup(final int minFreeFiles, final int fileSize, final boolean sync) {
       minFiles = minFreeFiles;
+      poolSize = minFreeFiles;
       this.fileSize = fileSize;
       this.sync = sync;
       maxAIO = 50;
    }
 
    public void createJournal() throws Exception {
-      journal = new JournalImpl(fileSize, minFiles, 0, 0, fileFactory, filePrefix, fileExtension, maxAIO) {
+      journal = new JournalImpl(fileSize, minFiles, poolSize, 0, 0, fileFactory, filePrefix, fileExtension, maxAIO) {
          @Override
          public void onCompactDone() {
             latchDone.countDown();
@@ -210,6 +222,7 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
       File dir = new File(getTestDir());
 
       FilenameFilter fnf = new FilenameFilter() {
+         @Override
          public boolean accept(final File file, final String name) {
             return name.endsWith("." + fileExtension);
          }
@@ -232,9 +245,9 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
    }
 
    protected void loadAndCheck(final boolean printDebugJournal) throws Exception {
-      List<RecordInfo> committedRecords = new ArrayList<RecordInfo>();
+      List<RecordInfo> committedRecords = new ArrayList<>();
 
-      List<PreparedTransactionInfo> preparedTransactions = new ArrayList<PreparedTransactionInfo>();
+      List<PreparedTransactionInfo> preparedTransactions = new ArrayList<>();
 
       journal.load(committedRecords, preparedTransactions, null);
 
@@ -246,15 +259,15 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
 
       // check prepared transactions
 
-      List<PreparedTransactionInfo> prepared = new ArrayList<PreparedTransactionInfo>();
+      List<PreparedTransactionInfo> prepared = new ArrayList<>();
 
       for (Map.Entry<Long, TransactionHolder> entry : transactions.entrySet()) {
          if (entry.getValue().prepared) {
             PreparedTransactionInfo info = new PreparedTransactionInfo(entry.getKey(), null);
 
-            info.records.addAll(entry.getValue().records);
+            info.getRecords().addAll(entry.getValue().records);
 
-            info.recordsToDelete.addAll(entry.getValue().deletes);
+            info.getRecordsToDelete().addAll(entry.getValue().deletes);
 
             prepared.add(info);
          }
@@ -452,15 +465,15 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
 
          PreparedTransactionInfo ractual = iterActual.next();
 
-         Assert.assertEquals("ids not same", rexpected.id, ractual.id);
+         Assert.assertEquals("ids not same", rexpected.getId(), ractual.getId());
 
-         checkRecordsEquivalent(rexpected.records, ractual.records);
+         checkRecordsEquivalent(rexpected.getRecords(), ractual.getRecords());
 
-         Assert.assertEquals("deletes size not same", rexpected.recordsToDelete.size(), ractual.recordsToDelete.size());
+         Assert.assertEquals("deletes size not same", rexpected.getRecordsToDelete().size(), ractual.getRecordsToDelete().size());
 
-         Iterator<RecordInfo> iterDeletesExpected = rexpected.recordsToDelete.iterator();
+         Iterator<RecordInfo> iterDeletesExpected = rexpected.getRecordsToDelete().iterator();
 
-         Iterator<RecordInfo> iterDeletesActual = ractual.recordsToDelete.iterator();
+         Iterator<RecordInfo> iterDeletesActual = ractual.getRecordsToDelete().iterator();
 
          while (iterDeletesExpected.hasNext()) {
             long lexpected = iterDeletesExpected.next().id;
@@ -536,9 +549,9 @@ public abstract class JournalImplTestBase extends ActiveMQTestBase {
 
    static final class TransactionHolder {
 
-      List<RecordInfo> records = new ArrayList<RecordInfo>();
+      List<RecordInfo> records = new ArrayList<>();
 
-      List<RecordInfo> deletes = new ArrayList<RecordInfo>();
+      List<RecordInfo> deletes = new ArrayList<>();
 
       boolean prepared;
    }

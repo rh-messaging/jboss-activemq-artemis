@@ -64,38 +64,52 @@ public final class ConfigurationUtils {
          }
          case REPLICATED: {
             ReplicatedPolicyConfiguration pc = (ReplicatedPolicyConfiguration) conf;
-            return new ReplicatedPolicy(pc.isCheckForLiveServer(), pc.getGroupName(), pc.getClusterName());
+            return new ReplicatedPolicy(pc.isCheckForLiveServer(), pc.getGroupName(), pc.getClusterName(), pc.getInitialReplicationSyncTimeout());
          }
          case REPLICA: {
             ReplicaPolicyConfiguration pc = (ReplicaPolicyConfiguration) conf;
-            return new ReplicaPolicy(pc.getClusterName(), pc.getMaxSavedReplicatedJournalsSize(), pc.getGroupName(), pc.isRestartBackup(), pc.isAllowFailBack(), pc.getFailbackDelay(), getScaleDownPolicy(pc.getScaleDownConfiguration()));
+            return new ReplicaPolicy(pc.getClusterName(), pc.getMaxSavedReplicatedJournalsSize(), pc.getGroupName(), pc.isRestartBackup(), pc.isAllowFailBack(), pc.getInitialReplicationSyncTimeout(), getScaleDownPolicy(pc.getScaleDownConfiguration()));
          }
          case SHARED_STORE_MASTER: {
             SharedStoreMasterPolicyConfiguration pc = (SharedStoreMasterPolicyConfiguration) conf;
-            return new SharedStoreMasterPolicy(pc.getFailbackDelay(), pc.isFailoverOnServerShutdown());
+            return new SharedStoreMasterPolicy(pc.isFailoverOnServerShutdown());
          }
          case SHARED_STORE_SLAVE: {
             SharedStoreSlavePolicyConfiguration pc = (SharedStoreSlavePolicyConfiguration) conf;
-            return new SharedStoreSlavePolicy(pc.getFailbackDelay(), pc.isFailoverOnServerShutdown(), pc.isRestartBackup(), pc.isAllowFailBack(), getScaleDownPolicy(pc.getScaleDownConfiguration()));
+            return new SharedStoreSlavePolicy(pc.isFailoverOnServerShutdown(), pc.isRestartBackup(), pc.isAllowFailBack(), getScaleDownPolicy(pc.getScaleDownConfiguration()));
          }
          case COLOCATED: {
             ColocatedPolicyConfiguration pc = (ColocatedPolicyConfiguration) conf;
 
-            HAPolicyConfiguration backupConf = pc.getBackupConfig();
-            BackupPolicy backupPolicy;
-            if (backupConf == null) {
-               backupPolicy = new ReplicaPolicy();
-            }
-            else {
-               backupPolicy = (BackupPolicy) getHAPolicy(backupConf);
-            }
             HAPolicyConfiguration liveConf = pc.getLiveConfig();
             HAPolicy livePolicy;
+            //if null default to colocated
             if (liveConf == null) {
                livePolicy = new ReplicatedPolicy();
             }
             else {
                livePolicy = getHAPolicy(liveConf);
+            }
+            HAPolicyConfiguration backupConf = pc.getBackupConfig();
+            BackupPolicy backupPolicy;
+            if (backupConf == null) {
+               if (livePolicy instanceof ReplicatedPolicy) {
+                  backupPolicy = new ReplicaPolicy();
+               }
+               else if (livePolicy instanceof SharedStoreMasterPolicy) {
+                  backupPolicy = new SharedStoreSlavePolicy();
+               }
+               else {
+                  throw ActiveMQMessageBundle.BUNDLE.liveBackupMismatch();
+               }
+            }
+            else {
+               backupPolicy = (BackupPolicy) getHAPolicy(backupConf);
+            }
+
+            if ((livePolicy instanceof ReplicatedPolicy && !(backupPolicy instanceof ReplicaPolicy)) ||
+                  (livePolicy instanceof SharedStoreMasterPolicy && !(backupPolicy instanceof SharedStoreSlavePolicy))) {
+               throw ActiveMQMessageBundle.BUNDLE.liveBackupMismatch();
             }
             return new ColocatedPolicy(pc.isRequestBackup(), pc.getBackupRequestRetries(), pc.getBackupRequestRetryInterval(), pc.getMaxBackups(), pc.getBackupPortOffset(), pc.getExcludedConnectors(), livePolicy, backupPolicy);
          }

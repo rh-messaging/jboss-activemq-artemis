@@ -37,6 +37,7 @@ import org.apache.activemq.artemis.api.jms.management.JMSQueueControl;
 import org.apache.activemq.artemis.api.jms.management.TopicControl;
 import org.apache.activemq.artemis.core.config.FileDeploymentManager;
 import org.apache.activemq.artemis.core.config.impl.FileConfiguration;
+import org.apache.activemq.artemis.core.config.impl.SecurityConfiguration;
 import org.apache.activemq.artemis.core.registry.JndiBindingRegistry;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactory;
 import org.apache.activemq.artemis.core.security.Role;
@@ -45,14 +46,15 @@ import org.apache.activemq.artemis.core.server.impl.ActiveMQServerImpl;
 import org.apache.activemq.artemis.jms.server.JMSServerManager;
 import org.apache.activemq.artemis.jms.server.impl.JMSServerManagerImpl;
 import org.apache.activemq.artemis.jms.tests.JmsTestLogger;
-import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManagerImpl;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQJAASSecurityManager;
+import org.apache.activemq.artemis.spi.core.security.jaas.InVMLoginModule;
 
 public class LocalTestServer implements Server, Runnable {
    // Constants ------------------------------------------------------------------------------------
 
    private boolean started = false;
 
-   private final HashMap<String, List<String>> allBindings = new HashMap<String, List<String>>();
+   private final HashMap<String, List<String>> allBindings = new HashMap<>();
    private JMSServerManagerImpl jmsServerManager;
 
    // Static ---------------------------------------------------------------------------------------
@@ -79,10 +81,12 @@ public class LocalTestServer implements Server, Runnable {
 
    // Server implementation ------------------------------------------------------------------------
 
+   @Override
    public int getServerID() {
       return serverIndex;
    }
 
+   @Override
    public synchronized void start(final HashMap<String, Object> configuration,
                                   final boolean clearJournal) throws Exception {
       if (isStarted()) {
@@ -101,7 +105,7 @@ public class LocalTestServer implements Server, Runnable {
 
       javax.management.MBeanServer beanServer = java.lang.management.ManagementFactory.getPlatformMBeanServer();
       FileConfiguration fileConfiguration = new FileConfiguration();
-      ActiveMQSecurityManagerImpl securityManager = new ActiveMQSecurityManagerImpl();
+      ActiveMQJAASSecurityManager securityManager = new ActiveMQJAASSecurityManager(InVMLoginModule.class.getName(), new SecurityConfiguration());
       securityManager.getConfiguration().addUser("guest", "guest");
       securityManager.getConfiguration().setDefaultUser("guest");
       securityManager.getConfiguration().addRole("guest", "guest");
@@ -131,6 +135,7 @@ public class LocalTestServer implements Server, Runnable {
       return directory.delete();
    }
 
+   @Override
    public synchronized boolean stop() throws Exception {
       jmsServerManager.stop();
       started = false;
@@ -139,25 +144,30 @@ public class LocalTestServer implements Server, Runnable {
       return true;
    }
 
+   @Override
    public void ping() throws Exception {
       if (!isStarted()) {
          throw new RuntimeException("ok");
       }
    }
 
+   @Override
    public synchronized void kill() throws Exception {
       stop();
    }
 
+   @Override
    public synchronized boolean isStarted() throws Exception {
       return started;
    }
 
+   @Override
    public synchronized void startServerPeer() throws Exception {
       System.setProperty(Constants.SERVER_INDEX_PROPERTY_NAME, "" + getServerID());
       getActiveMQServer().start();
    }
 
+   @Override
    public synchronized void stopServerPeer() throws Exception {
       System.setProperty(Constants.SERVER_INDEX_PROPERTY_NAME, "" + getServerID());
       getActiveMQServer().stop();
@@ -177,48 +187,58 @@ public class LocalTestServer implements Server, Runnable {
    /**
     * Only for in-VM use!
     */
+   @Override
    public ActiveMQServer getServerPeer() {
       return getActiveMQServer();
    }
 
+   @Override
    public void destroyQueue(final String name, final String jndiName) throws Exception {
       getJMSServerManager().destroyQueue(name);
    }
 
+   @Override
    public void destroyTopic(final String name, final String jndiName) throws Exception {
       getJMSServerManager().destroyTopic(name);
    }
 
+   @Override
    public void createQueue(final String name, final String jndiName) throws Exception {
       getJMSServerManager().createQueue(true, name, null, true, "/queue/" + (jndiName != null ? jndiName : name));
    }
 
+   @Override
    public void createTopic(final String name, final String jndiName) throws Exception {
       getJMSServerManager().createTopic(true, name, "/topic/" + (jndiName != null ? jndiName : name));
    }
 
+   @Override
    public void deployConnectionFactory(final String clientId,
                                        final String objectName,
                                        final String... jndiBindings) throws Exception {
       deployConnectionFactory(clientId, JMSFactoryType.CF, objectName, -1, -1, -1, -1, false, false, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String objectName,
                                        final int consumerWindowSize,
                                        final String... jndiBindings) throws Exception {
       deployConnectionFactory(null, JMSFactoryType.CF, objectName, consumerWindowSize, -1, -1, -1, false, false, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String objectName, final String... jndiBindings) throws Exception {
       deployConnectionFactory(null, JMSFactoryType.CF, objectName, -1, -1, -1, -1, false, false, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String objectName,
                                        JMSFactoryType type,
                                        final String... jndiBindings) throws Exception {
       deployConnectionFactory(null, type, objectName, -1, -1, -1, -1, false, false, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String objectName,
                                        final int prefetchSize,
                                        final int defaultTempQueueFullSize,
@@ -228,6 +248,7 @@ public class LocalTestServer implements Server, Runnable {
       this.deployConnectionFactory(null, JMSFactoryType.CF, objectName, prefetchSize, defaultTempQueueFullSize, defaultTempQueuePageSize, defaultTempQueueDownCacheSize, false, false, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String objectName,
                                        final boolean supportsFailover,
                                        final boolean supportsLoadBalancing,
@@ -235,6 +256,7 @@ public class LocalTestServer implements Server, Runnable {
       this.deployConnectionFactory(null, JMSFactoryType.CF, objectName, -1, -1, -1, -1, supportsFailover, supportsLoadBalancing, -1, false, jndiBindings);
    }
 
+   @Override
    public void deployConnectionFactory(final String clientId,
                                        final JMSFactoryType type,
                                        final String objectName,
@@ -247,19 +269,21 @@ public class LocalTestServer implements Server, Runnable {
                                        final int dupsOkBatchSize,
                                        final boolean blockOnAcknowledge,
                                        final String... jndiBindings) throws Exception {
-      List<TransportConfiguration> connectorConfigs = new ArrayList<TransportConfiguration>();
+      List<TransportConfiguration> connectorConfigs = new ArrayList<>();
       connectorConfigs.add(new TransportConfiguration(NettyConnectorFactory.class.getName()));
 
-      ArrayList<String> connectors = new ArrayList<String>();
+      ArrayList<String> connectors = new ArrayList<>();
       connectors.add("netty");
 
       getJMSServerManager().createConnectionFactory(objectName, false, type, connectors, clientId, ActiveMQClient.DEFAULT_CLIENT_FAILURE_CHECK_PERIOD, ActiveMQClient.DEFAULT_CONNECTION_TTL, ActiveMQClient.DEFAULT_CALL_TIMEOUT, ActiveMQClient.DEFAULT_CALL_FAILOVER_TIMEOUT, ActiveMQClient.DEFAULT_CACHE_LARGE_MESSAGE_CLIENT, ActiveMQClient.DEFAULT_MIN_LARGE_MESSAGE_SIZE, ActiveMQClient.DEFAULT_COMPRESS_LARGE_MESSAGES, prefetchSize, ActiveMQClient.DEFAULT_CONSUMER_MAX_RATE, ActiveMQClient.DEFAULT_CONFIRMATION_WINDOW_SIZE, ActiveMQClient.DEFAULT_PRODUCER_WINDOW_SIZE, ActiveMQClient.DEFAULT_PRODUCER_MAX_RATE, blockOnAcknowledge, true, true, ActiveMQClient.DEFAULT_AUTO_GROUP, ActiveMQClient.DEFAULT_PRE_ACKNOWLEDGE, ActiveMQClient.DEFAULT_CONNECTION_LOAD_BALANCING_POLICY_CLASS_NAME, ActiveMQClient.DEFAULT_ACK_BATCH_SIZE, dupsOkBatchSize, ActiveMQClient.DEFAULT_USE_GLOBAL_POOLS, ActiveMQClient.DEFAULT_SCHEDULED_THREAD_POOL_MAX_SIZE, ActiveMQClient.DEFAULT_THREAD_POOL_MAX_SIZE, ActiveMQClient.DEFAULT_RETRY_INTERVAL, ActiveMQClient.DEFAULT_RETRY_INTERVAL_MULTIPLIER, ActiveMQClient.DEFAULT_MAX_RETRY_INTERVAL, ActiveMQClient.DEFAULT_RECONNECT_ATTEMPTS, ActiveMQClient.DEFAULT_FAILOVER_ON_INITIAL_CONNECTION, null, jndiBindings);
    }
 
+   @Override
    public void undeployConnectionFactory(final String objectName) throws Exception {
       getJMSServerManager().destroyConnectionFactory(objectName);
    }
 
+   @Override
    public void configureSecurityForDestination(final String destName,
                                                final boolean isQueue,
                                                final Set<Role> roles) throws Exception {
@@ -280,14 +304,17 @@ public class LocalTestServer implements Server, Runnable {
 
    // Private --------------------------------------------------------------------------------------
 
+   @Override
    public ActiveMQServer getActiveMQServer() {
       return jmsServerManager.getActiveMQServer();
    }
 
+   @Override
    public JMSServerManager getJMSServerManager() {
       return jmsServerManager;
    }
 
+   @Override
    public InitialContext getInitialContext() throws Exception {
       Properties props = new Properties();
       props.setProperty("java.naming.factory.initial", "org.apache.activemq.artemis.jms.tests.tools.container.InVMInitialContextFactory");
@@ -295,6 +322,7 @@ public class LocalTestServer implements Server, Runnable {
       return new InitialContext(props);
    }
 
+   @Override
    public void run() {
       //  bootstrap.run();
 
@@ -313,6 +341,7 @@ public class LocalTestServer implements Server, Runnable {
       }
    }
 
+   @Override
    public void removeAllMessages(final String destination, final boolean isQueue) throws Exception {
       if (isQueue) {
          JMSQueueControl queue = (JMSQueueControl) getActiveMQServer().getManagementService().getResource(ResourceNames.JMS_QUEUE + destination);
@@ -324,11 +353,12 @@ public class LocalTestServer implements Server, Runnable {
       }
    }
 
+   @Override
    public List<String> listAllSubscribersForTopic(final String s) throws Exception {
       ObjectName objectName = ObjectNameBuilder.DEFAULT.getJMSTopicObjectName(s);
       TopicControl topic = MBeanServerInvocationHandler.newProxyInstance(ManagementFactory.getPlatformMBeanServer(), objectName, TopicControl.class, false);
       Object[] subInfos = topic.listAllSubscriptions();
-      List<String> subs = new ArrayList<String>();
+      List<String> subs = new ArrayList<>();
       for (Object o : subInfos) {
          Object[] data = (Object[]) o;
          subs.add((String) data[2]);
@@ -336,10 +366,12 @@ public class LocalTestServer implements Server, Runnable {
       return subs;
    }
 
+   @Override
    public Set<Role> getSecurityConfig() throws Exception {
       return getActiveMQServer().getSecurityRepository().getMatch("*");
    }
 
+   @Override
    public void setSecurityConfig(final Set<Role> defConfig) throws Exception {
       getActiveMQServer().getSecurityRepository().removeMatch("#");
       getActiveMQServer().getSecurityRepository().addMatch("#", defConfig);

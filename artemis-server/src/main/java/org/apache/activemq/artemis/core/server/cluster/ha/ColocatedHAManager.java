@@ -16,6 +16,11 @@
  */
 package org.apache.activemq.artemis.core.server.cluster.ha;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.activemq.artemis.api.core.Pair;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
@@ -26,11 +31,6 @@ import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.cluster.ClusterControl;
 import org.apache.activemq.artemis.core.server.cluster.ClusterController;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public class ColocatedHAManager implements HAManager {
 
@@ -50,6 +50,7 @@ public class ColocatedHAManager implements HAManager {
    /**
     * starts the HA manager.
     */
+   @Override
    public void start() {
       if (started)
          return;
@@ -62,6 +63,7 @@ public class ColocatedHAManager implements HAManager {
    /**
     * stop any backups
     */
+   @Override
    public void stop() {
       for (ActiveMQServer activeMQServer : backupServers.values()) {
          try {
@@ -103,6 +105,7 @@ public class ColocatedHAManager implements HAManager {
     *
     * @return the backups
     */
+   @Override
    public Map<String, ActiveMQServer> getBackupServers() {
       return backupServers;
    }
@@ -129,7 +132,7 @@ public class ColocatedHAManager implements HAManager {
             return clusterControl.requestReplicatedBackup(backupSize, server.getNodeID());
          }
          else {
-            return clusterControl.requestSharedStoreBackup(backupSize, server.getConfiguration().getJournalDirectory(), server.getConfiguration().getBindingsDirectory(), server.getConfiguration().getLargeMessagesDirectory(), server.getConfiguration().getPagingDirectory());
+            return clusterControl.requestSharedStoreBackup(backupSize, server.getConfiguration().getJournalLocation().getAbsolutePath(), server.getConfiguration().getBindingsLocation().getAbsolutePath(), server.getConfiguration().getLargeMessagesLocation().getAbsolutePath(), server.getConfiguration().getPagingLocation().getAbsolutePath());
 
          }
       }
@@ -280,9 +283,10 @@ public class ColocatedHAManager implements HAManager {
             integer += portOffset;
             params.put("port", integer.toString());
          }
-         Object serverId = params.get("server-id");
+         Object serverId = params.get("serverId");
          if (serverId != null) {
-            params.put("server-id", serverId.toString() + "(" + name + ")");
+            Integer newid = Integer.parseInt(serverId.toString()) + portOffset;
+            params.put("serverId", newid.toString());
          }
       }
    }

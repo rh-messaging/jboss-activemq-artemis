@@ -96,7 +96,7 @@ public class AMQ1853Test {
    public void testConsumerMessagesAreNotOrdered() throws Exception {
 
       TestConsumer consumerAllFail = null;
-      messageList = new Hashtable<String, AtomicInteger>();
+      messageList = new Hashtable<>();
 
       try {
 
@@ -170,6 +170,7 @@ public class AMQ1853Test {
          return latch;
       }
 
+      @Override
       public void run() {
 
          ActiveMQConnectionFactory connectionFactory = null;
@@ -193,7 +194,7 @@ public class AMQ1853Test {
             producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
             for (int i = 0; i < (producerMessages); i++) {
-               TextMessage message = (TextMessage) session.createTextMessage();
+               TextMessage message = session.createTextMessage();
                message.setLongProperty("TestTime", (System.currentTimeMillis()));
                try {
                   producer.send(message);
@@ -264,6 +265,7 @@ public class AMQ1853Test {
          return bMessageReceiptIsOrdered;
       }
 
+      @Override
       public void run() {
 
          try {
@@ -317,6 +319,7 @@ public class AMQ1853Test {
          }
       }
 
+      @Override
       public synchronized void onException(JMSException ex) {
          LOG.error("Consumer for destination, (" + destinationName + "), JMS Exception occurred.  Shutting down client.");
       }
@@ -325,6 +328,7 @@ public class AMQ1853Test {
          this.bStop = bStop;
       }
 
+      @Override
       public synchronized void onMessage(Message message) {
          receivedMessageCounter++;
          latch.countDown();

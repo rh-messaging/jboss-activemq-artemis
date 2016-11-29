@@ -25,12 +25,17 @@ import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.Queue;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 public class PageCountSyncOnNonTXTest extends ActiveMQTestBase {
+
+   public static final String WORD_START = "&*STARTED&*";
 
    // We will add a random factor on the wait time
    private long timeToRun;
@@ -49,7 +54,16 @@ public class PageCountSyncOnNonTXTest extends ActiveMQTestBase {
    public void testSendNoTx() throws Exception {
       String QUEUE_NAME = "myQueue";
 
-      process = PageCountSyncServer.spawnVM(getTestDir(), timeToRun);
+      final CountDownLatch latch = new CountDownLatch(1);
+      Runnable runnable = new Runnable() {
+         @Override
+         public void run() {
+            latch.countDown();
+         }
+      };
+
+      process = PageCountSyncServer.spawnVMWithLogMacher(WORD_START, runnable, getTestDir(), timeToRun);
+      assertTrue("Server didn't start in 30 seconds", latch.await(30, TimeUnit.SECONDS));
 
       ServerLocator locator = createNettyNonHALocator();
 
@@ -120,7 +134,7 @@ public class PageCountSyncOnNonTXTest extends ActiveMQTestBase {
       }
       assertEquals("Process didn't end as expected", 1, process.waitFor());
 
-      ActiveMQServer server = PageCountSyncServer.createServer(getTestDir());
+      ActiveMQServer server = SpawnedServerSupport.createServer(getTestDir());
 
       try {
          server.start();

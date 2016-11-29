@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v6;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class BrokerInfoTest extends BaseCommandTestSupport {
 
    public static BrokerInfoTest SINGLETON = new BrokerInfoTest();
 
+   @Override
    public Object createObject() throws Exception {
       BrokerInfo info = new BrokerInfo();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       BrokerInfo info = (BrokerInfo) object;

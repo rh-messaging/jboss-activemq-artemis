@@ -16,6 +16,14 @@
  */
 package org.apache.activemq.artemis.tests.integration.management;
 
+import javax.management.Notification;
+import javax.management.openmbean.CompositeData;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.SimpleString;
@@ -33,24 +41,19 @@ import org.apache.activemq.artemis.api.core.management.MessageCounterInfo;
 import org.apache.activemq.artemis.api.core.management.ObjectNameBuilder;
 import org.apache.activemq.artemis.api.core.management.QueueControl;
 import org.apache.activemq.artemis.core.config.Configuration;
-import org.apache.activemq.artemis.core.message.impl.MessageImpl;
 import org.apache.activemq.artemis.core.messagecounter.impl.MessageCounterManagerImpl;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServers;
 import org.apache.activemq.artemis.core.server.Queue;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.tests.integration.jms.server.management.JMSUtil;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.Base64;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.json.JSONArray;
+import org.apache.activemq.artemis.utils.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import javax.management.Notification;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 public class QueueControlTest extends ManagementTestBase {
 
@@ -748,6 +751,118 @@ public class QueueControlTest extends ManagementTestBase {
    }
 
    /**
+    * Test retry - get a message from DLQ and put on original queue.
+    */
+   @Test
+   public void testRetryMessage() throws Exception {
+      final SimpleString dla = new SimpleString("DLA");
+      final SimpleString qName = new SimpleString("q1");
+      final SimpleString adName = new SimpleString("ad1");
+      final SimpleString dlq = new SimpleString("DLQ1");
+      final String sampleText = "Put me on DLQ";
+
+      AddressSettings addressSettings = new AddressSettings().setMaxDeliveryAttempts(1).setDeadLetterAddress(dla);
+      server.getAddressSettingsRepository().addMatch(adName.toString(), addressSettings);
+
+      session.createQueue(dla, dlq, null, false);
+      session.createQueue(adName, qName, null, false);
+
+      // Send message to queue.
+      ClientProducer producer = session.createProducer(adName);
+      producer.send(createTextMessage(session, sampleText));
+      session.start();
+
+      ClientConsumer clientConsumer = session.createConsumer(qName);
+      ClientMessage clientMessage = clientConsumer.receive(500);
+      clientMessage.acknowledge();
+      Assert.assertNotNull(clientMessage);
+
+      Assert.assertEquals(clientMessage.getBodyBuffer().readString(), sampleText);
+
+      // force a rollback to DLQ
+      session.rollback();
+      clientMessage = clientConsumer.receiveImmediate();
+      Assert.assertNull(clientMessage);
+
+      QueueControl queueControl = createManagementControl(dla, dlq);
+      Assert.assertEquals(1, getMessageCount(queueControl));
+      final long messageID = getFirstMessageId(queueControl);
+
+      // Retry the message - i.e. it should go from DLQ to original Queue.
+      Assert.assertTrue(queueControl.retryMessage(messageID));
+
+      // Assert DLQ is empty...
+      Assert.assertEquals(0, getMessageCount(queueControl));
+
+      // .. and that the message is now on the original queue once more.
+      clientMessage = clientConsumer.receive(500);
+      clientMessage.acknowledge();
+      Assert.assertNotNull(clientMessage);
+
+      Assert.assertEquals(sampleText, clientMessage.getBodyBuffer().readString());
+
+      clientConsumer.close();
+   }
+
+   /**
+    * Test retry multiple messages from  DLQ to original queue.
+    */
+   @Test
+   public void testRetryMultipleMessages() throws Exception {
+      final SimpleString dla = new SimpleString("DLA");
+      final SimpleString qName = new SimpleString("q1");
+      final SimpleString adName = new SimpleString("ad1");
+      final SimpleString dlq = new SimpleString("DLQ1");
+      final String sampleText = "Put me on DLQ";
+      final int numMessagesToTest = 10;
+
+      AddressSettings addressSettings = new AddressSettings().setMaxDeliveryAttempts(1).setDeadLetterAddress(dla);
+      server.getAddressSettingsRepository().addMatch(adName.toString(), addressSettings);
+
+      session.createQueue(dla, dlq, null, false);
+      session.createQueue(adName, qName, null, false);
+
+      // Send message to queue.
+      ClientProducer producer = session.createProducer(adName);
+      for (int i = 0; i < numMessagesToTest; i++) {
+         producer.send(createTextMessage(session, sampleText));
+      }
+
+      session.start();
+
+      // Read and rollback all messages to DLQ
+      ClientConsumer clientConsumer = session.createConsumer(qName);
+      for (int i = 0; i < numMessagesToTest; i++) {
+         ClientMessage clientMessage = clientConsumer.receive(500);
+         clientMessage.acknowledge();
+         Assert.assertNotNull(clientMessage);
+         Assert.assertEquals(clientMessage.getBodyBuffer().readString(), sampleText);
+         session.rollback();
+      }
+
+      Assert.assertNull(clientConsumer.receiveImmediate());
+
+      QueueControl dlqQueueControl = createManagementControl(dla, dlq);
+      Assert.assertEquals(numMessagesToTest, getMessageCount(dlqQueueControl));
+
+      // Retry all messages - i.e. they should go from DLQ to original Queue.
+      Assert.assertEquals(numMessagesToTest, dlqQueueControl.retryMessages());
+
+      // Assert DLQ is empty...
+      Assert.assertEquals(0, getMessageCount(dlqQueueControl));
+
+      // .. and that the messages is now on the original queue once more.
+      for (int i = 0; i < numMessagesToTest; i++) {
+         ClientMessage clientMessage = clientConsumer.receive(500);
+         clientMessage.acknowledge();
+         Assert.assertNotNull(clientMessage);
+         Assert.assertEquals(clientMessage.getBodyBuffer().readString(), sampleText);
+      }
+
+      clientConsumer.close();
+   }
+
+   /**
     * <ol>
     * <li>send a message to queue</li>
     * <li>move all messages from queue to otherQueue using management method</li>
@@ -1144,10 +1259,10 @@ public class QueueControlTest extends ManagementTestBase {
       // send 2 messages on queue, both scheduled
       long timeout = System.currentTimeMillis() + 5000;
       ClientMessage m1 = session.createMessage(true);
-      m1.putLongProperty(MessageImpl.HDR_SCHEDULED_DELIVERY_TIME, timeout);
+      m1.putLongProperty(Message.HDR_SCHEDULED_DELIVERY_TIME, timeout);
       producer.send(m1);
       ClientMessage m2 = session.createMessage(true);
-      m2.putLongProperty(MessageImpl.HDR_SCHEDULED_DELIVERY_TIME, timeout);
+      m2.putLongProperty(Message.HDR_SCHEDULED_DELIVERY_TIME, timeout);
       producer.send(m2);
 
       QueueControl queueControl = createManagementControl(address, queue);
@@ -1192,7 +1307,7 @@ public class QueueControlTest extends ManagementTestBase {
 
       ClientConsumer cons = session.createConsumer(queue);
       session.start();
-      LinkedList<ClientMessage> msgs = new LinkedList<ClientMessage>();
+      LinkedList<ClientMessage> msgs = new LinkedList<>();
       for (int i = 0; i < 50; i++) {
          ClientMessage msg = cons.receive(1000);
          msgs.add(msg);
@@ -1905,6 +2020,57 @@ public class QueueControlTest extends ManagementTestBase {
       assertEquals(CoreNotificationType.BINDING_REMOVED.toString(), notif.getType());
    }
 
+   @Test
+   public void testSendMessage() throws Exception {
+      SimpleString address = RandomUtil.randomSimpleString();
+      SimpleString queue = RandomUtil.randomSimpleString();
+
+      session.createQueue(address, queue, null, false);
+
+      QueueControl queueControl = createManagementControl(address, queue);
+
+      queueControl.sendMessage(new HashMap<String, String>(), Message.TEXT_TYPE, Base64.encodeBytes("theBody".getBytes()), "myID", true, "myUser", "myPassword");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      // the message IDs are set on the server
+      CompositeData[] browse = queueControl.browse(null);
+
+      Assert.assertEquals(1, browse.length);
+
+      byte[] body = (byte[]) browse[0].get("body");
+
+      Assert.assertNotNull(body);
+
+      Assert.assertEquals(new String(body), "theBody");
+   }
+
+   @Test
+   public void testSendNullMessage() throws Exception {
+      SimpleString address = RandomUtil.randomSimpleString();
+      SimpleString queue = RandomUtil.randomSimpleString();
+
+      session.createQueue(address, queue, null, false);
+
+      QueueControl queueControl = createManagementControl(address, queue);
+
+      queueControl.sendMessage(new HashMap<String, String>(), Message.TEXT_TYPE, null, "myID", true, "myUser", "myPassword");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      // the message IDs are set on the server
+      CompositeData[] browse = queueControl.browse(null);
+
+      Assert.assertEquals(1, browse.length);
+
+      byte[] body = (byte[]) browse[0].get("body");
+
+      Assert.assertNotNull(body);
+
+      Assert.assertEquals(new String(body), "");
+   }
+
+
    // Package protected ---------------------------------------------
 
    // Protected -----------------------------------------------------
@@ -1924,10 +2090,17 @@ public class QueueControlTest extends ManagementTestBase {
       session.start();
    }
 
+   @Override
    protected QueueControl createManagementControl(final SimpleString address,
                                                   final SimpleString queue) throws Exception {
       QueueControl queueControl = ManagementControlHelper.createQueueControl(address, queue, mbeanServer);
 
       return queueControl;
+   }
+
+   protected long getFirstMessageId(final QueueControl queueControl) throws Exception {
+      JSONArray array = new JSONArray(queueControl.getFirstMessageAsJSON());
+      JSONObject object = (JSONObject)array.get(0);
+      return object.getLong("messageID");
    }
 }

@@ -81,12 +81,14 @@ public class FailoverTransactionTest extends TestSupport {
       return suite(FailoverTransactionTest.class);
    }
 
+   @Override
    public void setUp() throws Exception {
       super.setMaxTestTime(2 * 60 * 1000); // some boxes can be real slow
       super.setAutoFail(true);
       super.setUp();
    }
 
+   @Override
    public void tearDown() throws Exception {
       super.tearDown();
       stopBroker();
@@ -181,6 +183,7 @@ public class FailoverTransactionTest extends TestSupport {
             // so commit will hang as if reply is lost
             context.setDontSendReponse(true);
             Executors.newSingleThreadExecutor().execute(new Runnable() {
+               @Override
                public void run() {
                   LOG.info("Stopping broker post commit...");
                   try {
@@ -208,6 +211,7 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch commitDoneLatch = new CountDownLatch(1);
       // broker will die on commit reply so this will hang till restart
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async commit...");
             try {
@@ -279,6 +283,7 @@ public class FailoverTransactionTest extends TestSupport {
             // so commit will hang as if reply is lost
             context.setDontSendReponse(true);
             Executors.newSingleThreadExecutor().execute(new Runnable() {
+               @Override
                public void run() {
                   LOG.info("Stopping broker post commit...");
                   try {
@@ -306,6 +311,7 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch commitDoneLatch = new CountDownLatch(1);
       // broker will die on commit reply so this will hang till restart
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async commit...");
             try {
@@ -390,6 +396,7 @@ public class FailoverTransactionTest extends TestSupport {
             super.send(producerExchange, messageSend);
             producerExchange.getConnectionContext().setDontSendReponse(true);
             Executors.newSingleThreadExecutor().execute(new Runnable() {
+               @Override
                public void run() {
                   LOG.info("Stopping broker post send...");
                   try {
@@ -415,6 +422,7 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch sendDoneLatch = new CountDownLatch(1);
       // broker will die on send reply so this will hang till restart
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async send...");
             try {
@@ -512,6 +520,7 @@ public class FailoverTransactionTest extends TestSupport {
 
                producerExchange.getConnectionContext().setDontSendReponse(true);
                Executors.newSingleThreadExecutor().execute(new Runnable() {
+                  @Override
                   public void run() {
                      LOG.info("Stopping connection post send...");
                      try {
@@ -541,6 +550,7 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch sendDoneLatch = new CountDownLatch(1);
       // proxy connection will die on send reply so this will hang on failover reconnect till open
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async send...");
             try {
@@ -667,12 +677,15 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch connectionConsumerGotOne = new CountDownLatch(1);
       final Session poolSession = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
       connection.createConnectionConsumer(destination, null, new ServerSessionPool() {
+         @Override
          public ServerSession getServerSession() throws JMSException {
             return new ServerSession() {
+               @Override
                public Session getSession() throws JMSException {
                   return poolSession;
                }
 
+               @Override
                public void start() throws JMSException {
                   connectionConsumerGotOne.countDown();
                   poolSession.run();
@@ -732,6 +745,7 @@ public class FailoverTransactionTest extends TestSupport {
 
             consumerExchange.getConnectionContext().setDontSendReponse(true);
             Executors.newSingleThreadExecutor().execute(new Runnable() {
+               @Override
                public void run() {
                   LOG.info("Stopping broker on ack: " + ack);
                   try {
@@ -746,7 +760,7 @@ public class FailoverTransactionTest extends TestSupport {
       }});
       broker.start();
 
-      Vector<Connection> connections = new Vector<Connection>();
+      Vector<Connection> connections = new Vector<>();
       ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory("failover:(" + url + ")");
       configureConnectionFactory(cf);
       Connection connection = cf.createConnection();
@@ -771,10 +785,11 @@ public class FailoverTransactionTest extends TestSupport {
       produceMessage(producerSession, destination);
       produceMessage(producerSession, destination);
 
-      final Vector<Message> receivedMessages = new Vector<Message>();
+      final Vector<Message> receivedMessages = new Vector<>();
       final CountDownLatch commitDoneLatch = new CountDownLatch(1);
       final AtomicBoolean gotTransactionRolledBackException = new AtomicBoolean(false);
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async commit after consume...");
             try {
@@ -893,6 +908,7 @@ public class FailoverTransactionTest extends TestSupport {
          public void removeConsumer(ConnectionContext context, final ConsumerInfo info) throws Exception {
             if (count++ == 1) {
                Executors.newSingleThreadExecutor().execute(new Runnable() {
+                  @Override
                   public void run() {
                      LOG.info("Stopping broker on removeConsumer: " + info);
                      try {
@@ -908,7 +924,7 @@ public class FailoverTransactionTest extends TestSupport {
       }});
       broker.start();
 
-      Vector<Connection> connections = new Vector<Connection>();
+      Vector<Connection> connections = new Vector<>();
       ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory("failover:(" + url + ")");
       configureConnectionFactory(cf);
       Connection connection = cf.createConnection();
@@ -925,13 +941,13 @@ public class FailoverTransactionTest extends TestSupport {
       final Session consumerSession = connection.createSession(false, Session.CLIENT_ACKNOWLEDGE);
 
       final int sessionCount = 10;
-      final Stack<Session> sessions = new Stack<Session>();
+      final Stack<Session> sessions = new Stack<>();
       for (int i = 0; i < sessionCount; i++) {
          sessions.push(connection.createSession(false, Session.AUTO_ACKNOWLEDGE));
       }
 
       final int consumerCount = 1000;
-      final Deque<MessageConsumer> consumers = new ArrayDeque<MessageConsumer>();
+      final Deque<MessageConsumer> consumers = new ArrayDeque<>();
       for (int i = 0; i < consumerCount; i++) {
          consumers.push(consumerSession.createConsumer(destination));
       }
@@ -957,6 +973,7 @@ public class FailoverTransactionTest extends TestSupport {
             for (int i = 0; i < consumerCount && !consumers.isEmpty(); i++) {
 
                executorService.execute(new Runnable() {
+                  @Override
                   public void run() {
                      MessageConsumer localConsumer = null;
                      try {
@@ -1082,6 +1099,7 @@ public class FailoverTransactionTest extends TestSupport {
       final CountDownLatch commitDone = new CountDownLatch(1);
       // will block pending re-deliveries
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async commit...");
             try {
@@ -1132,10 +1150,11 @@ public class FailoverTransactionTest extends TestSupport {
 
       final CountDownLatch commitDone = new CountDownLatch(1);
 
-      final Vector<Exception> exceptions = new Vector<Exception>();
+      final Vector<Exception> exceptions = new Vector<>();
 
       // commit may fail if other consumer gets the message on restart
       Executors.newSingleThreadExecutor().execute(new Runnable() {
+         @Override
          public void run() {
             LOG.info("doing async commit...");
             try {

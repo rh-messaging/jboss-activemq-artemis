@@ -43,12 +43,13 @@ final class PageSyncTimer {
    private final long timeSync;
 
    private final Runnable runnable = new Runnable() {
+      @Override
       public void run() {
          tick();
       }
    };
 
-   private final List<OperationContext> syncOperations = new LinkedList<OperationContext>();
+   private final List<OperationContext> syncOperations = new LinkedList<>();
 
    // Static --------------------------------------------------------
 

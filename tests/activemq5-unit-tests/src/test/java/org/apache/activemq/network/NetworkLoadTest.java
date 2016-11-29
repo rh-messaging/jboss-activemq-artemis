@@ -91,6 +91,7 @@ public class NetworkLoadTest extends TestCase {
          MessageConsumer consumer = fromSession.createConsumer(new ActiveMQQueue("Q" + from));
 
          consumer.setMessageListener(new MessageListener() {
+            @Override
             public void onMessage(Message msg) {
                try {
                   producer.send(msg);
@@ -122,6 +123,7 @@ public class NetworkLoadTest extends TestCase {
    private BrokerService[] brokers;
    private ForwardingClient[] forwardingClients;
 
+   @Override
    protected void setUp() throws Exception {
       groupId = "network-load-test-" + System.currentTimeMillis();
       brokers = new BrokerService[BROKER_COUNT];
@@ -143,6 +145,7 @@ public class NetworkLoadTest extends TestCase {
       }
    }
 
+   @Override
    protected void tearDown() throws Exception {
       for (int i = 0; i < forwardingClients.length; i++) {
          LOG.info("Stoping fowarding client " + i);
@@ -182,7 +185,7 @@ public class NetworkLoadTest extends TestCase {
       memoryManager.getMemoryUsage().setLimit(1024 * 1024 * 50); // 50 MB
       broker.setSystemUsage(memoryManager);
 
-      final List<PolicyEntry> policyEntries = new ArrayList<PolicyEntry>();
+      final List<PolicyEntry> policyEntries = new ArrayList<>();
       final PolicyEntry entry = new PolicyEntry();
       entry.setQueue(">");
       entry.setMemoryLimit(1024 * 1024 * 1); // Set to 1 MB
@@ -227,13 +230,14 @@ public class NetworkLoadTest extends TestCase {
       Session fromSession = fromConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
       MessageConsumer consumer = fromSession.createConsumer(new ActiveMQQueue("Q" + from));
 
-      final AtomicReference<ActiveMQTextMessage> lastMessageReceived = new AtomicReference<ActiveMQTextMessage>();
+      final AtomicReference<ActiveMQTextMessage> lastMessageReceived = new AtomicReference<>();
       final AtomicLong producedMessages = new AtomicLong();
       final AtomicLong receivedMessages = new AtomicLong();
       final AtomicBoolean done = new AtomicBoolean();
 
       // Setup the consumer..
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message msg) {
             ActiveMQTextMessage m = (ActiveMQTextMessage) msg;
             ActiveMQTextMessage last = lastMessageReceived.get();

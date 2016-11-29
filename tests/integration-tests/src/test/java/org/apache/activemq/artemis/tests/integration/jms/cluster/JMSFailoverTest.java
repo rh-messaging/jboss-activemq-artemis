@@ -47,7 +47,7 @@ import org.apache.activemq.artemis.tests.integration.jms.server.management.JMSUt
 import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.tests.util.InVMNodeManagerServer;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -98,7 +98,7 @@ public class JMSFailoverTest extends ActiveMQTestBase {
 
    protected ActiveMQServer backupServer;
 
-   protected Map<String, Object> backupParams = new HashMap<String, Object>();
+   protected Map<String, Object> backupParams = new HashMap<>();
 
    private TransportConfiguration backuptc;
 
@@ -360,6 +360,7 @@ public class JMSFailoverTest extends ActiveMQTestBase {
 
       // The thread that will fail the server
       Thread spoilerThread = new Thread() {
+         @Override
          public void run() {
             flagAlign.countDown();
             // a large timeout just to help in case of debugging
@@ -505,6 +506,7 @@ public class JMSFailoverTest extends ActiveMQTestBase {
 
       volatile JMSException e;
 
+      @Override
       public void onException(final JMSException e) {
          this.e = e;
       }

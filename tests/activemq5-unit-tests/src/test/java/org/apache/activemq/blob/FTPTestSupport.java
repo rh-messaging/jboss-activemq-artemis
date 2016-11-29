@@ -47,6 +47,7 @@ public abstract class FTPTestSupport extends EmbeddedBrokerTestSupport {
 
    final File ftpHomeDirFile = new File("target/FTPBlobTest/ftptest");
 
+   @Override
    protected void setUp() throws Exception {
 
       if (ftpHomeDirFile.getParentFile().exists()) {
@@ -67,7 +68,7 @@ public abstract class FTPTestSupport extends EmbeddedBrokerTestSupport {
       user.setHomeDirectory(ftpHomeDirFile.getParent());
 
       // authorize user
-      List<Authority> auths = new ArrayList<Authority>();
+      List<Authority> auths = new ArrayList<>();
       Authority auth = new WritePermission();
       auths.add(auth);
       user.setAuthorities(auths);
@@ -100,6 +101,7 @@ public abstract class FTPTestSupport extends EmbeddedBrokerTestSupport {
       connection.start();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       if (connection != null) {
          connection.stop();

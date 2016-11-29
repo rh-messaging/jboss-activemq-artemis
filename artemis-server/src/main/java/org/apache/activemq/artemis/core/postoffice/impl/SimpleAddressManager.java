@@ -31,8 +31,6 @@ import org.apache.activemq.artemis.core.postoffice.BindingsFactory;
 import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.transaction.Transaction;
-import org.apache.activemq.artemis.core.transaction.TransactionOperationAbstract;
-import org.apache.activemq.artemis.utils.ConcurrentHashSet;
 
 /**
  * A simple address manager that maintains the addresses and bindings.
@@ -42,14 +40,12 @@ public class SimpleAddressManager implements AddressManager {
    /**
     * HashMap<Address, Binding>
     */
-   private final ConcurrentMap<SimpleString, Bindings> mappings = new ConcurrentHashMap<SimpleString, Bindings>();
+   private final ConcurrentMap<SimpleString, Bindings> mappings = new ConcurrentHashMap<>();
 
    /**
     * HashMap<QueueName, Binding>
     */
-   private final ConcurrentMap<SimpleString, Binding> nameMap = new ConcurrentHashMap<SimpleString, Binding>();
-
-   private final ConcurrentHashSet<SimpleString> pendingDeletes = new ConcurrentHashSet<SimpleString>();
+   private final ConcurrentMap<SimpleString, Binding> nameMap = new ConcurrentHashMap<>();
 
    private final BindingsFactory bindingsFactory;
 
@@ -57,8 +53,9 @@ public class SimpleAddressManager implements AddressManager {
       this.bindingsFactory = bindingsFactory;
    }
 
+   @Override
    public boolean addBinding(final Binding binding) throws Exception {
-      if (nameMap.putIfAbsent(binding.getUniqueName(), binding) != null || pendingDeletes.contains(binding.getUniqueName())) {
+      if (nameMap.putIfAbsent(binding.getUniqueName(), binding) != null) {
          throw ActiveMQMessageBundle.BUNDLE.bindingAlreadyExists(binding);
       }
 
@@ -69,6 +66,7 @@ public class SimpleAddressManager implements AddressManager {
       return addMappingInternal(binding.getAddress(), binding);
    }
 
+   @Override
    public Binding removeBinding(final SimpleString uniqueName, Transaction tx) throws Exception {
       final Binding binding = nameMap.remove(uniqueName);
 
@@ -76,41 +74,27 @@ public class SimpleAddressManager implements AddressManager {
          return null;
       }
 
-      if (tx != null) {
-         pendingDeletes.add(uniqueName);
-         tx.addOperation(new TransactionOperationAbstract() {
-
-            @Override
-            public void afterCommit(Transaction tx) {
-               pendingDeletes.remove(uniqueName);
-            }
-
-            @Override
-            public void afterRollback(Transaction tx) {
-               nameMap.put(uniqueName, binding);
-               pendingDeletes.remove(uniqueName);
-            }
-
-         });
-      }
-
       removeBindingInternal(binding.getAddress(), uniqueName);
 
       return binding;
    }
 
+   @Override
    public Bindings getBindingsForRoutingAddress(final SimpleString address) throws Exception {
       return mappings.get(address);
    }
 
+   @Override
    public Binding getBinding(final SimpleString bindableName) {
       return nameMap.get(bindableName);
    }
 
+   @Override
    public Map<SimpleString, Binding> getBindings() {
       return nameMap;
    }
 
+   @Override
    public Bindings getMatchingBindings(final SimpleString address) throws Exception {
       Address add = new AddressImpl(address);
 
@@ -127,6 +111,7 @@ public class SimpleAddressManager implements AddressManager {
       return bindings;
    }
 
+   @Override
    public void clear() {
       nameMap.clear();
       mappings.clear();

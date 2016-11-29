@@ -65,7 +65,7 @@ public abstract class CursorSupport extends CombinationTestSupport {
       producerConnection.start();
       Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
       MessageProducer producer = session.createProducer(getDestination(session));
-      List<Message> senderList = new ArrayList<Message>();
+      List<Message> senderList = new ArrayList<>();
       for (int i = 0; i < MESSAGE_COUNT; i++) {
          Message msg = session.createTextMessage("test" + i);
          senderList.add(msg);
@@ -76,7 +76,7 @@ public abstract class CursorSupport extends CombinationTestSupport {
       consumerConnection = getConsumerConnection(factory);
       // create durable subs
       consumer = getConsumer(consumerConnection);
-      List<Message> consumerList = new ArrayList<Message>();
+      List<Message> consumerList = new ArrayList<>();
       for (int i = 0; i < MESSAGE_COUNT; i++) {
          Message msg = consumer.receive(1000 * 5);
          assertNotNull("Message " + i + " was missing.", msg);
@@ -101,7 +101,7 @@ public abstract class CursorSupport extends CombinationTestSupport {
       producerConnection.start();
       Session session = producerConnection.createSession(false, Session.AUTO_ACKNOWLEDGE);
       MessageProducer producer = session.createProducer(getDestination(session));
-      List<TextMessage> senderList = new ArrayList<TextMessage>();
+      List<TextMessage> senderList = new ArrayList<>();
       for (int i = 0; i < MESSAGE_COUNT / 10; i++) {
          TextMessage msg = session.createTextMessage("test" + i);
          senderList.add(msg);
@@ -111,10 +111,11 @@ public abstract class CursorSupport extends CombinationTestSupport {
       consumerConnection = getConsumerConnection(factory);
       // create durable subs
       consumer = getConsumer(consumerConnection);
-      final List<Message> consumerList = new ArrayList<Message>();
+      final List<Message> consumerList = new ArrayList<>();
       final CountDownLatch latch = new CountDownLatch(1);
       consumer.setMessageListener(new MessageListener() {
 
+         @Override
          public void onMessage(Message msg) {
             try {
                // sleep to act as a slow consumer
@@ -164,6 +165,7 @@ public abstract class CursorSupport extends CombinationTestSupport {
       return connection;
    }
 
+   @Override
    protected void setUp() throws Exception {
       if (broker == null) {
          broker = createBroker();
@@ -171,6 +173,7 @@ public abstract class CursorSupport extends CombinationTestSupport {
       super.setUp();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       super.tearDown();
       if (broker != null) {

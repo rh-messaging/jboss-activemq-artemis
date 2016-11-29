@@ -57,7 +57,7 @@ public class AMQ4485Test extends TestCase {
    final int messageCount = 20;
    int memoryLimit = 40 * 1024;
    final ActiveMQQueue destination = new ActiveMQQueue("QUEUE." + this.getClass().getName());
-   final Vector<Throwable> exceptions = new Vector<Throwable>();
+   final Vector<Throwable> exceptions = new Vector<>();
    final CountDownLatch slowSendResume = new CountDownLatch(1);
 
    protected void configureBroker(long memoryLimit) throws Exception {
@@ -80,6 +80,7 @@ public class AMQ4485Test extends TestCase {
                if (true) {
                   TransactionBroker transactionBroker = (TransactionBroker) broker.getBroker().getAdaptor(TransactionBroker.class);
                   transactionBroker.getTransaction(producerExchange.getConnectionContext(), messageSend.getTransactionId(), false).addSynchronization(new Synchronization() {
+                                                                                                                                                         @Override
                                                                                                                                                          public void afterCommit() throws Exception {
                                                                                                                                                             LOG.error("AfterCommit, NUM:" + num + ", " + messageSend.getMessageId() + ", tx: " + messageSend.getTransactionId());
                                                                                                                                                             if (num == 5) {
@@ -108,8 +109,8 @@ public class AMQ4485Test extends TestCase {
 
    public void testOutOfOrderTransactionCompletionOnMemoryLimit() throws Exception {
 
-      Set<Integer> expected = new HashSet<Integer>();
-      final Vector<Session> sessionVector = new Vector<Session>();
+      Set<Integer> expected = new HashSet<>();
+      final Vector<Session> sessionVector = new Vector<>();
       ExecutorService executorService = Executors.newCachedThreadPool();
       for (int i = 1; i <= messageCount; i++) {
          sessionVector.add(send(i, 1, true));
@@ -174,6 +175,7 @@ public class AMQ4485Test extends TestCase {
       return session;
    }
 
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
       broker = new BrokerService();
@@ -185,6 +187,7 @@ public class AMQ4485Test extends TestCase {
 
    }
 
+   @Override
    protected void tearDown() throws Exception {
       super.tearDown();
       if (broker != null) {

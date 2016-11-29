@@ -51,6 +51,7 @@ public final class VersionLoader {
 
          try {
             PROP_FILE_NAME = AccessController.doPrivileged(new PrivilegedAction<String>() {
+               @Override
                public String run() {
                   return System.getProperty(VersionLoader.VERSION_PROP_FILE_KEY);
                }
@@ -117,7 +118,7 @@ public final class VersionLoader {
             int microVersion = Integer.valueOf(versionProps.getProperty("activemq.version.microVersion"));
             int[] incrementingVersions = parseCompatibleVersionList(versionProps.getProperty("activemq.version.incrementingVersion"));
             int[] compatibleVersionArray = parseCompatibleVersionList(versionProps.getProperty("activemq.version.compatibleVersionList"));
-            List<Version> definedVersions = new ArrayList<Version>(incrementingVersions.length);
+            List<Version> definedVersions = new ArrayList<>(incrementingVersions.length);
             for (int incrementingVersion : incrementingVersions) {
                definedVersions.add(new VersionImpl(versionName, majorVersion, minorVersion, microVersion, incrementingVersion, compatibleVersionArray));
             }

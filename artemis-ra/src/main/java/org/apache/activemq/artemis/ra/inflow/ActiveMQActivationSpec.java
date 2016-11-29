@@ -135,6 +135,8 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
    // undefined by default, default is specified at the RA level in ActiveMQRAProperties
    private Long setupInterval;
 
+   private Boolean rebalanceConnections = false;
+
    /**
     * Constructor
     */
@@ -161,6 +163,7 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
     *
     * @return The resource adapter
     */
+   @Override
    public ResourceAdapter getResourceAdapter() {
       if (ActiveMQActivationSpec.trace) {
          ActiveMQRALogger.LOGGER.trace("getResourceAdapter()");
@@ -214,6 +217,7 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
     * @param ra The resource adapter
     * @throws ResourceException Thrown if incorrect resource adapter
     */
+   @Override
    public void setResourceAdapter(final ResourceAdapter ra) throws ResourceException {
       if (ActiveMQActivationSpec.trace) {
          ActiveMQRALogger.LOGGER.trace("setResourceAdapter(" + ra + ")");
@@ -626,6 +630,14 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
       this.localTx = localTx;
    }
 
+   public boolean isRebalanceConnections() {
+      return rebalanceConnections;
+   }
+
+   public void setRebalanceConnections(boolean rebalanceConnections) {
+      this.rebalanceConnections = rebalanceConnections;
+   }
+
    public int getSetupAttempts() {
       if (ActiveMQActivationSpec.trace) {
          ActiveMQRALogger.LOGGER.trace("getSetupAttempts()");
@@ -673,13 +685,14 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
     *
     * @throws InvalidPropertyException Thrown if a validation exception occurs
     */
+   @Override
    public void validate() throws InvalidPropertyException {
       if (ActiveMQActivationSpec.trace) {
          ActiveMQRALogger.LOGGER.trace("validate()");
       }
 
-      List<String> errorMessages = new ArrayList<String>();
-      List<PropertyDescriptor> propsNotSet = new ArrayList<PropertyDescriptor>();
+      List<String> errorMessages = new ArrayList<>();
+      List<PropertyDescriptor> propsNotSet = new ArrayList<>();
 
       try {
          if (destination == null || destination.trim().equals("")) {
@@ -846,6 +859,7 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
       if (parsedJndiParams != null ? !parsedJndiParams.equals(that.parsedJndiParams) : that.parsedJndiParams != null)
          return false;
       if (localTx != null ? !localTx.equals(that.localTx) : that.localTx != null) return false;
+      if (rebalanceConnections != null ? !rebalanceConnections.equals(that.rebalanceConnections) : that.rebalanceConnections != null) return false;
       if (setupAttempts != null ? !setupAttempts.equals(that.setupAttempts) : that.setupAttempts != null) return false;
       return !(setupInterval != null ? !setupInterval.equals(that.setupInterval) : that.setupInterval != null);
 
@@ -873,6 +887,7 @@ public class ActiveMQActivationSpec extends ConnectionFactoryProperties implemen
       result = 31 * result + (jndiParams != null ? jndiParams.hashCode() : 0);
       result = 31 * result + (parsedJndiParams != null ? parsedJndiParams.hashCode() : 0);
       result = 31 * result + (localTx != null ? localTx.hashCode() : 0);
+      result = 31 * result + (rebalanceConnections != null ? rebalanceConnections.hashCode() : 0);
       result = 31 * result + (setupAttempts != null ? setupAttempts.hashCode() : 0);
       result = 31 * result + (setupInterval != null ? setupInterval.hashCode() : 0);
       return result;

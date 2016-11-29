@@ -37,7 +37,7 @@ import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 public class MessageGroupExample {
 
    public static void main(final String[] args) throws Exception {
-      final Map<String, String> messageReceiverMap = new ConcurrentHashMap<String, String>();
+      final Map<String, String> messageReceiverMap = new ConcurrentHashMap<>();
       Connection connection = null;
       try {
 
@@ -109,6 +109,7 @@ class SimpleMessageListener implements MessageListener {
       this.messageReceiverMap = messageReceiverMap;
    }
 
+   @Override
    public void onMessage(final Message message) {
       try {
          TextMessage msg = (TextMessage) message;

@@ -152,6 +152,7 @@ public class ClusterControl implements AutoCloseable {
    /**
     * close this cluster control and its resources
     */
+   @Override
    public void close() {
       sessionFactory.close();
    }
@@ -196,5 +197,13 @@ public class ClusterControl implements AutoCloseable {
    public void announceScaleDown(SimpleString targetNodeId, SimpleString scaledDownNodeId) {
       ScaleDownAnnounceMessage announceMessage = new ScaleDownAnnounceMessage(targetNodeId, scaledDownNodeId);
       clusterChannel.send(announceMessage);
+   }
+
+   public String getClusterUser() {
+      return clusterUser;
+   }
+
+   public String getClusterPassword() {
+      return clusterPassword;
    }
 }

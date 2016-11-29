@@ -75,6 +75,7 @@ public class MQTTProtocolHandler extends ChannelInboundHandlerAdapter {
       stopped = true;
    }
 
+   @Override
    public void channelRead(ChannelHandlerContext ctx, Object msg) {
       try {
          if (stopped) {
@@ -143,7 +144,7 @@ public class MQTTProtocolHandler extends ChannelInboundHandlerAdapter {
          }
       }
       catch (Exception e) {
-         log.debug("Error processing Control Packet, Disconnecting Client" + e.getMessage());
+         log.warn("Error processing Control Packet, Disconnecting Client" + e.getMessage());
          disconnect();
       }
    }

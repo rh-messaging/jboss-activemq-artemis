@@ -27,7 +27,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.tests.unit.UnitTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -71,6 +71,7 @@ public class PingStressTest extends ActiveMQTestBase {
     */
    private void internalTest() throws Exception {
       Interceptor noPongInterceptor = new Interceptor() {
+         @Override
          public boolean intercept(final Packet packet, final RemotingConnection conn) throws ActiveMQException {
             PingStressTest.log.info("In interceptor, packet is " + packet.getType());
             if (packet.getType() == PacketImpl.PING) {

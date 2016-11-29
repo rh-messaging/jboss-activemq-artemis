@@ -106,7 +106,7 @@ public final class Page implements Comparable<Page> {
          throw ActiveMQMessageBundle.BUNDLE.invalidPageIO();
       }
 
-      ArrayList<PagedMessage> messages = new ArrayList<PagedMessage>();
+      ArrayList<PagedMessage> messages = new ArrayList<>();
 
       size.set((int) file.size());
       // Using direct buffer, as described on https://jira.jboss.org/browse/HORNETQ-467
@@ -291,6 +291,7 @@ public final class Page implements Comparable<Page> {
       return "Page::pageID=" + this.pageId + ", file=" + this.file;
    }
 
+   @Override
    public int compareTo(Page otherPage) {
       return otherPage.getPageId() - this.pageId;
    }
@@ -358,7 +359,7 @@ public final class Page implements Comparable<Page> {
 
    private synchronized Set<PageSubscriptionCounter> getOrCreatePendingCounters() {
       if (pendingCounters == null) {
-         pendingCounters = new ConcurrentHashSet<PageSubscriptionCounter>();
+         pendingCounters = new ConcurrentHashSet<>();
       }
 
       return pendingCounters;

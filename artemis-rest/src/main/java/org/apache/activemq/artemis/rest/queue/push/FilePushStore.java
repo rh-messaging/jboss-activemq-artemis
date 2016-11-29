@@ -31,7 +31,7 @@ import org.apache.activemq.artemis.rest.topic.PushTopicRegistration;
 
 public class FilePushStore implements PushStore {
 
-   protected Map<String, PushRegistration> map = new HashMap<String, PushRegistration>();
+   protected Map<String, PushRegistration> map = new HashMap<>();
    protected File dir;
    protected JAXBContext ctx;
 
@@ -58,12 +58,13 @@ public class FilePushStore implements PushStore {
    }
 
    public synchronized List<PushRegistration> getRegistrations() {
-      List<PushRegistration> list = new ArrayList<PushRegistration>(map.values());
+      List<PushRegistration> list = new ArrayList<>(map.values());
       return list;
    }
 
+   @Override
    public synchronized List<PushRegistration> getByDestination(String destination) {
-      List<PushRegistration> list = new ArrayList<PushRegistration>();
+      List<PushRegistration> list = new ArrayList<>();
       for (PushRegistration reg : map.values()) {
          if (reg.getDestination().equals(destination)) {
             list.add(reg);
@@ -72,6 +73,7 @@ public class FilePushStore implements PushStore {
       return list;
    }
 
+   @Override
    public synchronized void update(PushRegistration reg) throws Exception {
       if (reg.getLoadedFrom() == null)
          return;
@@ -84,6 +86,7 @@ public class FilePushStore implements PushStore {
       marshaller.marshal(reg, (File) reg.getLoadedFrom());
    }
 
+   @Override
    public synchronized void add(PushRegistration reg) throws Exception {
       map.put(reg.getId(), reg);
       if (!this.dir.exists())
@@ -94,6 +97,7 @@ public class FilePushStore implements PushStore {
       save(reg);
    }
 
+   @Override
    public synchronized void remove(PushRegistration reg) throws Exception {
       map.remove(reg.getId());
       if (reg.getLoadedFrom() == null)
@@ -102,8 +106,9 @@ public class FilePushStore implements PushStore {
       fp.delete();
    }
 
+   @Override
    public synchronized void removeAll() throws Exception {
-      ArrayList<PushRegistration> copy = new ArrayList<PushRegistration>(map.values());
+      ArrayList<PushRegistration> copy = new ArrayList<>(map.values());
       for (PushRegistration reg : copy)
          remove(reg);
       this.dir.delete();

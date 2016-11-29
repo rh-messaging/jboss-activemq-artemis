@@ -56,7 +56,7 @@ public class NetworkReconnectTest extends TestCase {
    private ActiveMQConnectionFactory producerConnectionFactory;
    private ActiveMQConnectionFactory consumerConnectionFactory;
    private Destination destination;
-   private ArrayList<Connection> connections = new ArrayList<Connection>();
+   private ArrayList<Connection> connections = new ArrayList<>();
 
    public void xtestMultipleProducerBrokerRestarts() throws Exception {
       for (int i = 0; i < 10; i++) {
@@ -183,6 +183,7 @@ public class NetworkReconnectTest extends TestCase {
 
    }
 
+   @Override
    protected void setUp() throws Exception {
 
       LOG.info("===============================================================================");
@@ -195,6 +196,7 @@ public class NetworkReconnectTest extends TestCase {
 
    }
 
+   @Override
    protected void tearDown() throws Exception {
       disposeConsumerConnections();
       try {
@@ -300,6 +302,7 @@ public class NetworkReconnectTest extends TestCase {
 
       ConsumerEventSource source = new ConsumerEventSource(connection, destination);
       source.setConsumerListener(new ConsumerListener() {
+         @Override
          public void onConsumerEvent(ConsumerEvent event) {
             rc.set(event.getConsumerCount());
          }

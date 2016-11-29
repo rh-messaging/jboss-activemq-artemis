@@ -19,6 +19,7 @@ package org.apache.activemq.artemis.tests.integration.cluster.distribution;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -489,18 +490,30 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
 
    }
 
+
+
    protected void createQueue(final int node,
                               final String address,
                               final String queueName,
                               final String filterVal,
                               final boolean durable) throws Exception {
+      createQueue(node, address, queueName, filterVal, durable, null, null);
+   }
+
+   protected void createQueue(final int node,
+                              final String address,
+                              final String queueName,
+                              final String filterVal,
+                              final boolean durable,
+                              final String user,
+                              final String password) throws Exception {
       ClientSessionFactory sf = sfs[node];
 
       if (sf == null) {
          throw new IllegalArgumentException("No sf at " + node);
       }
 
-      ClientSession session = addClientSession(sf.createSession(false, true, true));
+      ClientSession session = addClientSession(sf.createSession(user, password, false, true, true, ActiveMQClient.DEFAULT_PRE_ACKNOWLEDGE, ActiveMQClient.DEFAULT_ACK_BATCH_SIZE));
 
       String filterString = null;
 
@@ -541,6 +554,16 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
                               final String queueName,
                               final String filterVal,
                               boolean autoCommitAcks) throws Exception {
+      addConsumer(consumerID, node, queueName, filterVal, autoCommitAcks, null, null);
+   }
+
+   protected void addConsumer(final int consumerID,
+                              final int node,
+                              final String queueName,
+                              final String filterVal,
+                              boolean autoCommitAcks,
+                              final String user,
+                              final String password) throws Exception {
       try {
          if (consumers[consumerID] != null) {
             throw new IllegalArgumentException("Already a consumer at " + node);
@@ -552,7 +575,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
             throw new IllegalArgumentException("No sf at " + node);
          }
 
-         ClientSession session = addClientSession(sf.createSession(false, false, autoCommitAcks));
+         ClientSession session = addClientSession(sf.createSession(user, password, false, false, autoCommitAcks, ActiveMQClient.DEFAULT_PRE_ACKNOWLEDGE, ActiveMQClient.DEFAULT_ACK_BATCH_SIZE));
 
          String filterString = null;
 
@@ -803,7 +826,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
                                                         final int msgStart,
                                                         final int msgEnd,
                                                         final int... consumerIDs) throws Exception {
-      HashMap<SimpleString, Integer> groupIdsReceived = new HashMap<SimpleString, Integer>();
+      HashMap<SimpleString, Integer> groupIdsReceived = new HashMap<>();
       for (int i = 0; i < consumerIDs.length; i++) {
          ConsumerHolder holder = consumers[consumerIDs[i]];
 
@@ -1057,6 +1080,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
 
       int order;
 
+      @Override
       public int compareTo(final OrderedConsumerHolder o) {
          int thisOrder = order;
          int otherOrder = o.order;
@@ -1073,7 +1097,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
 
       // First get one from each consumer to determine the order, then we sort them in this order
 
-      List<OrderedConsumerHolder> sorted = new ArrayList<OrderedConsumerHolder>();
+      List<OrderedConsumerHolder> sorted = new ArrayList<>();
 
       for (int consumerID : consumerIDs) {
          ConsumerHolder holder = consumers[consumerID];
@@ -1144,9 +1168,9 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
    protected void verifyReceiveRoundRobinInSomeOrderWithCounts(final boolean ack,
                                                                final int[] messageCounts,
                                                                final int... consumerIDs) throws Exception {
-      List<LinkedList<Integer>> receivedCounts = new ArrayList<LinkedList<Integer>>();
+      List<LinkedList<Integer>> receivedCounts = new ArrayList<>();
 
-      Set<Integer> counts = new HashSet<Integer>();
+      Set<Integer> counts = new HashSet<>();
 
       for (int consumerID : consumerIDs) {
          ConsumerHolder holder = consumers[consumerID];
@@ -1155,7 +1179,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
             throw new IllegalArgumentException("No consumer at " + consumerID);
          }
 
-         LinkedList<Integer> list = new LinkedList<Integer>();
+         LinkedList<Integer> list = new LinkedList<>();
 
          receivedCounts.add(list);
 
@@ -1252,7 +1276,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
          throw new IllegalArgumentException("No consumer at " + consumerID);
       }
 
-      List<Integer> ints = new ArrayList<Integer>();
+      List<Integer> ints = new ArrayList<>();
 
       ClientMessage message = null;
 
@@ -1307,6 +1331,10 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
    }
 
    protected void setupSessionFactory(final int node, final boolean netty, boolean ha) throws Exception {
+      setupSessionFactory(node, netty, ha, null, null);
+   }
+
+   protected void setupSessionFactory(final int node, final boolean netty, boolean ha, final String user, final String password) throws Exception {
       if (sfs[node] != null) {
          throw new IllegalArgumentException("Already a factory at " + node);
       }
@@ -1329,13 +1357,13 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
          locators[node] = ActiveMQClient.createServerLocatorWithoutHA(serverTotc);
       }
 
-      locators[node].setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance());
+      locators[node].setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance(locators[node]));
 
       locators[node].setBlockOnNonDurableSend(true).setBlockOnDurableSend(true);
       addServerLocator(locators[node]);
       ClientSessionFactory sf = createSessionFactory(locators[node]);
 
-      ClientSession session = sf.createSession();
+      ClientSession session = sf.createSession(user, password, false, true, true, ActiveMQClient.DEFAULT_PRE_ACKNOWLEDGE, ActiveMQClient.DEFAULT_ACK_BATCH_SIZE);
       session.close();
       sfs[node] = sf;
    }
@@ -1512,7 +1540,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
 
       TransportConfiguration connector = createTransportConfiguration(netty, false, params);
 
-      List<String> connectorPairs = new ArrayList<String>();
+      List<String> connectorPairs = new ArrayList<>();
       connectorPairs.add(connector.getName());
 
       UDPBroadcastEndpointFactory endpoint = new UDPBroadcastEndpointFactory().setGroupAddress(groupAddress).setGroupPort(port);
@@ -1560,7 +1588,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
 
       TransportConfiguration connector = createTransportConfiguration(netty, false, params);
 
-      List<String> connectorPairs = new ArrayList<String>();
+      List<String> connectorPairs = new ArrayList<>();
       connectorPairs.add(connector.getName());
 
       UDPBroadcastEndpointFactory endpoint = new UDPBroadcastEndpointFactory().setGroupAddress(groupAddress).setGroupPort(port);
@@ -1620,7 +1648,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       if (nodeTo != -1) {
          TransportConfiguration serverTotc = createTransportConfiguration(netty, false, generateParams(nodeTo, netty));
          serverFrom.getConfiguration().getConnectorConfigurations().put(serverTotc.getName(), serverTotc);
-         pairs = new ArrayList<String>();
+         pairs = new ArrayList<>();
          pairs.add(serverTotc.getName());
       }
       Configuration config = serverFrom.getConfiguration();
@@ -1654,7 +1682,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       if (nodeTo != -1) {
          TransportConfiguration serverTotc = createTransportConfiguration(netty, false, generateParams(nodeTo, netty));
          serverFrom.getConfiguration().getConnectorConfigurations().put(serverTotc.getName(), serverTotc);
-         pairs = new ArrayList<String>();
+         pairs = new ArrayList<>();
          pairs.add(serverTotc.getName());
       }
       Configuration config = serverFrom.getConfiguration();
@@ -1662,6 +1690,23 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       ClusterConnectionConfiguration clusterConf = new ClusterConnectionConfiguration().setName(name).setAddress(address).setConnectorName(name).setReconnectAttempts(reconnectAttempts).setRetryInterval(retryInterval).setMessageLoadBalancingType(messageLoadBalancingType).setMaxHops(maxHops).setConfirmationWindowSize(1024).setStaticConnectors(pairs).setAllowDirectConnectionsOnly(allowDirectConnectionsOnly);
 
       config.getClusterConfigurations().add(clusterConf);
+   }
+
+
+   protected void setupClusterConnection(final String name,
+                                         final String uri,
+                                         int server) throws Exception {
+      ActiveMQServer serverFrom = servers[server];
+
+      if (serverFrom == null) {
+         throw new IllegalStateException("No server at node " + server);
+      }
+
+      ClusterConnectionConfiguration configuration = new ClusterConnectionConfiguration(new URI(uri)).setName(name);
+
+      serverFrom.getConfiguration().addClusterConfiguration(configuration);
+
+
    }
 
    protected void setupClusterConnection(final String name,
@@ -1680,7 +1725,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       TransportConfiguration connectorFrom = createTransportConfiguration(netty, false, generateParams(nodeFrom, netty));
       serverFrom.getConfiguration().getConnectorConfigurations().put(connectorFrom.getName(), connectorFrom);
 
-      List<String> pairs = new ArrayList<String>();
+      List<String> pairs = new ArrayList<>();
       for (int element : nodesTo) {
          TransportConfiguration serverTotc = createTransportConfiguration(netty, false, generateParams(element, netty));
          serverFrom.getConfiguration().getConnectorConfigurations().put(serverTotc.getName(), serverTotc);
@@ -1710,7 +1755,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       TransportConfiguration connectorFrom = createTransportConfiguration(netty, false, generateParams(nodeFrom, netty));
       serverFrom.getConfiguration().getConnectorConfigurations().put(connectorFrom.getName(), connectorFrom);
 
-      List<String> pairs = new ArrayList<String>();
+      List<String> pairs = new ArrayList<>();
       for (int element : nodesTo) {
          TransportConfiguration serverTotc = createTransportConfiguration(netty, false, generateParams(element, netty));
          serverFrom.getConfiguration().getConnectorConfigurations().put(serverTotc.getName(), serverTotc);
@@ -1748,7 +1793,7 @@ public abstract class ClusterTestBase extends ActiveMQTestBase {
       TransportConfiguration connectorFrom = createTransportConfiguration(netty, false, generateParams(nodeFrom, netty));
       serverFrom.getConfiguration().getConnectorConfigurations().put(name, connectorFrom);
 
-      List<String> pairs = new ArrayList<String>();
+      List<String> pairs = new ArrayList<>();
       for (int element : nodesTo) {
          TransportConfiguration serverTotc = createTransportConfiguration(netty, false, generateParams(element, netty));
          serverFrom.getConfiguration().getConnectorConfigurations().put(serverTotc.getName(), serverTotc);

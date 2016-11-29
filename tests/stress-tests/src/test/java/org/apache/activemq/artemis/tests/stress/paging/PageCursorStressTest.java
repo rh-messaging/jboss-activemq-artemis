@@ -39,8 +39,8 @@ import org.apache.activemq.artemis.core.transaction.Transaction;
 import org.apache.activemq.artemis.core.transaction.impl.TransactionImpl;
 import org.apache.activemq.artemis.tests.unit.core.postoffice.impl.FakeQueue;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.utils.LinkedListIterator;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -145,6 +145,7 @@ public class PageCursorStressTest extends ActiveMQTestBase {
 
       PageSubscription cursorEven = createNonPersistentCursor(new Filter() {
 
+         @Override
          public boolean match(ServerMessage message) {
             Boolean property = message.getBooleanProperty("even");
             if (property == null) {
@@ -155,6 +156,7 @@ public class PageCursorStressTest extends ActiveMQTestBase {
             }
          }
 
+         @Override
          public SimpleString getFilterString() {
             return new SimpleString("even=true");
          }
@@ -163,6 +165,7 @@ public class PageCursorStressTest extends ActiveMQTestBase {
 
       PageSubscription cursorOdd = createNonPersistentCursor(new Filter() {
 
+         @Override
          public boolean match(ServerMessage message) {
             Boolean property = message.getBooleanProperty("even");
             if (property == null) {
@@ -173,6 +176,7 @@ public class PageCursorStressTest extends ActiveMQTestBase {
             }
          }
 
+         @Override
          public SimpleString getFilterString() {
             return new SimpleString("even=true");
          }
@@ -776,7 +780,7 @@ public class PageCursorStressTest extends ActiveMQTestBase {
    public void setUp() throws Exception {
       super.setUp();
       OperationContextImpl.clearContext();
-      queueList = new ArrayList<Queue>();
+      queueList = new ArrayList<>();
 
       createServer();
       lock = new ReentrantReadWriteLock().readLock();

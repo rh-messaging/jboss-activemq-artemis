@@ -58,6 +58,7 @@ public final class Topology {
 
    private static final class DirectExecutor implements Executor {
 
+      @Override
       public void execute(final Runnable runnable) {
          runnable.run();
       }
@@ -83,7 +84,7 @@ public final class Topology {
    /**
     * It will remove all elements as if it haven't received anyone from the server.
     */
-   public void clear() {
+   public synchronized void clear() {
       topology.clear();
    }
 
@@ -246,6 +247,7 @@ public final class Topology {
 
       if (copy.size() > 0) {
          executor.execute(new Runnable() {
+            @Override
             public void run() {
                for (ClusterTopologyListener listener : copy) {
                   if (ActiveMQClientLogger.LOGGER.isTraceEnabled()) {
@@ -311,6 +313,7 @@ public final class Topology {
          final ArrayList<ClusterTopologyListener> copy = copyListeners();
 
          executor.execute(new Runnable() {
+            @Override
             public void run() {
                for (ClusterTopologyListener listener : copy) {
                   if (ActiveMQClientLogger.LOGGER.isTraceEnabled()) {
@@ -335,13 +338,14 @@ public final class Topology {
       }
 
       executor.execute(new Runnable() {
+         @Override
          public void run() {
             int count = 0;
 
             final Map<String, TopologyMemberImpl> copy;
 
             synchronized (Topology.this) {
-               copy = new HashMap<String, TopologyMemberImpl>(topology);
+               copy = new HashMap<>(topology);
             }
 
             for (Map.Entry<String, TopologyMemberImpl> entry : copy.entrySet()) {

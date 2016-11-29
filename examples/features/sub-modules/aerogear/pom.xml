@@ -24,7 +24,7 @@ under the License.
    <parent>
       <groupId>org.apache.activemq.examples.modules</groupId>
       <artifactId>broker-modules</artifactId>
-      <version>1.1.1-SNAPSHOT</version>
+      <version>1.3.0-SNAPSHOT</version>
    </parent>
 
    <properties>
@@ -60,18 +60,9 @@ under the License.
                   <configuration>
                      <ignore>${noServer}</ignore>
                      <!-- this list was extracted from mvn dependency:tree on integration/aerogear -->
-                     <libList>
+                     <libListWithDeps>
                         <param>org.apache.activemq:artemis-aerogear-integration:${project.version}</param>
-                        <param>org.jboss.aerogear:unifiedpush-java-client:1.0.0</param>
-                        <param>net.iharder:base64:2.3.8</param>
-                        <param>com.fasterxml.jackson.core:jackson-annotations:2.3.0</param>
-                        <param>com.fasterxml.jackson.core:jackson-core:2.3.0</param>
-                        <param>org.jboss.resteasy:resteasy-jackson-provider:2.3.2.Final</param>
-                        <param>org.codehaus.jackson:jackson-core-asl:1.8.5</param>
-                        <param>org.codehaus.jackson:jackson-mapper-asl:1.8.5</param>
-                        <param>org.codehaus.jackson:jackson-jaxrs:1.8.5</param>
-                        <param>org.codehaus.jackson:jackson-xc:1.8.5</param>
-                     </libList>
+                     </libListWithDeps>
                   </configuration>
                </execution>
                <execution>

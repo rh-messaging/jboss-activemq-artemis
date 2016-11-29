@@ -173,7 +173,7 @@ public class DestinationInterceptorDurableSubTest extends EmbeddedBrokerTestSupp
          // AMQ-4571 only removed the latter not the former on unsubscribe(), so we need
          // to check against both.
          ObjectName[] names = (ObjectName[]) mbsc.getAttribute(new ObjectName(JMX_CONTEXT_BASE_NAME + topicName), "Subscriptions");
-         ObjectInstance instance = (ObjectInstance) mbsc.getObjectInstance(new ObjectName(JMX_CONTEXT_BASE_NAME +
+         ObjectInstance instance = mbsc.getObjectInstance(new ObjectName(JMX_CONTEXT_BASE_NAME +
                                                                                              topicName +
                                                                                              ",endpoint=Consumer,clientId=myId1,consumerId=Durable(myId1_" +
                                                                                              subName +
@@ -199,10 +199,12 @@ public class DestinationInterceptorDurableSubTest extends EmbeddedBrokerTestSupp
       return false;
    }
 
+   @Override
    protected void tearDown() throws Exception {
       super.tearDown();
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       XBeanBrokerFactory factory = new XBeanBrokerFactory();
       BrokerService answer = factory.createBroker(new URI(getBrokerConfigUri()));
@@ -241,11 +243,13 @@ public class DestinationInterceptorDurableSubTest extends EmbeddedBrokerTestSupp
       /* (non-Javadoc)
        * @see org.apache.activemq.broker.region.DestinationInterceptor#intercept(org.apache.activemq.broker.region.Destination)
        */
+      @Override
       public Destination intercept(final Destination destination) {
          LOG.info("intercept({})", destination.getName());
 
          if (!destination.getActiveMQDestination().getPhysicalName().startsWith("ActiveMQ")) {
             return new DestinationFilter(destination) {
+               @Override
                public void send(ProducerBrokerExchange context, Message message) throws Exception {
                   // Send message to Destination
                   if (LOG.isDebugEnabled()) {
@@ -262,6 +266,7 @@ public class DestinationInterceptorDurableSubTest extends EmbeddedBrokerTestSupp
       /* (non-Javadoc)
        * @see org.apache.activemq.broker.region.DestinationInterceptor#remove(org.apache.activemq.broker.region.Destination)
        */
+      @Override
       public void remove(Destination destination) {
          LOG.info("remove({})", destination.getName());
          this.broker = null;
@@ -270,6 +275,7 @@ public class DestinationInterceptorDurableSubTest extends EmbeddedBrokerTestSupp
       /* (non-Javadoc)
        * @see org.apache.activemq.broker.region.DestinationInterceptor#create(org.apache.activemq.broker.Broker, org.apache.activemq.broker.ConnectionContext, org.apache.activemq.command.ActiveMQDestination)
        */
+      @Override
       public void create(Broker broker, ConnectionContext context, ActiveMQDestination destination) throws Exception {
          LOG.info("create(" + broker.getBrokerName() + ", " + context.toString() + ", " + destination.getPhysicalName());
       }

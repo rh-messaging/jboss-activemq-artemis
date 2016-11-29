@@ -53,6 +53,7 @@ import org.apache.activemq.artemis.core.paging.cursor.PageSubscription;
 import org.apache.activemq.artemis.core.persistence.OperationContext;
 import org.apache.activemq.artemis.core.protocol.core.Packet;
 import org.apache.activemq.artemis.core.protocol.core.impl.wireformat.BackupReplicationStartFailedMessage;
+import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.core.server.cluster.Bridge;
 import org.apache.activemq.artemis.core.server.cluster.impl.BridgeImpl;
 import org.apache.activemq.artemis.core.server.cluster.impl.ClusterConnectionImpl;
@@ -81,15 +82,15 @@ public interface ActiveMQServerLogger extends BasicLogger {
    void serverStarting(String type, Configuration configuration);
 
    @LogMessage(level = Logger.Level.INFO)
-   @Message(id = 221001, value = "Apache ActiveMQ Artemis Message Broker version {0} [nodeID={1}] {2}", format = Message.Format.MESSAGE_FORMAT)
-   void serverStarted(String fullVersion, SimpleString nodeId, String identity);
+   @Message(id = 221001, value = "Apache ActiveMQ Artemis Message Broker version {0} [{1}, nodeID={2}] {3}", format = Message.Format.MESSAGE_FORMAT)
+   void serverStarted(String fullVersion, String name, SimpleString nodeId, String identity);
 
    @LogMessage(level = Logger.Level.INFO)
-   @Message(id = 221002, value = "Apache ActiveMQ Artemis Message Broker version {0} [{1}] stopped", format = Message.Format.MESSAGE_FORMAT)
-   void serverStopped(String version, SimpleString nodeId);
+   @Message(id = 221002, value = "Apache ActiveMQ Artemis Message Broker version {0} [{1}] stopped, uptime {2}", format = Message.Format.MESSAGE_FORMAT)
+   void serverStopped(String version, SimpleString nodeId, String uptime);
 
    @LogMessage(level = Logger.Level.INFO)
-   @Message(id = 221003, value = "trying to deploy queue {0}", format = Message.Format.MESSAGE_FORMAT)
+   @Message(id = 221003, value = "Trying to deploy queue {0}", format = Message.Format.MESSAGE_FORMAT)
    void deployQueue(SimpleString queueName);
 
    @LogMessage(level = Logger.Level.INFO)
@@ -190,7 +191,7 @@ public interface ActiveMQServerLogger extends BasicLogger {
    @LogMessage(level = Logger.Level.INFO)
    @Message(
       id = 221026,
-      value = "Bridge {0} connected to fowardingAddress={1}. {2} does not have any bindings what means messages will be ignored until a binding is created.",
+      value = "Bridge {0} connected to fowardingAddress={1}. {2} does not have any bindings. Messages will be ignored until a binding is created.",
       format = Message.Format.MESSAGE_FORMAT)
    void bridgeNoBindings(SimpleString name, SimpleString forwardingAddress, SimpleString address);
 
@@ -253,7 +254,7 @@ public interface ActiveMQServerLogger extends BasicLogger {
    void restartingReplicatedBackupAfterFailback();
 
    @LogMessage(level = Logger.Level.INFO)
-   @Message(id = 221040, value = "Remote group coordinators did not start yet", format = Message.Format.MESSAGE_FORMAT)
+   @Message(id = 221040, value = "Remote group coordinators has not started.", format = Message.Format.MESSAGE_FORMAT)
    void remoteGroupCoordinatorsNotStarted();
 
    @LogMessage(level = Logger.Level.INFO)
@@ -299,6 +300,14 @@ public interface ActiveMQServerLogger extends BasicLogger {
    @LogMessage(level = Logger.Level.INFO)
    @Message(id = 221050, value = "Activating Shared Store Slave", format = Message.Format.MESSAGE_FORMAT)
    void activatingSharedStoreSlave();
+
+   @LogMessage(level = Logger.Level.INFO)
+   @Message(id = 221051, value = "Populating security roles from LDAP at: {0}", format = Message.Format.MESSAGE_FORMAT)
+   void populatingSecurityRolesFromLDAP(String url);
+
+   @LogMessage(level = Logger.Level.INFO)
+   @Message(id = 221052, value = "trying to deploy topic {0}", format = Message.Format.MESSAGE_FORMAT)
+   void deployTopic(SimpleString topicName);   
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222000, value = "ActiveMQServer is being finalized and has not been stopped. Please remember to stop the server before letting it go out of scope",
@@ -689,14 +698,14 @@ public interface ActiveMQServerLogger extends BasicLogger {
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222095, value = "Connection failed with failedOver={0}", format = Message.Format.MESSAGE_FORMAT)
-   void bridgeConnectionFailed(@Cause Exception e, Boolean failedOver);
+   void bridgeConnectionFailed(Boolean failedOver);
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222096, value = "Error on querying binding on bridge {0}. Retrying in 100 milliseconds", format = Message.Format.MESSAGE_FORMAT)
    void errorQueryingBridge(@Cause Throwable t, SimpleString name);
 
    @LogMessage(level = Logger.Level.WARN)
-   @Message(id = 222097, value = "Address {0} does not have any bindings yet, retry #({1})",
+   @Message(id = 222097, value = "Address {0} does not have any bindings, retry #({1})",
       format = Message.Format.MESSAGE_FORMAT)
    void errorQueryingBridge(SimpleString address, Integer retryCount);
 
@@ -723,7 +732,7 @@ public interface ActiveMQServerLogger extends BasicLogger {
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222103, value = "transaction with xid {0} timed out", format = Message.Format.MESSAGE_FORMAT)
-   void unexpectedXid(Xid xid);
+   void timedOutXID(Xid xid);
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222104, value = "IO Error completing the transaction, code = {0}, message = {1}", format = Message.Format.MESSAGE_FORMAT)
@@ -864,7 +873,7 @@ public interface ActiveMQServerLogger extends BasicLogger {
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222134, value = "No connector defined with name {0}. The bridge will not be deployed.",
       format = Message.Format.MESSAGE_FORMAT)
-   void bridgeNoConnector(String name);
+   void noConnector(String name);
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222135, value = "Stopping Redistributor, Timed out waiting for tasks to complete", format = Message.Format.MESSAGE_FORMAT)
@@ -1000,9 +1009,10 @@ public interface ActiveMQServerLogger extends BasicLogger {
       format = Message.Format.MESSAGE_FORMAT)
    void groupingQueueRemoved(int size, SimpleString clusterName);
 
+   @SuppressWarnings("deprecation")
    @LogMessage(level = Logger.Level.WARN)
-   @Message(id = 222168, value = "The ''protocol'' property is deprecated, if you want this Acceptor to support multiple protocols use the ''protocols'' property, i.e. ''CORE,AMQP,STOMP''",
-      format = Message.Format.MESSAGE_FORMAT)
+   @Message(id = 222168, value = "The ''" + TransportConstants.PROTOCOL_PROP_NAME + "'' property is deprecated. If you want this Acceptor to support multiple protocols, use the ''" + TransportConstants.PROTOCOLS_PROP_NAME + "'' property, e.g. with value ''CORE,AMQP,STOMP''",
+            format = Message.Format.MESSAGE_FORMAT)
    void warnDeprecatedProtocol();
 
    @LogMessage(level = Logger.Level.WARN)
@@ -1186,6 +1196,14 @@ public interface ActiveMQServerLogger extends BasicLogger {
       format = Message.Format.MESSAGE_FORMAT)
    void noProtocolManagerFound(String protocol, String host);
 
+   @LogMessage(level = Logger.Level.WARN)
+   @Message(id = 222204, value = "Duplicated Acceptor {0} with parameters {1} classFactory={2} duplicated on the configuration", format = Message.Format.MESSAGE_FORMAT)
+   void duplicatedAcceptor(String name, String parameters, String classFactory);
+
+   @LogMessage(level = Logger.Level.WARN)
+   @Message(id = 222205, value = "OutOfMemoryError possible! There are currently {0} addresses with a total max-size-bytes of {1} bytes, but the maximum memory available is {2} bytes.", format = Message.Format.MESSAGE_FORMAT)
+   void potentialOOME(long addressCount, long totalMaxSizeBytes, long maxMemory);
+
    @LogMessage(level = Logger.Level.ERROR)
    @Message(id = 224000, value = "Failure in initialisation", format = Message.Format.MESSAGE_FORMAT)
    void initializationError(@Cause Throwable e);
@@ -1283,8 +1301,8 @@ public interface ActiveMQServerLogger extends BasicLogger {
    void errorWritingToInvmConnector(@Cause Exception e, Runnable runnable);
 
    @LogMessage(level = Logger.Level.ERROR)
-   @Message(id = 224028, value = "Failed to stop acceptor", format = Message.Format.MESSAGE_FORMAT)
-   void errorStoppingAcceptor();
+   @Message(id = 224028, value = "Failed to stop accepto {0}r", format = Message.Format.MESSAGE_FORMAT)
+   void errorStoppingAcceptor(String name);
 
    @LogMessage(level = Logger.Level.ERROR)
    @Message(id = 224029, value = "large message sync: largeMessage instance is incompatible with it, ignoring data", format = Message.Format.MESSAGE_FORMAT)
@@ -1441,4 +1459,19 @@ public interface ActiveMQServerLogger extends BasicLogger {
    @Message(id = 224065, value = "Failed to remove auto-created queue {0}", format = Message.Format.MESSAGE_FORMAT)
    void errorRemovingAutoCreatedQueue(@Cause Exception e, SimpleString bindingName);
 
+   @LogMessage(level = Logger.Level.ERROR)
+   @Message(id = 224066, value = "Error opening context for LDAP", format = Message.Format.MESSAGE_FORMAT)
+   void errorOpeningContextForLDAP(@Cause Exception e);
+
+   @LogMessage(level = Logger.Level.ERROR)
+   @Message(id = 224067, value = "Error populating security roles from LDAP", format = Message.Format.MESSAGE_FORMAT)
+   void errorPopulatingSecurityRolesFromLDAP(@Cause Exception e);
+
+   @LogMessage(level = Logger.Level.ERROR)
+   @Message(id = 224068, value = "Unable to stop component: {0}", format = Message.Format.MESSAGE_FORMAT)
+   void errorStoppingComponent(@Cause Throwable t, String componentClassName);
+
+   @LogMessage(level = Logger.Level.DEBUG)
+   @Message(id = 224070, value = "Received Interrupt Exception whilst waiting for component to shutdown: {0}", format = Message.Format.MESSAGE_FORMAT)
+   void interruptWhilstStoppingComponent(String componentClassName);
 }

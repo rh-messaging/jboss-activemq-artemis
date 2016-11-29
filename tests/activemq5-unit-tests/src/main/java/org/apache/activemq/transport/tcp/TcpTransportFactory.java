@@ -69,9 +69,10 @@ public class TcpTransportFactory extends TransportFactory {
       return super.doConnect(location);
    }
 
+   @Override
    public TransportServer doBind(final URI location) throws IOException {
       try {
-         Map<String, String> options = new HashMap<String, String>(URISupport.parseParameters(location));
+         Map<String, String> options = new HashMap<>(URISupport.parseParameters(location));
 
          ServerSocketFactory serverSocketFactory = createServerSocketFactory();
          TcpTransportServer server = createTcpTransportServer(location, serverSocketFactory);
@@ -93,10 +94,11 @@ public class TcpTransportFactory extends TransportFactory {
       return new TcpTransportServer(this, location, serverSocketFactory);
    }
 
+   @Override
    @SuppressWarnings("rawtypes")
    public Transport compositeConfigure(Transport transport, WireFormat format, Map options) {
 
-      TcpTransport tcpTransport = (TcpTransport) transport.narrow(TcpTransport.class);
+      TcpTransport tcpTransport = transport.narrow(TcpTransport.class);
       IntrospectionSupport.setProperties(tcpTransport, options);
 
       Map<String, Object> socketOptions = IntrospectionSupport.extractProperties(options, "socket.");
@@ -129,6 +131,7 @@ public class TcpTransportFactory extends TransportFactory {
       return true;
    }
 
+   @Override
    protected Transport createTransport(URI location, WireFormat wf) throws UnknownHostException, IOException {
       URI localLocation = null;
       String path = location.getPath();

@@ -28,9 +28,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.activemq.artemis.api.core.Pair;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.core.io.IOCallback;
+import org.apache.activemq.artemis.core.io.IOCriticalErrorListener;
+import org.apache.activemq.artemis.core.io.SequentialFile;
 import org.apache.activemq.artemis.core.journal.Journal;
 import org.apache.activemq.artemis.core.journal.JournalLoadInformation;
-import org.apache.activemq.artemis.core.io.SequentialFile;
 import org.apache.activemq.artemis.core.message.impl.MessageInternal;
 import org.apache.activemq.artemis.core.paging.PageTransactionInfo;
 import org.apache.activemq.artemis.core.paging.PagedMessage;
@@ -61,6 +62,26 @@ public class NullStorageManager implements StorageManager {
    private final AtomicLong idSequence = new AtomicLong(0);
 
    private volatile boolean started;
+
+   private final IOCriticalErrorListener ioCriticalErrorListener;
+
+   public NullStorageManager(IOCriticalErrorListener ioCriticalErrorListener) {
+      this.ioCriticalErrorListener = ioCriticalErrorListener;
+   }
+
+   public NullStorageManager() {
+      this(new IOCriticalErrorListener() {
+         @Override
+         public void onIOException(Throwable code, String message, SequentialFile file) {
+            code.printStackTrace();
+         }
+      });
+   }
+
+   @Override
+   public void criticalError(Throwable error) {
+
+   }
 
    private static final OperationContext dummyContext = new OperationContext() {
 
@@ -396,9 +417,11 @@ public class NullStorageManager implements StorageManager {
    public void deleteCursorAcknowledge(long ackID) throws Exception {
    }
 
+   @Override
    public void storePageCompleteTransactional(long txID, long queueID, PagePosition position) throws Exception {
    }
 
+   @Override
    public void deletePageComplete(long ackID) throws Exception {
    }
 
@@ -424,6 +447,7 @@ public class NullStorageManager implements StorageManager {
    public void deletePageCounter(final long txID, final long recordID) throws Exception {
    }
 
+   @Override
    public void deletePendingPageCounter(long txID, long recordID) throws Exception {
    }
 
@@ -473,7 +497,8 @@ public class NullStorageManager implements StorageManager {
    public void startReplication(final ReplicationManager replicationManager,
                                 final PagingManager pagingManager,
                                 final String nodeID,
-                                final boolean autoFailBack) throws Exception {
+                                final boolean autoFailBack,
+                                long initialReplicationSyncTimeout) throws Exception {
       // no-op
    }
 

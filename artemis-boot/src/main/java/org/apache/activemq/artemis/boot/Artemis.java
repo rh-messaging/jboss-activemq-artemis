@@ -48,12 +48,12 @@ public class Artemis {
 
    /** This is a good method for booting an embedded command */
    public static Object execute(File artemisHome, File artemisInstance, List<String> args) throws Throwable {
-      return execute(artemisHome, artemisInstance, (String[]) args.toArray(new String[args.size()]));
+      return execute(artemisHome, artemisInstance, args.toArray(new String[args.size()]));
    }
 
    /** This is a good method for booting an embedded command */
    public static Object execute(File fileHome, File fileInstance, String ... args) throws Throwable {
-      ArrayList<File> dirs = new ArrayList<File>();
+      ArrayList<File> dirs = new ArrayList<>();
       if (fileHome != null) {
          dirs.add(new File(fileHome, "lib"));
       }
@@ -62,12 +62,24 @@ public class Artemis {
       }
 
 
-      ArrayList<URL> urls = new ArrayList<URL>();
+      ArrayList<URL> urls = new ArrayList<>();
+
+      // Without the etc on the config, things like JGroups configuration wouldn't be loaded
+      if (fileInstance != null) {
+         File etcFile = new File(fileInstance, "etc");
+         // Adding etc to the classLoader so modules can lookup for their configs
+         urls.add(etcFile.toURI().toURL());
+      }
+      if (fileHome != null) {
+         File etcFile = new File(fileHome, "etc");
+         // Adding etc to the classLoader so modules can lookup for their configs
+         urls.add(etcFile.toURI().toURL());
+      }
       for (File bootdir : dirs) {
          if (bootdir.exists() && bootdir.isDirectory()) {
 
             // Find the jar files in the directory..
-            ArrayList<File> files = new ArrayList<File>();
+            ArrayList<File> files = new ArrayList<>();
             for (File f : bootdir.listFiles()) {
                if (f.getName().endsWith(".jar") || f.getName().endsWith(".zip")) {
                   files.add(f);
@@ -76,6 +88,7 @@ public class Artemis {
 
             // Sort the list by file name..
             Collections.sort(files, new Comparator<File>() {
+               @Override
                public int compare(File file, File file1) {
                   return file.getName().compareTo(file1.getName());
                }
@@ -96,13 +109,6 @@ public class Artemis {
       String loggingConfig = System.getProperty("logging.configuration");
       if (loggingConfig != null) {
          System.setProperty("logging.configuration", fixupFileURI(loggingConfig));
-      }
-
-      // Without the etc on the config, things like JGroups configuration wouldn't be loaded
-      if (fileInstance != null) {
-         File etcFile = new File(fileInstance, "etc");
-         // Adding etc to the classLoader so modules can lookup for their configs
-         urls.add(etcFile.toURI().toURL());
       }
 
       ClassLoader originalCL = Thread.currentThread().getContextClassLoader();

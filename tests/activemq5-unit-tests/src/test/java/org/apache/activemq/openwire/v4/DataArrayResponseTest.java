@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v4;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class DataArrayResponseTest extends ResponseTest {
 
    public static DataArrayResponseTest SINGLETON = new DataArrayResponseTest();
 
+   @Override
    public Object createObject() throws Exception {
       DataArrayResponse info = new DataArrayResponse();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       DataArrayResponse info = (DataArrayResponse) object;

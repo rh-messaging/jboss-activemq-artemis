@@ -20,18 +20,13 @@ import javax.jms.ConnectionFactory;
 import javax.management.MBeanServer;
 import javax.management.MBeanServerFactory;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.jms.management.JMSServerControl;
-import org.apache.activemq.artemis.tests.integration.management.ManagementControlHelper;
-import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
-import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.registry.JndiBindingRegistry;
 import org.apache.activemq.artemis.core.security.Role;
@@ -40,7 +35,10 @@ import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.jms.server.config.ConnectionFactoryConfiguration;
 import org.apache.activemq.artemis.jms.server.config.impl.ConnectionFactoryConfigurationImpl;
 import org.apache.activemq.artemis.jms.server.impl.JMSServerManagerImpl;
-import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManagerImpl;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQJAASSecurityManager;
+import org.apache.activemq.artemis.tests.integration.management.ManagementControlHelper;
+import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
+import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.junit.After;
 import org.junit.Before;
 
@@ -70,13 +68,12 @@ public class OpenWireTestBase extends ActiveMQTestBase {
 
       serverConfig.getAddressesSettings().put("jms.queue.#", new AddressSettings().setAutoCreateJmsQueues(false).setDeadLetterAddress(new SimpleString("jms.queue.ActiveMQ.DLQ")));
 
-      serverConfig.getAcceptorConfigurations().add(new TransportConfiguration(NETTY_ACCEPTOR_FACTORY));
       serverConfig.setSecurityEnabled(enableSecurity);
 
       extraServerConfig(serverConfig);
 
       if (enableSecurity) {
-         ActiveMQSecurityManagerImpl securityManager = (ActiveMQSecurityManagerImpl) server.getSecurityManager();
+         ActiveMQJAASSecurityManager securityManager = (ActiveMQJAASSecurityManager) server.getSecurityManager();
          securityManager.getConfiguration().addRole("openwireSender", "sender");
          securityManager.getConfiguration().addUser("openwireSender", "SeNdEr");
          //sender cannot receive
@@ -99,20 +96,13 @@ public class OpenWireTestBase extends ActiveMQTestBase {
          //guest cannot do anything
          Role destRole = new Role("manager", false, false, false, false, true, true, false);
 
-         Map<String, Set<Role>> settings = server.getConfiguration().getSecurityRoles();
-         if (settings == null) {
-            settings = new HashMap<String, Set<Role>>();
-            server.getConfiguration().setSecurityRoles(settings);
-         }
-         Set<Role> anySet = settings.get("#");
-         if (anySet == null) {
-            anySet = new HashSet<Role>();
-            settings.put("#", anySet);
-         }
-         anySet.add(senderRole);
-         anySet.add(receiverRole);
-         anySet.add(guestRole);
-         anySet.add(destRole);
+         Set<Role> roles =  new HashSet<>();
+         roles.add(senderRole);
+         roles.add(receiverRole);
+         roles.add(guestRole);
+         roles.add(destRole);
+
+         server.getConfiguration().putSecurityRoles("#", roles);
       }
       jmsServer = new JMSServerManagerImpl(server);
       namingContext = new InVMNamingContext();
@@ -130,7 +120,7 @@ public class OpenWireTestBase extends ActiveMQTestBase {
    }
 
    protected void registerConnectionFactory() throws Exception {
-      List<TransportConfiguration> connectorConfigs = new ArrayList<TransportConfiguration>();
+      List<TransportConfiguration> connectorConfigs = new ArrayList<>();
       connectorConfigs.add(new TransportConfiguration(INVM_CONNECTOR_FACTORY));
 
       createCF(connectorConfigs, "/cf");

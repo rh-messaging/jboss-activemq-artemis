@@ -170,6 +170,7 @@ public class PagingWithFailoverAndCountersTest extends ActiveMQTestBase {
          this.txSize = txSize;
       }
 
+      @Override
       public void run() {
          try {
 
@@ -235,6 +236,7 @@ public class PagingWithFailoverAndCountersTest extends ActiveMQTestBase {
          super("Monitor-thread");
       }
 
+      @Override
       public void run() {
 
          ActiveMQServer server = inProcessBackup.getServer();
@@ -244,7 +246,7 @@ public class PagingWithFailoverAndCountersTest extends ActiveMQTestBase {
             // The best to way to validate if the server is ready and operating is to send and consume at least one message
             // before we could do valid monitoring
             try {
-               ServerLocator locator = PagingWithFailoverServer.createLocator(PORT2).setInitialConnectAttempts(100).setRetryInterval(100);
+               ServerLocator locator = SpawnedServerSupport.createLocator(PORT2).setInitialConnectAttempts(100).setRetryInterval(100);
                ClientSessionFactory factory = locator.createSessionFactory();
                ClientSession session = factory.createSession();
 
@@ -288,7 +290,7 @@ public class PagingWithFailoverAndCountersTest extends ActiveMQTestBase {
    public void testValidateDeliveryAndCounters() throws Exception {
       startLive();
 
-      ServerLocator locator = PagingWithFailoverServer.createLocator(PORT1).setInitialConnectAttempts(100).setReconnectAttempts(-1).setRetryInterval(100);
+      ServerLocator locator = SpawnedServerSupport.createLocator(PORT1).setInitialConnectAttempts(100).setReconnectAttempts(-1).setRetryInterval(100);
 
       ClientSessionFactory factory = locator.createSessionFactory();
 
@@ -355,11 +357,11 @@ public class PagingWithFailoverAndCountersTest extends ActiveMQTestBase {
       waitForServerToStart(server);
       Queue queue = server.locateQueue(SimpleString.toSimpleString("cons2"));
 
-      int messageCount = (int) getMessageCount(queue);
+      int messageCount = getMessageCount(queue);
 
       assertTrue(messageCount >= 0);
 
-      locator = PagingWithFailoverServer.createLocator(PORT1).setInitialConnectAttempts(100).setReconnectAttempts(-1).setRetryInterval(100);
+      locator = SpawnedServerSupport.createLocator(PORT1).setInitialConnectAttempts(100).setReconnectAttempts(-1).setRetryInterval(100);
 
       factory = locator.createSessionFactory();
 

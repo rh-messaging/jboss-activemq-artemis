@@ -266,28 +266,33 @@ public class RedeliveryConsumerTest extends ActiveMQTestBase {
 
       server.stop();
 
-      JournalImpl journal = new JournalImpl(server.getConfiguration().getJournalFileSize(), 2, 0, 0, new NIOSequentialFileFactory(server.getConfiguration().getJournalLocation(), 1), "activemq-data", "amq", 1);
+      JournalImpl journal = new JournalImpl(server.getConfiguration().getJournalFileSize(), 2, 2, 0, 0, new NIOSequentialFileFactory(server.getConfiguration().getJournalLocation(), 1), "activemq-data", "amq", 1);
 
       final AtomicInteger updates = new AtomicInteger();
 
       journal.start();
       journal.load(new LoaderCallback() {
 
+         @Override
          public void failedTransaction(long transactionID, List<RecordInfo> records, List<RecordInfo> recordsToDelete) {
          }
 
+         @Override
          public void updateRecord(RecordInfo info) {
             if (info.userRecordType == JournalRecordIds.UPDATE_DELIVERY_COUNT) {
                updates.incrementAndGet();
             }
          }
 
+         @Override
          public void deleteRecord(long id) {
          }
 
+         @Override
          public void addRecord(RecordInfo info) {
          }
 
+         @Override
          public void addPreparedTransaction(PreparedTransactionInfo preparedTransaction) {
          }
       });

@@ -102,18 +102,21 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
 
    protected void waitForBridgeFormation() throws Exception {
       Wait.waitFor(new Wait.Condition() {
+         @Override
          public boolean isSatisified() throws Exception {
             return !broker3.getNetworkConnectors().get(0).activeBridges().isEmpty();
          }
       });
 
       Wait.waitFor(new Wait.Condition() {
+         @Override
          public boolean isSatisified() throws Exception {
             return !broker2.getNetworkConnectors().get(0).activeBridges().isEmpty();
          }
       });
 
       Wait.waitFor(new Wait.Condition() {
+         @Override
          public boolean isSatisified() throws Exception {
             return !broker1.getNetworkConnectors().get(0).activeBridges().isEmpty();
          }
@@ -167,6 +170,7 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
       final CountDownLatch consumerStarted = new CountDownLatch(1);
 
       Thread producerThread = new Thread(new Runnable() {
+         @Override
          public void run() {
             TopicWithDuplicateMessages producer = new TopicWithDuplicateMessages();
             producer.setBrokerURL(BROKER_1);
@@ -182,6 +186,7 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
 
       final TopicWithDuplicateMessages consumer = new TopicWithDuplicateMessages();
       Thread consumerThread = new Thread(new Runnable() {
+         @Override
          public void run() {
             consumer.setBrokerURL(BROKER_2);
             consumer.setTopicName(TOPIC_NAME);
@@ -233,7 +238,7 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
       consumerThread.join();
 
       int duplicateCount = 0;
-      Map<String, String> map = new HashMap<String, String>();
+      Map<String, String> map = new HashMap<>();
       for (String msg : consumer.getMessageStrings()) {
          if (map.containsKey(msg)) {
             LOG.info("got duplicate: " + msg);
@@ -275,7 +280,7 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
 
       public List<String> getMessageStrings() {
          synchronized (receivedStrings) {
-            return new ArrayList<String>(receivedStrings);
+            return new ArrayList<>(receivedStrings);
          }
       }
 
@@ -319,6 +324,7 @@ public class NoDuplicateOnTopicNetworkTest extends CombinationTestSupport {
          }
          consumer.setMessageListener(new MessageListener() {
 
+            @Override
             public void onMessage(Message arg0) {
                TextMessage msg = (TextMessage) arg0;
                try {

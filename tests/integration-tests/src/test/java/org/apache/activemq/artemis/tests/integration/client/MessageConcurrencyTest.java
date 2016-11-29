@@ -27,7 +27,7 @@ import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -67,9 +67,9 @@ public class MessageConcurrencyTest extends ActiveMQTestBase {
 
       ClientSession createSession = sf.createSession();
 
-      Set<ClientSession> sendSessions = new HashSet<ClientSession>();
+      Set<ClientSession> sendSessions = new HashSet<>();
 
-      Set<Sender> senders = new HashSet<Sender>();
+      Set<Sender> senders = new HashSet<>();
 
       final int numSessions = 100;
 
@@ -131,9 +131,9 @@ public class MessageConcurrencyTest extends ActiveMQTestBase {
 
       consumeSession.start();
 
-      Set<ClientSession> sendSessions = new HashSet<ClientSession>();
+      Set<ClientSession> sendSessions = new HashSet<>();
 
-      final Set<Sender> senders = new HashSet<Sender>();
+      final Set<Sender> senders = new HashSet<>();
 
       final int numSessions = 100;
 
@@ -154,6 +154,7 @@ public class MessageConcurrencyTest extends ActiveMQTestBase {
       }
 
       consumer.setMessageHandler(new MessageHandler() {
+         @Override
          public void onMessage(ClientMessage message) {
             for (Sender sender : senders) {
                sender.queue.add(message);
@@ -192,7 +193,7 @@ public class MessageConcurrencyTest extends ActiveMQTestBase {
 
    private class Sender extends Thread {
 
-      private final BlockingQueue<ClientMessage> queue = new LinkedBlockingQueue<ClientMessage>();
+      private final BlockingQueue<ClientMessage> queue = new LinkedBlockingQueue<>();
 
       private final ClientProducer producer;
 
@@ -206,6 +207,7 @@ public class MessageConcurrencyTest extends ActiveMQTestBase {
 
       volatile boolean failed;
 
+      @Override
       public void run() {
          try {
             for (int i = 0; i < numMessages; i++) {

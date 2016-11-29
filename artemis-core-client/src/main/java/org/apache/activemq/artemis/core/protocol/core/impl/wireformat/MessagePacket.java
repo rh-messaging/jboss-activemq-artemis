@@ -20,7 +20,7 @@ import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.core.message.impl.MessageInternal;
 import org.apache.activemq.artemis.core.protocol.core.impl.PacketImpl;
 
-public abstract class MessagePacket extends PacketImpl {
+public abstract class MessagePacket extends PacketImpl implements MessagePacketI {
 
    protected MessageInternal message;
 
@@ -30,8 +30,16 @@ public abstract class MessagePacket extends PacketImpl {
       this.message = message;
    }
 
+   @Override
    public Message getMessage() {
       return message;
    }
+
+   @Override
+   public String toString() {
+      return this.getParentString() + ",message=" + message + "]";
+
+   }
+
 
 }

@@ -29,8 +29,8 @@ import org.apache.activemq.artemis.ra.ActiveMQRAConnectionFactoryImpl;
 import org.apache.activemq.artemis.ra.ActiveMQRAConnectionManager;
 import org.apache.activemq.artemis.ra.ActiveMQRAManagedConnectionFactory;
 import org.apache.activemq.artemis.ra.ActiveMQResourceAdapter;
-import org.apache.activemq.artemis.spi.core.security.ActiveMQSecurityManagerImpl;
 import org.apache.activemq.artemis.service.extensions.ServiceUtils;
+import org.apache.activemq.artemis.spi.core.security.ActiveMQJAASSecurityManager;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,14 +51,14 @@ public class JMSContextTest extends ActiveMQRATestBase {
    public void setUp() throws Exception {
       useDummyTransactionManager();
       super.setUp();
-      ActiveMQSecurityManagerImpl securityManager = (ActiveMQSecurityManagerImpl) server.getSecurityManager();
+      ActiveMQJAASSecurityManager securityManager = (ActiveMQJAASSecurityManager) server.getSecurityManager();
       securityManager.getConfiguration().addUser("testuser", "testpassword");
       securityManager.getConfiguration().addUser("guest", "guest");
       securityManager.getConfiguration().setDefaultUser("guest");
       securityManager.getConfiguration().addRole("testuser", "arole");
       securityManager.getConfiguration().addRole("guest", "arole");
       Role role = new Role("arole", true, true, true, true, true, true, true);
-      Set<Role> roles = new HashSet<Role>();
+      Set<Role> roles = new HashSet<>();
       roles.add(role);
       server.getSecurityRepository().addMatch(MDBQUEUEPREFIXED, roles);
       resourceAdapter = new ActiveMQResourceAdapter();

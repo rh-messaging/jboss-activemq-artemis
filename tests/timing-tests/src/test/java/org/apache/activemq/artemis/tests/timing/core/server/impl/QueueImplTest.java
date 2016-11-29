@@ -106,7 +106,7 @@ public class QueueImplTest extends ActiveMQTestBase {
       ref8.setScheduledDeliveryTime(now + 6000);
       queue.addTail(ref8);
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       // Scheduled refs are added back to *FRONT* of queue - otherwise if there were many messages in the queue
       // They may get stranded behind a big backlog
@@ -179,7 +179,7 @@ public class QueueImplTest extends ActiveMQTestBase {
 
       queue.deliverNow();
 
-      List<MessageReference> refs = new ArrayList<MessageReference>();
+      List<MessageReference> refs = new ArrayList<>();
 
       refs.add(ref2);
       refs.add(ref3);
@@ -236,7 +236,7 @@ public class QueueImplTest extends ActiveMQTestBase {
       MessageReference messageReference = generateReference(queue, 1);
       queue.addConsumer(consumer);
       messageReference.setScheduledDeliveryTime(System.currentTimeMillis() + 2000);
-      queue.addHead(messageReference);
+      queue.addHead(messageReference, false);
 
       boolean gotLatch = countDownLatch.await(3000, TimeUnit.MILLISECONDS);
       Assert.assertTrue(gotLatch);

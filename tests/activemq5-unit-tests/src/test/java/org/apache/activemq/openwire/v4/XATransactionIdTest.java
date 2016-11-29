@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v4;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class XATransactionIdTest extends TransactionIdTestSupport {
 
    public static XATransactionIdTest SINGLETON = new XATransactionIdTest();
 
+   @Override
    public Object createObject() throws Exception {
       XATransactionId info = new XATransactionId();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       XATransactionId info = (XATransactionId) object;

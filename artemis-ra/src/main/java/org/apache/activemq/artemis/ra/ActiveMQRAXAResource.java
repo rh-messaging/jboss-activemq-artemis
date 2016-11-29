@@ -21,8 +21,8 @@ import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
-import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
 import org.apache.activemq.artemis.core.client.impl.ActiveMQXAResource;
+import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
 
 /**
  * ActiveMQXAResource.
@@ -66,6 +66,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @param flags One of TMNOFLAGS, TMJOIN, or TMRESUME
     * @throws XAException An error has occurred
     */
+   @Override
    public void start(final Xid xid, final int flags) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("start(" + xid + ", " + flags + ")");
@@ -75,13 +76,18 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
 
       ClientSessionInternal sessionInternal = (ClientSessionInternal) xaResource;
       try {
-         //this resets any tx stuff, we assume here that the tm and jca layer are well behaved when it comes to this
-         sessionInternal.resetIfNeeded();
-      }
-      catch (ActiveMQException e) {
-         ActiveMQRALogger.LOGGER.problemResettingXASession();
-      }
-      try {
+         try {
+            //this resets any tx stuff, we assume here that the tm and jca layer are well behaved when it comes to this
+            sessionInternal.resetIfNeeded();
+         }
+         catch (ActiveMQException e) {
+            ActiveMQRALogger.LOGGER.problemResettingXASession(e);
+
+            XAException xaException = new XAException(XAException.XAER_RMFAIL);
+            xaException.initCause(e);
+            throw xaException;
+         }
+
          xaResource.start(xid, flags);
       }
       finally {
@@ -97,6 +103,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @param flags One of TMSUCCESS, TMFAIL, or TMSUSPEND.
     * @throws XAException An error has occurred
     */
+   @Override
    public void end(final Xid xid, final int flags) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("end(" + xid + ", " + flags + ")");
@@ -119,6 +126,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @return XA_RDONLY or XA_OK
     * @throws XAException An error has occurred
     */
+   @Override
    public int prepare(final Xid xid) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("prepare(" + xid + ")");
@@ -134,6 +142,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @param onePhase If true, the resource manager should use a one-phase commit protocol to commit the work done on behalf of xid.
     * @throws XAException An error has occurred
     */
+   @Override
    public void commit(final Xid xid, final boolean onePhase) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("commit(" + xid + ", " + onePhase + ")");
@@ -148,6 +157,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @param xid A global transaction identifier
     * @throws XAException An error has occurred
     */
+   @Override
    public void rollback(final Xid xid) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("rollback(" + xid + ")");
@@ -162,6 +172,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @param xid A global transaction identifier
     * @throws XAException An error has occurred
     */
+   @Override
    public void forget(final Xid xid) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("forget(" + xid + ")");
@@ -185,6 +196,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @return True if its the same RM instance; otherwise false.
     * @throws XAException An error has occurred
     */
+   @Override
    public boolean isSameRM(final XAResource xaRes) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("isSameRM(" + xaRes + ")");
@@ -200,6 +212,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @return Zero or more XIDs
     * @throws XAException An error has occurred
     */
+   @Override
    public Xid[] recover(final int flag) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("recover(" + flag + ")");
@@ -214,6 +227,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @return The transaction timeout
     * @throws XAException An error has occurred
     */
+   @Override
    public int getTransactionTimeout() throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("getTransactionTimeout()");
@@ -229,6 +243,7 @@ public class ActiveMQRAXAResource implements ActiveMQXAResource {
     * @return True if the transaction timeout value is set successfully; otherwise false.
     * @throws XAException An error has occurred
     */
+   @Override
    public boolean setTransactionTimeout(final int seconds) throws XAException {
       if (ActiveMQRAXAResource.trace) {
          ActiveMQRALogger.LOGGER.trace("setTransactionTimeout(" + seconds + ")");

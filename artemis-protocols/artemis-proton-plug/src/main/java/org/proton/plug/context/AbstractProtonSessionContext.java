@@ -45,9 +45,9 @@ public abstract class AbstractProtonSessionContext extends ProtonInitializable i
 
    private long currentTag = 0;
 
-   protected Map<Receiver, AbstractProtonReceiverContext> receivers = new HashMap<Receiver, AbstractProtonReceiverContext>();
+   protected Map<Receiver, AbstractProtonReceiverContext> receivers = new HashMap<>();
 
-   protected Map<Sender, AbstractProtonContextSender> senders = new HashMap<Sender, AbstractProtonContextSender>();
+   protected Map<Sender, AbstractProtonContextSender> senders = new HashMap<>();
 
    protected boolean closed = false;
 
@@ -59,6 +59,7 @@ public abstract class AbstractProtonSessionContext extends ProtonInitializable i
       this.session = session;
    }
 
+   @Override
    public void initialise() throws Exception {
       if (!isInitialized()) {
          super.initialise();

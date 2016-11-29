@@ -31,7 +31,7 @@ import org.apache.activemq.artemis.core.security.Role;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.impl.QueueImpl;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -125,7 +125,7 @@ public class AddressControlTest extends ManagementTestBase {
       Object[] roles = addressControl.getRoles();
       Assert.assertEquals(0, roles.length);
 
-      Set<Role> newRoles = new HashSet<Role>();
+      Set<Role> newRoles = new HashSet<>();
       newRoles.add(role);
       server.getSecurityRepository().addMatch(address.toString(), newRoles);
 
@@ -158,7 +158,7 @@ public class AddressControlTest extends ManagementTestBase {
       RoleInfo[] roles = RoleInfo.from(jsonString);
       Assert.assertEquals(0, roles.length);
 
-      Set<Role> newRoles = new HashSet<Role>();
+      Set<Role> newRoles = new HashSet<>();
       newRoles.add(role);
       server.getSecurityRepository().addMatch(address.toString(), newRoles);
 
@@ -188,7 +188,7 @@ public class AddressControlTest extends ManagementTestBase {
       SimpleString address = RandomUtil.randomSimpleString();
 
       AddressSettings addressSettings = new AddressSettings().setPageSizeBytes(1024).setMaxSizeBytes(10 * 1024);
-      final int NUMBER_MESSAGES_BEFORE_PAGING = 5;
+      final int NUMBER_MESSAGES_BEFORE_PAGING = 7;
 
       server.getAddressSettingsRepository().addMatch(address.toString(), addressSettings);
       server.start();

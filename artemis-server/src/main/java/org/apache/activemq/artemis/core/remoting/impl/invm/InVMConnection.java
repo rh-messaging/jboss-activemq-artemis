@@ -96,18 +96,31 @@ public class InVMConnection implements Connection {
       this.defaultActiveMQPrincipal = defaultActiveMQPrincipal;
    }
 
+   @Override
    public void forceClose() {
       // no op
    }
 
+   @Override
+   public boolean isWritable(ReadyListener listener) {
+      return true;
+   }
+
+   @Override
+   public void fireReady(boolean ready) {
+   }
+
+   @Override
    public RemotingConnection getProtocolConnection() {
       return this.protocolConnection;
    }
 
+   @Override
    public void setProtocolConnection(RemotingConnection connection) {
       this.protocolConnection = connection;
    }
 
+   @Override
    public void close() {
       if (closing) {
          return;
@@ -124,25 +137,31 @@ public class InVMConnection implements Connection {
       }
    }
 
+   @Override
    public ActiveMQBuffer createTransportBuffer(final int size) {
       return ActiveMQBuffers.dynamicBuffer(size);
    }
 
+   @Override
    public Object getID() {
       return id;
    }
 
+   @Override
    public void checkFlushBatchBuffer() {
    }
 
+   @Override
    public void write(final ActiveMQBuffer buffer) {
       write(buffer, false, false, null);
    }
 
+   @Override
    public void write(final ActiveMQBuffer buffer, final boolean flush, final boolean batch) {
       write(buffer, flush, batch, null);
    }
 
+   @Override
    public void write(final ActiveMQBuffer buffer,
                      final boolean flush,
                      final boolean batch,
@@ -153,6 +172,7 @@ public class InVMConnection implements Connection {
 
       try {
          executor.execute(new Runnable() {
+            @Override
             public void run() {
                try {
                   if (!closed) {
@@ -183,6 +203,7 @@ public class InVMConnection implements Connection {
          if (flush && flushEnabled) {
             final CountDownLatch latch = new CountDownLatch(1);
             executor.execute(new Runnable() {
+               @Override
                public void run() {
                   latch.countDown();
                }
@@ -204,10 +225,12 @@ public class InVMConnection implements Connection {
 
    }
 
+   @Override
    public String getRemoteAddress() {
       return "invm:" + serverID;
    }
 
+   @Override
    public String getLocalAddress() {
       return "invm:" + serverID;
    }
@@ -216,17 +239,12 @@ public class InVMConnection implements Connection {
       return -1;
    }
 
-   public void addReadyListener(ReadyListener listener) {
-   }
-
-   public void removeReadyListener(ReadyListener listener) {
-   }
-
    @Override
    public boolean isUsingProtocolHandling() {
       return false;
    }
 
+   @Override
    public ActiveMQPrincipal getDefaultActiveMQPrincipal() {
       return defaultActiveMQPrincipal;
    }
@@ -241,7 +259,7 @@ public class InVMConnection implements Connection {
 
    @Override
    public TransportConfiguration getConnectorConfig() {
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
 
       params.put(org.apache.activemq.artemis.core.remoting.impl.invm.TransportConstants.SERVER_ID_PROP_NAME, serverID);
 

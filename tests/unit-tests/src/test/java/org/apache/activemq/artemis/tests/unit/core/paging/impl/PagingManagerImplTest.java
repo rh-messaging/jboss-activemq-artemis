@@ -37,8 +37,8 @@ import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
 import org.apache.activemq.artemis.core.settings.impl.AddressFullMessagePolicy;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.core.settings.impl.HierarchicalObjectRepository;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,7 +50,7 @@ public class PagingManagerImplTest extends ActiveMQTestBase {
    @Test
    public void testPagingManager() throws Exception {
 
-      HierarchicalRepository<AddressSettings> addressSettings = new HierarchicalObjectRepository<AddressSettings>();
+      HierarchicalRepository<AddressSettings> addressSettings = new HierarchicalObjectRepository<>();
       addressSettings.setDefault(new AddressSettings().setAddressFullMessagePolicy(AddressFullMessagePolicy.PAGE));
 
       final StorageManager storageManager = new NullStorageManager();

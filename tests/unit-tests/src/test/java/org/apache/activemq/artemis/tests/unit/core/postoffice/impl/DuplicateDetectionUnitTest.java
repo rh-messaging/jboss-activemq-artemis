@@ -37,9 +37,9 @@ import org.apache.activemq.artemis.core.postoffice.PostOffice;
 import org.apache.activemq.artemis.core.postoffice.impl.DuplicateIDCacheImpl;
 import org.apache.activemq.artemis.core.server.impl.PostOfficeJournalLoader;
 import org.apache.activemq.artemis.core.transaction.impl.ResourceManagerImpl;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.utils.ExecutorFactory;
 import org.apache.activemq.artemis.utils.OrderedExecutorFactory;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -96,7 +96,7 @@ public class DuplicateDetectionUnitTest extends ActiveMQTestBase {
          journal.start();
          journal.loadBindingJournal(new ArrayList<QueueBindingInfo>(), new ArrayList<GroupingInfo>());
 
-         HashMap<SimpleString, List<Pair<byte[], Long>>> mapDups = new HashMap<SimpleString, List<Pair<byte[], Long>>>();
+         HashMap<SimpleString, List<Pair<byte[], Long>>> mapDups = new HashMap<>();
 
          FakePagingManager pagingManager = new FakePagingManager();
          journal.loadMessageJournal(postOffice, pagingManager, new ResourceManagerImpl(0, 0, scheduledThreadPool), null, mapDups, null, null, new PostOfficeJournalLoader(postOffice, pagingManager, null, null, null, null, null, null));
@@ -106,7 +106,7 @@ public class DuplicateDetectionUnitTest extends ActiveMQTestBase {
          DuplicateIDCacheImpl cacheID = new DuplicateIDCacheImpl(ADDRESS, 10, journal, true);
 
          for (int i = 0; i < 100; i++) {
-            cacheID.addToCache(RandomUtil.randomBytes(), null);
+            cacheID.addToCache(RandomUtil.randomBytes());
          }
 
          journal.stop();

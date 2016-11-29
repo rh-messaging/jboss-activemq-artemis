@@ -37,7 +37,6 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.core.buffers.impl.ChannelBufferWrapper;
-import org.apache.activemq.artemis.core.protocol.stomp.WebSocketServerHandler;
 import org.apache.activemq.artemis.core.remoting.impl.netty.ConnectionCreator;
 import org.apache.activemq.artemis.core.remoting.impl.netty.HttpAcceptorHandler;
 import org.apache.activemq.artemis.core.remoting.impl.netty.HttpKeepAliveRunnable;
@@ -45,6 +44,7 @@ import org.apache.activemq.artemis.core.remoting.impl.netty.NettyAcceptor;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnector;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyServerConnection;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
+import org.apache.activemq.artemis.core.server.protocol.stomp.WebSocketServerHandler;
 import org.apache.activemq.artemis.spi.core.protocol.ProtocolManager;
 import org.apache.activemq.artemis.utils.ConfigurationHelper;
 
@@ -154,7 +154,15 @@ public class ProtocolHandler {
 
          //if we get here we assume we use the core protocol as we match nothing else
          if (protocolToUse == null) {
-            protocolToUse = ActiveMQClient.DEFAULT_CORE_PROTOCOL;
+            for (Map.Entry<String, ProtocolManager> entry : protocolMap.entrySet()) {
+               if (entry.getValue().acceptsNoHandshake()) {
+                  protocolToUse = entry.getKey();
+                  break;
+               }
+            }
+            if (protocolToUse == null) {
+               protocolToUse = ActiveMQClient.DEFAULT_CORE_PROTOCOL;
+            }
          }
          ProtocolManager protocolManagerToUse = protocolMap.get(protocolToUse);
          ConnectionCreator channelHandler = nettyAcceptor.createConnectionCreator();

@@ -75,7 +75,7 @@ public class ActiveMQXAResourceRecovery {
          String username = parser.getUsername();
          String password = parser.getPassword();
          TransportConfiguration transportConfiguration = new TransportConfiguration(connectorFactoryClassName, connectorParams);
-         xaRecoveryConfigs[i] = new XARecoveryConfig(false, new TransportConfiguration[]{transportConfiguration}, username, password, null);
+         xaRecoveryConfigs[i] = new XARecoveryConfig(false, new TransportConfiguration[]{transportConfiguration}, username, password, null, null);
       }
 
       res = new ActiveMQXAResourceWrapper(xaRecoveryConfigs);
@@ -172,7 +172,7 @@ public class ActiveMQXAResourceRecovery {
          }
 
          // other tokens are for connector configurations
-         connectorParameters = new HashMap<String, Object>();
+         connectorParameters = new HashMap<>();
          if (strings.length >= 3) {
             for (int i = 3; i < strings.length; i++) {
                String[] str = strings[i].split("=");

@@ -16,8 +16,12 @@
  */
 package org.apache.activemq.artemis.core.config.impl;
 
+import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.auth.login.Configuration;
+
 import org.apache.activemq.artemis.core.security.User;
 import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
+import org.apache.activemq.artemis.spi.core.security.jaas.InVMLoginModule;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,19 +29,19 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public class SecurityConfiguration {
+public class SecurityConfiguration extends Configuration {
 
    /**
     * the current valid users
     */
-   protected final Map<String, User> users = new HashMap<String, User>();
+   protected final Map<String, User> users = new HashMap<>();
 
    protected String defaultUser = null;
 
    /**
     * the roles for the users
     */
-   protected final Map<String, List<String>> roles = new HashMap<String, List<String>>();
+   protected final Map<String, List<String>> roles = new HashMap<>();
 
    public SecurityConfiguration() {
    }
@@ -103,5 +107,14 @@ public class SecurityConfiguration {
 
    public List<String> getRole(String username) {
       return roles.get(username);
+   }
+
+   @Override
+   public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
+      Map<String, SecurityConfiguration> map = new HashMap<>();
+      map.put(InVMLoginModule.CONFIG_PROP_NAME, this);
+      AppConfigurationEntry appConfigurationEntry = new AppConfigurationEntry(name, AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, map);
+
+      return new AppConfigurationEntry[] {appConfigurationEntry};
    }
 }

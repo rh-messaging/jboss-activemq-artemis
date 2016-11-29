@@ -47,7 +47,8 @@ import org.apache.activemq.artemis.core.paging.impl.PagingStoreFactoryNIO;
 import org.apache.activemq.artemis.core.persistence.StorageManager;
 import org.apache.activemq.artemis.core.persistence.impl.journal.DescribeJournal;
 import org.apache.activemq.artemis.core.persistence.impl.journal.JournalRecordIds;
-import org.apache.activemq.artemis.core.persistence.impl.journal.JournalStorageManager;
+import org.apache.activemq.artemis.core.persistence.impl.journal.codec.CursorAckRecordEncoding;
+import org.apache.activemq.artemis.core.persistence.impl.journal.codec.PageUpdateTXEncoding;
 import org.apache.activemq.artemis.core.persistence.impl.nullpm.NullStorageManager;
 import org.apache.activemq.artemis.core.server.impl.FileLockNodeManager;
 import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
@@ -148,7 +149,7 @@ public class PrintData extends LockAbstract {
          };
          final StorageManager sm = new NullStorageManager();
          PagingStoreFactory pageStoreFactory = new PagingStoreFactoryNIO(sm, pageDirectory, 1000L, scheduled, execfactory, false, null);
-         HierarchicalRepository<AddressSettings> addressSettingsRepository = new HierarchicalObjectRepository<AddressSettings>();
+         HierarchicalRepository<AddressSettings> addressSettingsRepository = new HierarchicalObjectRepository<>();
          addressSettingsRepository.setDefault(new AddressSettings());
          PagingManager manager = new PagingManagerImpl(pageStoreFactory, addressSettingsRepository);
 
@@ -235,20 +236,20 @@ public class PrintData extends LockAbstract {
          ActiveMQBuffer buff = ActiveMQBuffers.wrappedBuffer(data);
 
          if (record.userRecordType == JournalRecordIds.ACKNOWLEDGE_CURSOR) {
-            JournalStorageManager.CursorAckRecordEncoding encoding = new JournalStorageManager.CursorAckRecordEncoding();
+            CursorAckRecordEncoding encoding = new CursorAckRecordEncoding();
             encoding.decode(buff);
 
             Set<PagePosition> set = cursorInfo.getCursorRecords().get(encoding.queueID);
 
             if (set == null) {
-               set = new HashSet<PagePosition>();
+               set = new HashSet<>();
                cursorInfo.getCursorRecords().put(encoding.queueID, set);
             }
 
             set.add(encoding.position);
          }
          else if (record.userRecordType == JournalRecordIds.PAGE_CURSOR_COMPLETE) {
-            JournalStorageManager.CursorAckRecordEncoding encoding = new JournalStorageManager.CursorAckRecordEncoding();
+            CursorAckRecordEncoding encoding = new CursorAckRecordEncoding();
             encoding.decode(buff);
 
             Long queueID = Long.valueOf(encoding.queueID);
@@ -260,7 +261,7 @@ public class PrintData extends LockAbstract {
          }
          else if (record.userRecordType == JournalRecordIds.PAGE_TRANSACTION) {
             if (record.isUpdate) {
-               JournalStorageManager.PageUpdateTXEncoding pageUpdate = new JournalStorageManager.PageUpdateTXEncoding();
+               PageUpdateTXEncoding pageUpdate = new PageUpdateTXEncoding();
 
                pageUpdate.decode(buff);
                cursorInfo.getPgTXs().add(pageUpdate.pageTX);
@@ -281,11 +282,11 @@ public class PrintData extends LockAbstract {
 
    private static class PageCursorsInfo {
 
-      private final Map<Long, Set<PagePosition>> cursorRecords = new HashMap<Long, Set<PagePosition>>();
+      private final Map<Long, Set<PagePosition>> cursorRecords = new HashMap<>();
 
-      private final Set<Long> pgTXs = new HashSet<Long>();
+      private final Set<Long> pgTXs = new HashSet<>();
 
-      private final Map<Long, Set<Long>> completePages = new HashMap<Long, Set<Long>>();
+      private final Map<Long, Set<Long>> completePages = new HashMap<>();
 
       public PageCursorsInfo() {
       }
@@ -315,7 +316,7 @@ public class PrintData extends LockAbstract {
          Set<Long> completePagesSet = completePages.get(queueID);
 
          if (completePagesSet == null) {
-            completePagesSet = new HashSet<Long>();
+            completePagesSet = new HashSet<>();
             completePages.put(queueID, completePagesSet);
          }
 

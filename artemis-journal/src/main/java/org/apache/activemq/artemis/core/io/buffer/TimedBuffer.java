@@ -111,7 +111,7 @@ public class TimedBuffer {
 
       bufferLimit = 0;
 
-      callbacks = new ArrayList<IOCallback>();
+      callbacks = new ArrayList<>();
 
       this.timeout = timeout;
    }
@@ -294,7 +294,7 @@ public class TimedBuffer {
             pendingSync = false;
 
             // swap the instance as the previous callback list is being used asynchronously
-            callbacks = new LinkedList<IOCallback>();
+            callbacks = new LinkedList<>();
 
             buffer.clear();
 
@@ -365,6 +365,7 @@ public class TimedBuffer {
       final int sleepMillis = timeout / 1000000; // truncates
       final int sleepNanos = timeout % 1000000;
 
+      @Override
       public void run() {
          long lastFlushTime = 0;
 

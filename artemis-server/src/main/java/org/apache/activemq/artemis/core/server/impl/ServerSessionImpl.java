@@ -18,7 +18,6 @@ package org.apache.activemq.artemis.core.server.impl;
 
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
+import org.apache.activemq.artemis.api.core.ActiveMQIllegalStateException;
 import org.apache.activemq.artemis.api.core.ActiveMQNonExistentQueueException;
 import org.apache.activemq.artemis.api.core.Message;
 import org.apache.activemq.artemis.api.core.Pair;
@@ -39,11 +39,11 @@ import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.management.CoreNotificationType;
 import org.apache.activemq.artemis.api.core.management.ManagementHelper;
 import org.apache.activemq.artemis.api.core.management.ResourceNames;
-import org.apache.activemq.artemis.core.io.IOCallback;
 import org.apache.activemq.artemis.core.client.impl.ClientMessageImpl;
 import org.apache.activemq.artemis.core.exception.ActiveMQXAException;
 import org.apache.activemq.artemis.core.filter.Filter;
 import org.apache.activemq.artemis.core.filter.impl.FilterImpl;
+import org.apache.activemq.artemis.core.io.IOCallback;
 import org.apache.activemq.artemis.core.message.impl.MessageInternal;
 import org.apache.activemq.artemis.core.paging.PagingStore;
 import org.apache.activemq.artemis.core.persistence.OperationContext;
@@ -57,10 +57,10 @@ import org.apache.activemq.artemis.core.remoting.CloseListener;
 import org.apache.activemq.artemis.core.remoting.FailureListener;
 import org.apache.activemq.artemis.core.security.CheckType;
 import org.apache.activemq.artemis.core.security.SecurityStore;
-import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
-import org.apache.activemq.artemis.core.server.BindingQueryResult;
 import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
+import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
+import org.apache.activemq.artemis.core.server.BindingQueryResult;
 import org.apache.activemq.artemis.core.server.LargeServerMessage;
 import org.apache.activemq.artemis.core.server.MessageReference;
 import org.apache.activemq.artemis.core.server.Queue;
@@ -114,7 +114,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
    protected final RemotingConnection remotingConnection;
 
-   protected final Map<Long, ServerConsumer> consumers = new ConcurrentHashMap<Long, ServerConsumer>();
+   protected final Map<Long, ServerConsumer> consumers = new ConcurrentHashMap<>();
 
    protected Transaction tx;
 
@@ -132,7 +132,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
    protected volatile boolean started = false;
 
-   protected final Map<SimpleString, TempQueueCleanerUpper> tempQueueCleannerUppers = new HashMap<SimpleString, TempQueueCleanerUpper>();
+   protected final Map<SimpleString, TempQueueCleanerUpper> tempQueueCleannerUppers = new HashMap<>();
 
    protected final String name;
 
@@ -158,7 +158,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
    private QueueCreator queueCreator;
 
    // Session's usage should be by definition single threaded, hence it's not needed to use a concurrentHashMap here
-   protected final Map<SimpleString, Pair<UUID, AtomicLong>> targetAddressInfos = new HashMap<SimpleString, Pair<UUID, AtomicLong>>();
+   protected final Map<SimpleString, Pair<UUID, AtomicLong>> targetAddressInfos = new HashMap<>();
 
    private final long creationTime = System.currentTimeMillis();
 
@@ -279,35 +279,58 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
    /**
     * @return the sessionContext
     */
+   @Override
    public OperationContext getSessionContext() {
       return context;
    }
 
+   @Override
    public String getUsername() {
       return username;
    }
 
+   @Override
    public String getPassword() {
       return password;
    }
 
+   @Override
    public int getMinLargeMessageSize() {
       return minLargeMessageSize;
    }
 
+   @Override
    public String getName() {
       return name;
    }
 
+   @Override
    public Object getConnectionID() {
       return remotingConnection.getID();
    }
 
+   @Override
    public Set<ServerConsumer> getServerConsumers() {
-      Set<ServerConsumer> consumersClone = new HashSet<ServerConsumer>(consumers.values());
+      Set<ServerConsumer> consumersClone = new HashSet<>(consumers.values());
       return Collections.unmodifiableSet(consumersClone);
    }
 
+   @Override
+   public void markTXFailed(Throwable e) {
+      Transaction currentTX = this.tx;
+      if (currentTX != null) {
+         if (e instanceof ActiveMQException) {
+            currentTX.markAsRollbackOnly((ActiveMQException) e);
+         }
+         else {
+            ActiveMQException exception = new ActiveMQException(e.getMessage());
+            exception.initCause(e);
+            currentTX.markAsRollbackOnly(exception);
+         }
+      }
+   }
+
+   @Override
    public boolean removeConsumer(final long consumerID) throws Exception {
       return consumers.remove(consumerID) != null;
    }
@@ -331,7 +354,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
       //putting closing of consumers outside the sync block
       //https://issues.jboss.org/browse/HORNETQ-1141
-      Set<ServerConsumer> consumersClone = new HashSet<ServerConsumer>(consumers.values());
+      Set<ServerConsumer> consumersClone = new HashSet<>(consumers.values());
 
       for (ServerConsumer consumer : consumersClone) {
          try {
@@ -370,10 +393,12 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public QueueCreator getQueueCreator() {
       return queueCreator;
    }
 
+   @Override
    public ServerConsumer createConsumer(final long consumerID,
                                         final SimpleString queueName,
                                         final SimpleString filterString,
@@ -454,9 +479,10 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
                                         ManagementService managementService2,
                                         boolean supportLargeMessage,
                                         Integer credits) throws Exception {
-      return new ServerConsumerImpl(consumerID, this, (QueueBinding) binding, filter, started, browseOnly, storageManager, callback, preAcknowledge, strictUpdateDeliveryCount, managementService, supportLargeMessage, credits);
+      return new ServerConsumerImpl(consumerID, this, binding, filter, started, browseOnly, storageManager, callback, preAcknowledge, strictUpdateDeliveryCount, managementService, supportLargeMessage, credits);
    }
 
+   @Override
    public Queue createQueue(final SimpleString address,
                             final SimpleString name,
                             final SimpleString filterString,
@@ -519,6 +545,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       server.createSharedQueue(address, name, filterString, SimpleString.toSimpleString(getUsername()), durable);
    }
 
+   @Override
    public RemotingConnection getRemotingConnection() {
       return remotingConnection;
    }
@@ -553,6 +580,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
          }
       }
 
+      @Override
       public void connectionFailed(ActiveMQException exception, boolean failedOver) {
          run();
       }
@@ -562,6 +590,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
          connectionFailed(me, failedOver);
       }
 
+      @Override
       public void connectionClosed() {
          run();
       }
@@ -573,6 +602,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
    }
 
+   @Override
    public void deleteQueue(final SimpleString queueToDelete) throws Exception {
       Binding binding = postOffice.getBinding(queueToDelete);
 
@@ -591,12 +621,13 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public QueueQueryResult executeQueueQuery(final SimpleString name) throws Exception {
-      boolean autoCreateJmsQueues = name.toString().startsWith(ResourceNames.JMS_QUEUE) && server.getAddressSettingsRepository().getMatch(name.toString()).isAutoCreateJmsQueues();
-
       if (name == null) {
          throw ActiveMQMessageBundle.BUNDLE.queueNameIsNull();
       }
+
+      boolean autoCreateJmsQueues = name.toString().startsWith(ResourceNames.JMS_QUEUE) && server.getAddressSettingsRepository().getMatch(name.toString()).isAutoCreateJmsQueues();
 
       QueueQueryResult response;
 
@@ -625,14 +656,15 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return response;
    }
 
+   @Override
    public BindingQueryResult executeBindingQuery(final SimpleString address) throws Exception {
-      boolean autoCreateJmsQueues = address.toString().startsWith(ResourceNames.JMS_QUEUE) && server.getAddressSettingsRepository().getMatch(address.toString()).isAutoCreateJmsQueues();
-
       if (address == null) {
          throw ActiveMQMessageBundle.BUNDLE.addressIsNull();
       }
 
-      List<SimpleString> names = new ArrayList<SimpleString>();
+      boolean autoCreateJmsQueues = address.toString().startsWith(ResourceNames.JMS_QUEUE) && server.getAddressSettingsRepository().getMatch(address.toString()).isAutoCreateJmsQueues();
+
+      List<SimpleString> names = new ArrayList<>();
 
       // make an exception for the management address (see HORNETQ-29)
       if (address.equals(managementAddress)) {
@@ -650,6 +682,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return new BindingQueryResult(!names.isEmpty(), names, autoCreateJmsQueues);
    }
 
+   @Override
    public void forceConsumerDelivery(final long consumerID, final long sequence) throws Exception {
       ServerConsumer consumer = consumers.get(consumerID);
 
@@ -668,19 +701,24 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void acknowledge(final long consumerID, final long messageID) throws Exception {
-      ServerConsumer consumer = consumers.get(consumerID);
-
-      if (consumer == null) {
-         throw ActiveMQMessageBundle.BUNDLE.consumerDoesntExist(consumerID);
-      }
+      ServerConsumer consumer = findConsumer(consumerID);
 
       if (tx != null && tx.getState() == State.ROLLEDBACK) {
          // JBPAPP-8845 - if we let stuff to be acked on a rolled back TX, we will just
          // have these messages to be stuck on the limbo until the server is restarted
          // The tx has already timed out, so we need to ack and rollback immediately
          Transaction newTX = newTransaction();
-         consumer.acknowledge(newTX, messageID);
+         try {
+            consumer.acknowledge(newTX, messageID);
+         }
+         catch (Exception e) {
+            // just ignored
+            // will log it just in case
+            ActiveMQServerLogger.LOGGER.debug("Ignored exception while acking messageID " + messageID +
+                                                 " on a rolledback TX", e);
+         }
          newTX.rollback();
       }
       else {
@@ -688,8 +726,25 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
-   public void individualAcknowledge(final long consumerID, final long messageID) throws Exception {
+   private ServerConsumer findConsumer(long consumerID) throws Exception {
       ServerConsumer consumer = consumers.get(consumerID);
+
+      if (consumer == null) {
+         Transaction currentTX = tx;
+         ActiveMQIllegalStateException exception = ActiveMQMessageBundle.BUNDLE.consumerDoesntExist(consumerID);
+
+         if (currentTX != null) {
+            currentTX.markAsRollbackOnly(exception);
+         }
+
+         throw exception;
+      }
+      return consumer;
+   }
+
+   @Override
+   public void individualAcknowledge(final long consumerID, final long messageID) throws Exception {
+      ServerConsumer consumer = findConsumer(consumerID);
 
       if (tx != null && tx.getState() == State.ROLLEDBACK) {
          // JBPAPP-8845 - if we let stuff to be acked on a rolled back TX, we will just
@@ -705,6 +760,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
    }
 
+   @Override
    public void individualCancel(final long consumerID, final long messageID, boolean failed) throws Exception {
       ServerConsumer consumer = consumers.get(consumerID);
 
@@ -714,6 +770,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
 
    }
 
+   @Override
    public void expire(final long consumerID, final long messageID) throws Exception {
       MessageReference ref = consumers.get(consumerID).removeReferenceByID(messageID);
 
@@ -722,6 +779,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void commit() throws Exception {
       if (isTrace) {
          ActiveMQServerLogger.LOGGER.trace("Calling commit");
@@ -741,6 +799,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void rollback(final boolean considerLastMessageAsDelivered) throws Exception {
       rollback(false, considerLastMessageAsDelivered);
    }
@@ -783,6 +842,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return transactionFactory.newTransaction(xid, storageManager, timeoutSeconds);
    }
 
+   @Override
    public synchronized void xaCommit(final Xid xid, final boolean onePhase) throws Exception {
 
       if (tx != null && tx.getXid().equals(xid)) {
@@ -828,6 +888,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaEnd(final Xid xid) throws Exception {
       if (tx != null && tx.getXid().equals(xid)) {
          if (tx.getState() == Transaction.State.SUSPENDED) {
@@ -871,6 +932,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaForget(final Xid xid) throws Exception {
       long id = resourceManager.removeHeuristicCompletion(xid);
 
@@ -889,6 +951,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaJoin(final Xid xid) throws Exception {
       Transaction theTx = resourceManager.getTransaction(xid);
 
@@ -907,6 +970,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaResume(final Xid xid) throws Exception {
       if (tx != null) {
          final String msg = "Cannot resume, session is currently doing work in a transaction " + tx.getXid();
@@ -934,6 +998,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaRollback(final Xid xid) throws Exception {
       if (tx != null && tx.getXid().equals(xid)) {
          final String msg = "Cannot roll back, session is currently doing work in a transaction " + tx.getXid();
@@ -991,6 +1056,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaStart(final Xid xid) throws Exception {
       if (tx != null) {
          ActiveMQServerLogger.LOGGER.xidReplacedOnXStart(tx.getXid().toString(), xid.toString());
@@ -1024,31 +1090,30 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaFailed(final Xid xid) throws Exception {
-      if (tx != null) {
-         final String msg = "Cannot start, session is already doing work in a transaction " + tx.getXid();
+      Transaction theTX = resourceManager.getTransaction(xid);
 
-         throw new ActiveMQXAException(XAException.XAER_PROTO, msg);
+      if (theTX == null) {
+         theTX = newTransaction(xid);
+         resourceManager.putTransaction(xid, theTX);
+      }
+
+      if (theTX.isEffective()) {
+         ActiveMQServerLogger.LOGGER.debug("Client failed with Xid " + xid + " but the server already had it " + theTX.getState());
+         tx = null;
       }
       else {
+         theTX.markAsRollbackOnly(new ActiveMQException("Can't commit as a Failover happened during the operation"));
+         tx = theTX;
+      }
 
-         tx = newTransaction(xid);
-         tx.markAsRollbackOnly(new ActiveMQException("Can't commit as a Failover happened during the operation"));
-
-         if (isTrace) {
-            ActiveMQServerLogger.LOGGER.trace("xastart into tx= " + tx);
-         }
-
-         boolean added = resourceManager.putTransaction(xid, tx);
-
-         if (!added) {
-            final String msg = "Cannot start, there is already a xid " + tx.getXid();
-
-            throw new ActiveMQXAException(XAException.XAER_DUPID, msg);
-         }
+      if (isTrace) {
+         ActiveMQServerLogger.LOGGER.trace("xastart into tx= " + tx);
       }
    }
 
+   @Override
    public synchronized void xaSuspend() throws Exception {
 
       if (isTrace) {
@@ -1074,6 +1139,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public synchronized void xaPrepare(final Xid xid) throws Exception {
       if (tx != null && tx.getXid().equals(xid)) {
          final String msg = "Cannot commit, session is currently doing work in a transaction " + tx.getXid();
@@ -1106,8 +1172,9 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public List<Xid> xaGetInDoubtXids() {
-      List<Xid> xids = new ArrayList<Xid>();
+      List<Xid> xids = new ArrayList<>();
 
       xids.addAll(resourceManager.getPreparedTransactions());
       xids.addAll(resourceManager.getHeuristicCommittedTransactions());
@@ -1116,10 +1183,12 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return xids;
    }
 
+   @Override
    public int xaGetTimeout() {
       return resourceManager.getTimeoutSeconds();
    }
 
+   @Override
    public void xaSetTimeout(final int timeout) {
       timeoutSeconds = timeout;
       if (tx != null) {
@@ -1127,14 +1196,17 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void start() {
       setStarted(true);
    }
 
+   @Override
    public void stop() {
       setStarted(false);
    }
 
+   @Override
    public void waitContextCompletion() {
       try {
          if (!context.waitCompletion(10000)) {
@@ -1146,13 +1218,16 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void close(final boolean failed) {
       if (closed)
          return;
       context.executeOnCompletion(new IOCallback() {
+         @Override
          public void onError(int errorCode, String errorMessage) {
          }
 
+         @Override
          public void done() {
             try {
                doClose(failed);
@@ -1164,6 +1239,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       });
    }
 
+   @Override
    public void closeConsumer(final long consumerID) throws Exception {
       final ServerConsumer consumer = consumers.get(consumerID);
 
@@ -1175,6 +1251,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void receiveConsumerCredits(final long consumerID, final int credits) throws Exception {
       ServerConsumer consumer = consumers.get(consumerID);
 
@@ -1195,6 +1272,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return tx;
    }
 
+   @Override
    public void sendLarge(final MessageInternal message) throws Exception {
       // need to create the LargeMessage before continue
       long id = storageManager.generateID();
@@ -1212,6 +1290,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       currentLargeMessage = largeMsg;
    }
 
+   @Override
    public void send(final ServerMessage message, final boolean direct) throws Exception {
       //large message may come from StompSession directly, in which
       //case the id header already generated.
@@ -1259,6 +1338,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void sendContinuations(final int packetSize,
                                  final long messageBodySize,
                                  final byte[] body,
@@ -1285,10 +1365,12 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void requestProducerCredits(final SimpleString address, final int credits) throws Exception {
       PagingStore store = server.getPagingManager().getPageStore(address);
 
       if (!store.checkMemory(new Runnable() {
+         @Override
          public void run() {
             callback.sendProducerCreditsMessage(credits, address);
          }
@@ -1297,21 +1379,24 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public void setTransferring(final boolean transferring) {
-      Set<ServerConsumer> consumersClone = new HashSet<ServerConsumer>(consumers.values());
+      Set<ServerConsumer> consumersClone = new HashSet<>(consumers.values());
 
       for (ServerConsumer consumer : consumersClone) {
          consumer.setTransferring(transferring);
       }
    }
 
+   @Override
    public void addMetaData(String key, String data) {
       if (metaData == null) {
-         metaData = new HashMap<String, String>();
+         metaData = new HashMap<>();
       }
       metaData.put(key, data);
    }
 
+   @Override
    public boolean addUniqueMetaData(String key, String data) {
       ServerSession sessionWithMetaData = server.lookupSession(key, data);
       if (sessionWithMetaData != null && sessionWithMetaData != this) {
@@ -1324,6 +1409,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public String getMetaData(String key) {
       String data = null;
       if (metaData != null) {
@@ -1337,6 +1423,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return data;
    }
 
+   @Override
    public String[] getTargetAddresses() {
       Map<SimpleString, Pair<UUID, AtomicLong>> copy = cloneTargetAddresses();
       Iterator<SimpleString> iter = copy.keySet().iterator();
@@ -1350,6 +1437,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       return addresses;
    }
 
+   @Override
    public String getLastSentMessageID(String address) {
       Pair<UUID, AtomicLong> value = targetAddressInfos.get(SimpleString.toSimpleString(address));
       if (value != null) {
@@ -1360,6 +1448,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       }
    }
 
+   @Override
    public long getCreationTime() {
       return this.creationTime;
    }
@@ -1437,11 +1526,11 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
    }
 
    private Map<SimpleString, Pair<UUID, AtomicLong>> cloneTargetAddresses() {
-      return new HashMap<SimpleString, Pair<UUID, AtomicLong>>(targetAddressInfos);
+      return new HashMap<>(targetAddressInfos);
    }
 
    private void setStarted(final boolean s) {
-      Set<ServerConsumer> consumersClone = new HashSet<ServerConsumer>(consumers.values());
+      Set<ServerConsumer> consumersClone = new HashSet<>(consumers.values());
 
       for (ServerConsumer consumer : consumersClone) {
          consumer.setStarted(s);
@@ -1477,7 +1566,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
                            final Transaction theTx) throws Exception {
       boolean wasStarted = started;
 
-      List<MessageReference> toCancel = new ArrayList<MessageReference>();
+      List<MessageReference> toCancel = new ArrayList<>();
 
       for (ServerConsumer consumer : consumers.values()) {
          if (wasStarted) {
@@ -1494,9 +1583,10 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
       if (theTx.getState() == State.ROLLEDBACK) {
          Transaction newTX = newTransaction();
          cancelAndRollback(clientFailed, newTX, wasStarted, toCancel);
-         throw new IllegalStateException("Transaction has already been rolled back");
       }
-      cancelAndRollback(clientFailed, theTx, wasStarted, toCancel);
+      else {
+         cancelAndRollback(clientFailed, theTx, wasStarted, toCancel);
+      }
    }
 
    private void cancelAndRollback(boolean clientFailed,
@@ -1547,7 +1637,7 @@ public class ServerSessionImpl implements ServerSession, FailureListener {
          Pair<UUID, AtomicLong> value = targetAddressInfos.get(msg.getAddress());
 
          if (value == null) {
-            targetAddressInfos.put(msg.getAddress(), new Pair<UUID, AtomicLong>(msg.getUserID(), new AtomicLong(1)));
+            targetAddressInfos.put(msg.getAddress(), new Pair<>(msg.getUserID(), new AtomicLong(1)));
          }
          else {
             value.setA(msg.getUserID());

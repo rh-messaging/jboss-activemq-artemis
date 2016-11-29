@@ -51,18 +51,23 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
 
    private static final LoaderCallback dummyLoader = new LoaderCallback() {
 
+      @Override
       public void addPreparedTransaction(final PreparedTransactionInfo preparedTransaction) {
       }
 
+      @Override
       public void addRecord(final RecordInfo info) {
       }
 
+      @Override
       public void deleteRecord(final long id) {
       }
 
+      @Override
       public void updateRecord(final RecordInfo info) {
       }
 
+      @Override
       public void failedTransaction(final long transactionID,
                                     final List<RecordInfo> records,
                                     final List<RecordInfo> recordsToDelete) {
@@ -136,7 +141,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
       factory = new FakeSequentialFileFactory(512, true);
 
       try {
-         journalImpl = new JournalImpl(2000, 2, 0, 0, factory, "tt", "tt", 1000);
+         journalImpl = new JournalImpl(2000, 2, 2, 0, 0, factory, "tt", "tt", 1000);
          Assert.fail("Expected IllegalArgumentException");
       }
       catch (IllegalArgumentException ignored) {
@@ -834,10 +839,10 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
       setupAndLoadJournal(JOURNAL_SIZE, 1);
 
       Assert.assertEquals(1, transactions.size());
-      Assert.assertEquals(1, transactions.get(0).recordsToDelete.size());
+      Assert.assertEquals(1, transactions.get(0).getRecordsToDelete().size());
       Assert.assertEquals(1, records.size());
 
-      for (RecordInfo record : transactions.get(0).recordsToDelete) {
+      for (RecordInfo record : transactions.get(0).getRecordsToDelete()) {
          byte[] data = record.data;
          Assert.assertEquals(100, data.length);
          for (byte element : data) {
@@ -845,10 +850,10 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
          }
       }
 
-      Assert.assertEquals(10, transactions.get(0).extraData.length);
+      Assert.assertEquals(10, transactions.get(0).getExtraData().length);
 
       for (int i = 0; i < 10; i++) {
-         Assert.assertEquals((byte) 1, transactions.get(0).extraData[i]);
+         Assert.assertEquals((byte) 1, transactions.get(0).getExtraData()[i]);
       }
 
       journalImpl.appendCommitRecord(1L, false);
@@ -889,9 +894,9 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
       Assert.assertEquals(0, records.size());
       Assert.assertEquals(1, transactions.size());
 
-      Assert.assertEquals(10, transactions.get(0).extraData.length);
+      Assert.assertEquals(10, transactions.get(0).getExtraData().length);
       for (int i = 0; i < 10; i++) {
-         Assert.assertEquals((byte) 1, transactions.get(0).extraData[i]);
+         Assert.assertEquals((byte) 1, transactions.get(0).getExtraData()[i]);
       }
 
       journalImpl.checkReclaimStatus();
@@ -920,9 +925,9 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
 
       Assert.assertEquals(1, transactions.size());
 
-      Assert.assertEquals(15, transactions.get(0).extraData.length);
+      Assert.assertEquals(15, transactions.get(0).getExtraData().length);
 
-      for (byte element : transactions.get(0).extraData) {
+      for (byte element : transactions.get(0).getExtraData()) {
          Assert.assertEquals(2, element);
       }
 
@@ -1123,7 +1128,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
       final CountDownLatch latchReady = new CountDownLatch(2);
       final CountDownLatch latchStart = new CountDownLatch(1);
       final AtomicInteger finishedOK = new AtomicInteger(0);
-      final BlockingQueue<Integer> queueDelete = new LinkedBlockingQueue<Integer>();
+      final BlockingQueue<Integer> queueDelete = new LinkedBlockingQueue<>();
 
       final int NUMBER_OF_ELEMENTS = 500;
 
@@ -1196,7 +1201,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
    public void testAlignmentOverReload() throws Exception {
 
       factory = new FakeSequentialFileFactory(512, false);
-      journalImpl = new JournalImpl(512 + 512 * 3, 20, 0, 0, factory, "amq", "amq", 1000);
+      journalImpl = new JournalImpl(512 + 512 * 3, 20, 20, 0, 0, factory, "amq", "amq", 1000);
 
       journalImpl.start();
 
@@ -1209,7 +1214,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
 
       journalImpl.stop();
 
-      journalImpl = new JournalImpl(512 + 1024 + 512, 20, 0, 0, factory, "amq", "amq", 1000);
+      journalImpl = new JournalImpl(512 + 1024 + 512, 20, 20, 0, 0, factory, "amq", "amq", 1000);
       addActiveMQComponent(journalImpl);
       journalImpl.start();
       journalImpl.load(AlignedJournalImplTest.dummyLoader);
@@ -1225,12 +1230,12 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
 
       journalImpl.stop();
 
-      journalImpl = new JournalImpl(512 + 1024 + 512, 20, 0, 0, factory, "amq", "amq", 1000);
+      journalImpl = new JournalImpl(512 + 1024 + 512, 20, 20, 0, 0, factory, "amq", "amq", 1000);
       addActiveMQComponent(journalImpl);
       journalImpl.start();
 
-      ArrayList<RecordInfo> info = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> trans = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> info = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> trans = new ArrayList<>();
 
       journalImpl.load(info, trans, null);
 
@@ -1248,11 +1253,11 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
    public void setUp() throws Exception {
       super.setUp();
 
-      records = new ArrayList<RecordInfo>();
+      records = new ArrayList<>();
 
-      transactions = new ArrayList<PreparedTransactionInfo>();
+      transactions = new ArrayList<>();
 
-      incompleteTransactions = new ArrayList<Long>();
+      incompleteTransactions = new ArrayList<>();
 
       factory = null;
 
@@ -1296,7 +1301,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
          journalImpl.stop();
       }
 
-      journalImpl = new JournalImpl(journalSize, numberOfMinimalFiles, 0, 0, factory, "tt", "tt", 1000);
+      journalImpl = new JournalImpl(journalSize, numberOfMinimalFiles, numberOfMinimalFiles, 0, 0, factory, "tt", "tt", 1000);
       addActiveMQComponent(journalImpl);
       journalImpl.start();
 
@@ -1305,6 +1310,7 @@ public class AlignedJournalImplTest extends ActiveMQTestBase {
       incompleteTransactions.clear();
 
       journalImpl.load(records, transactions, new TransactionFailureCallback() {
+         @Override
          public void failedTransaction(final long transactionID,
                                        final List<RecordInfo> records,
                                        final List<RecordInfo> recordsToDelete) {

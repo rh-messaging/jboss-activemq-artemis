@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 import io.airlift.airline.Arguments;
 import io.airlift.airline.Command;
 import io.airlift.airline.Option;
+import org.apache.activemq.artemis.cli.CLIException;
 import org.apache.activemq.artemis.cli.commands.util.SyncCalculation;
 import org.apache.activemq.artemis.core.server.cluster.impl.MessageLoadBalancingType;
 import org.apache.activemq.artemis.jlibaio.LibaioContext;
@@ -70,8 +71,12 @@ public class Create extends InputAbstract {
    public static final String ETC_LOGGING_PROPERTIES = "etc/logging.properties";
    public static final String ETC_BOOTSTRAP_XML = "etc/bootstrap.xml";
    public static final String ETC_BROKER_XML = "etc/broker.xml";
+
    public static final String ETC_ARTEMIS_ROLES_PROPERTIES = "etc/artemis-roles.properties";
    public static final String ETC_ARTEMIS_USERS_PROPERTIES = "etc/artemis-users.properties";
+   public static final String ETC_LOGIN_CONFIG = "etc/login.config";
+   public static final String ETC_LOGIN_CONFIG_WITH_GUEST = "etc/login-with-guest.config";
+   public static final String ETC_LOGIN_CONFIG_WITHOUT_GUEST = "etc/login-without-guest.config";
    public static final String ETC_REPLICATED_SETTINGS_TXT = "etc/replicated-settings.txt";
    public static final String ETC_SHARED_STORE_SETTINGS_TXT = "etc/shared-store-settings.txt";
    public static final String ETC_CLUSTER_SECURITY_SETTINGS_TXT = "etc/cluster-security-settings.txt";
@@ -85,6 +90,9 @@ public class Create extends InputAbstract {
 
    @Option(name = "--host", description = "The host name of the broker (Default: 0.0.0.0 or input if clustered)")
    String host;
+
+   @Option(name = "--name", description = "The name of the broker (Default: same as host)")
+   String name;
 
    @Option(name = "--port-offset", description = "Off sets the default ports")
    int portOffset;
@@ -146,7 +154,7 @@ public class Create extends InputAbstract {
    @Option(name = "--password", description = "The user's password (Default: input)")
    String password;
 
-   @Option(name = "--role", description = "The name for the role created (Default: amq)")
+   @Option(name = "--role", description = "The name for the role created (Default: input)")
    String role;
 
    @Option(name = "--no-web", description = "This will remove the web server definition from bootstrap.xml")
@@ -160,6 +168,12 @@ public class Create extends InputAbstract {
 
    @Option(name = "--aio", description = "Force aio journal on the configuration regardless of the library being available or not.")
    boolean forceLibaio;
+
+   @Option(name = "--nio", description = "Force nio journal on the configuration regardless of the library being available or not.")
+   boolean forceNIO;
+
+   @Option(name = "--disable-persistence", description = "Disable message persistence to the journal")
+   boolean disablePersistence;
 
    boolean IS_WINDOWS;
 
@@ -362,7 +376,7 @@ public class Create extends InputAbstract {
 
    public String getRole() {
       if (role == null) {
-         role = "amq";
+         role = input("--role", "Please provide the default role:", "amq");
       }
       return role;
    }
@@ -395,18 +409,20 @@ public class Create extends InputAbstract {
       this.allowAnonymous = allowAnonymous;
    }
 
+   public boolean isDisablePersistence() {
+      return disablePersistence;
+   }
+
+   public void setDisablePersistence(boolean disablePersistence) {
+      this.disablePersistence = disablePersistence;
+   }
+
    @Override
    public Object execute(ActionContext context) throws Exception {
       this.checkDirectory();
       super.execute(context);
 
-      try {
-         return run(context);
-      }
-      catch (Throwable e) {
-         e.printStackTrace(context.err);
-         throw e;
-      }
+      return run(context);
    }
 
    /**
@@ -432,6 +448,11 @@ public class Create extends InputAbstract {
    }
 
    public Object run(ActionContext context) throws Exception {
+
+      if (forceLibaio && forceNIO) {
+         throw new RuntimeException("You can't specify --nio and --aio in the same execution.");
+      }
+
       IS_WINDOWS = System.getProperty("os.name").toLowerCase().trim().startsWith("win");
       IS_CYGWIN = IS_WINDOWS && "cygwin".equals(System.getenv("OSTYPE"));
 
@@ -442,11 +463,13 @@ public class Create extends InputAbstract {
 
       context.out.println(String.format("Creating ActiveMQ Artemis instance at: %s", directory.getCanonicalPath()));
 
-      HashMap<String, String> filters = new HashMap<String, String>();
+      HashMap<String, String> filters = new HashMap<>();
 
       filters.put("${master-slave}", isSlave() ? "slave" : "master");
 
       filters.put("${failover-on-shutdown}", isFailoverOnShutodwn() ? "true" : "false");
+
+      filters.put("${persistence-enabled}", isDisablePersistence() ? "false" : "true");
 
       if (replicated) {
          clustered = true;
@@ -492,9 +515,13 @@ public class Create extends InputAbstract {
 
       if (clustered) {
          filters.put("${host}", getHostForClustered());
+         if (name == null) {
+            name = getHostForClustered();
+         }
          String connectorSettings = readTextFile(ETC_CONNECTOR_SETTINGS_TXT);
          connectorSettings = applyFilters(connectorSettings, filters);
 
+         filters.put("${name}", name);
          filters.put("${connector-config.settings}", connectorSettings);
          filters.put("${cluster-security.settings}", readTextFile(ETC_CLUSTER_SECURITY_SETTINGS_TXT));
          filters.put("${cluster.settings}", applyFilters(readTextFile(ETC_CLUSTER_SETTINGS_TXT), filters));
@@ -502,6 +529,10 @@ public class Create extends InputAbstract {
          filters.put("${cluster-password}", getClusterPassword());
       }
       else {
+         if (name == null) {
+            name = getHost();
+         }
+         filters.put("${name}", name);
          filters.put("${host}", getHost());
          filters.put("${connector-config.settings}", "");
          filters.put("${cluster-security.settings}", "");
@@ -535,6 +566,17 @@ public class Create extends InputAbstract {
 
       filters.put("${java-opts}", javaOptions);
 
+      if (isAllowAnonymous()) {
+         write(ETC_LOGIN_CONFIG_WITH_GUEST, filters, false);
+         new File(directory, ETC_LOGIN_CONFIG_WITH_GUEST).renameTo(new File(directory, ETC_LOGIN_CONFIG));
+      }
+      else {
+         write(ETC_LOGIN_CONFIG_WITHOUT_GUEST, filters, false);
+         new File(directory, ETC_LOGIN_CONFIG_WITHOUT_GUEST).renameTo(new File(directory, ETC_LOGIN_CONFIG));
+      }
+
+      write(ETC_ARTEMIS_ROLES_PROPERTIES, filters, false);
+
       if (IS_WINDOWS) {
          write(BIN_ARTEMIS_CMD, null, false);
          write(BIN_ARTEMIS_SERVICE_EXE);
@@ -548,17 +590,9 @@ public class Create extends InputAbstract {
          write(BIN_ARTEMIS_SERVICE, null, true);
          makeExec(BIN_ARTEMIS_SERVICE);
          write(ETC_ARTEMIS_PROFILE, filters, true);
-         makeExec(ETC_ARTEMIS_PROFILE);
       }
 
       write(ETC_LOGGING_PROPERTIES, null, false);
-
-      if (isAllowAnonymous()) {
-         filters.put("${bootstrap.guest}", "default-user=\"" + getUser() + "\"");
-      }
-      else {
-         filters.put("${bootstrap.guest}", "");
-      }
 
       if (noWeb) {
          filters.put("${bootstrap-web-settings}", "");
@@ -569,10 +603,12 @@ public class Create extends InputAbstract {
 
       performAutoTune(filters, aio, dataFolder);
 
-      write(ETC_BOOTSTRAP_XML, filters, false);
       write(ETC_BROKER_XML, filters, false);
-      write(ETC_ARTEMIS_ROLES_PROPERTIES, filters, false);
       write(ETC_ARTEMIS_USERS_PROPERTIES, filters, false);
+
+      // we want this variable to remain unchanged so that it will use the value set in the profile
+      filters.remove("${artemis.instance}");
+      write(ETC_BOOTSTRAP_XML, filters, false);
 
       context.out.println("");
       context.out.println("You can now start the broker by executing:  ");
@@ -583,23 +619,10 @@ public class Create extends InputAbstract {
       context.out.println("");
 
       if (!IS_WINDOWS || IS_CYGWIN) {
-
-         // Does it look like we are on a System V init system?
-         if (new File("/etc/init.d/").isDirectory()) {
-            context.out.println("Or you can setup the broker as system service and run it in the background:");
-            context.out.println("");
-            context.out.println("   sudo ln -s \"%s\" /etc/init.d/".format(service.getCanonicalPath()));
-            context.out.println("   /etc/init.d/artemis-service start");
-            context.out.println("");
-
-         }
-         else {
-
-            context.out.println("Or you can run the broker in the background using:");
-            context.out.println("");
-            context.out.println(String.format("   \"%s\" start", path(service, true)));
-            context.out.println("");
-         }
+         context.out.println("Or you can run the broker in the background using:");
+         context.out.println("");
+         context.out.println(String.format("   \"%s\" start", path(service, true)));
+         context.out.println("");
       }
 
       if (IS_WINDOWS) {
@@ -624,6 +647,7 @@ public class Create extends InputAbstract {
       File dir = new File(path(getHome().toString(), false) + "/lib");
 
       File[] matches = dir.listFiles(new FilenameFilter() {
+         @Override
          public boolean accept(File dir, String name) {
             return name.startsWith("jboss-logmanager") && name.endsWith(".jar");
          }
@@ -669,7 +693,7 @@ public class Create extends InputAbstract {
 
             String writesPerMillisecondStr = new DecimalFormat("###.##").format(writesPerMillisecond);
 
-            HashMap<String, String> syncFilter = new HashMap<String, String>();
+            HashMap<String, String> syncFilter = new HashMap<>();
             syncFilter.put("${nanoseconds}", Long.toString(nanoseconds));
             syncFilter.put("${writesPerMillisecond}", writesPerMillisecondStr);
 
@@ -687,10 +711,14 @@ public class Create extends InputAbstract {
       }
    }
 
-   private boolean supportsLibaio() {
+   public boolean supportsLibaio() {
       if (forceLibaio) {
          // forcing libaio
          return true;
+      }
+      else if (forceNIO) {
+         // forcing NIO
+         return false;
       }
       else if (LibaioContext.isLoaded()) {
          try (LibaioContext context = new LibaioContext(1, true)) {
@@ -750,16 +778,16 @@ public class Create extends InputAbstract {
       }
    }
 
-   private void write(String source, HashMap<String, String> filters, boolean unixTarget) throws IOException {
+   private void write(String source, HashMap<String, String> filters, boolean unixTarget) throws Exception {
       write(source, new File(directory, source), filters, unixTarget);
    }
 
    private void write(String source,
                       File target,
                       HashMap<String, String> filters,
-                      boolean unixTarget) throws IOException {
+                      boolean unixTarget) throws Exception {
       if (target.exists() && !force) {
-         throw new RuntimeException(String.format("The file '%s' already exists.  Use --force to overwrite.", target));
+         throw new CLIException(String.format("The file '%s' already exists.  Use --force to overwrite.", target));
       }
 
       String content = applyFilters(readTextFile(source), filters);

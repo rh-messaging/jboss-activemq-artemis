@@ -33,7 +33,7 @@ public class AddressImpl implements Address {
 
    private final boolean containsWildCard;
 
-   private final List<Address> linkedAddresses = new ArrayList<Address>();
+   private final List<Address> linkedAddresses = new ArrayList<>();
 
    public AddressImpl(final SimpleString address) {
       this.address = address;
@@ -41,32 +41,39 @@ public class AddressImpl implements Address {
       containsWildCard = address.contains(WildcardAddressManager.SINGLE_WORD) || address.contains(WildcardAddressManager.ANY_WORDS);
    }
 
+   @Override
    public SimpleString getAddress() {
       return address;
    }
 
+   @Override
    public SimpleString[] getAddressParts() {
       return addressParts;
    }
 
+   @Override
    public boolean containsWildCard() {
       return containsWildCard;
    }
 
+   @Override
    public List<Address> getLinkedAddresses() {
       return linkedAddresses;
    }
 
+   @Override
    public void addLinkedAddress(final Address address) {
       if (!linkedAddresses.contains(address)) {
          linkedAddresses.add(address);
       }
    }
 
+   @Override
    public void removeLinkedAddress(final Address actualAddress) {
       linkedAddresses.remove(actualAddress);
    }
 
+   @Override
    public boolean matches(final Address add) {
       if (containsWildCard == add.containsWildCard()) {
          return address.equals(add.getAddress());

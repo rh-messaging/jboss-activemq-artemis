@@ -34,18 +34,21 @@ public class AddressQueryImpl implements ClientSession.AddressQuery {
                            final List<SimpleString> queueNames,
                            final boolean autoCreateJmsQueues) {
       this.exists = exists;
-      this.queueNames = new ArrayList<SimpleString>(queueNames);
+      this.queueNames = new ArrayList<>(queueNames);
       this.autoCreateJmsQueues = autoCreateJmsQueues;
    }
 
+   @Override
    public List<SimpleString> getQueueNames() {
       return queueNames;
    }
 
+   @Override
    public boolean isExists() {
       return exists;
    }
 
+   @Override
    public boolean isAutoCreateJmsQueues() {
       return autoCreateJmsQueues;
    }

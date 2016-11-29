@@ -34,19 +34,10 @@ import org.apache.activemq.artemis.utils.FileUtil;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
-import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.ArtifactResult;
 
 @Mojo(name = "create", defaultPhase = LifecyclePhase.VERIFY)
 public class ArtemisCreatePlugin extends ArtemisAbstractPlugin {
@@ -122,23 +113,21 @@ public class ArtemisCreatePlugin extends ArtemisAbstractPlugin {
    @Parameter(defaultValue = "ON_DEMAND")
    private String messageLoadBalancing;
 
-   @Component
-   private RepositorySystem repositorySystem;
-
-   @Parameter(defaultValue = "${repositorySystemSession}")
-   private RepositorySystemSession repoSession;
-
-   @Parameter(defaultValue = "${project.remoteProjectRepositories}")
-   private List<RemoteRepository> remoteRepos;
-
    /**
     * For extra stuff not covered by the properties
     */
    @Parameter
    ArrayList<String> args = new ArrayList<>();
 
+   /**
+    * Deprecated, use dependencyList and individualList
+    */
    @Parameter
    private String[] libList;
+
+   @Parameter
+   private String[] libListWithDeps;
+
 
    @Parameter(defaultValue = "${localRepository}")
    private org.apache.maven.artifact.repository.ArtifactRepository localRepository;
@@ -285,59 +274,20 @@ public class ArtemisCreatePlugin extends ArtemisAbstractPlugin {
 
             if (list != null) {
                getLog().debug("************************************************");
-               getLog().debug("Replacing configuration files:");
+               getLog().debug("Copying configuration files:");
 
-               for (String file : configuration.list()) {
-                  Path target = instance.toPath().resolve("etc").resolve(file);
-                  getLog().debug("Replacing " + file + " into " + target);
-
-                  Path originalFile = configuration.toPath().resolve(file);
-                  Files.copy(originalFile, target, StandardCopyOption.REPLACE_EXISTING);
-
-                  commandLineStream.println("");
-                  commandLineStream.println("# replacing " + originalFile.getFileName() + " on the default configuration");
-                  commandLineStream.println("cp " + originalFile + " " + target);
-               }
+               copyConfigurationFiles(list, configuration.toPath(), instance.toPath().resolve("etc"), commandLineStream);
             }
          }
 
-         if (libList != null) {
+         Set<File> files = resolveDependencies(libListWithDeps, libList);
+
+         if (!files.isEmpty() ) {
             commandLineStream.println();
             commandLineStream.println("# This is a list of files that need to be installed under ./lib.");
             commandLineStream.println("# We are copying them from your maven lib home");
-            for (int i = 0; i < libList.length; i++) {
-               String[] splitString = libList[i].split(":");
-
-               getLog().debug("********************" + splitString[0] + "/" + splitString[1] + "/" + splitString[2]);
-
-               Artifact artifact;
-               try {
-                  artifact = new DefaultArtifact(libList[i]);
-               }
-               catch (IllegalArgumentException e) {
-                  throw new MojoFailureException(e.getMessage(), e);
-               }
-
-               ArtifactRequest request = new ArtifactRequest();
-               request.setArtifact(artifact);
-               request.setRepositories(remoteRepos);
-
-               getLog().debug("Resolving artifact " + artifact + " from " + remoteRepos);
-
-               ArtifactResult result;
-               try {
-                  result = repositorySystem.resolveArtifact(repoSession, request);
-               }
-               catch (ArtifactResolutionException e) {
-                  throw new MojoExecutionException(e.getMessage(), e);
-               }
-
-               File artifactFile = result.getArtifact().getFile();
-
-               getLog().debug("Artifact:: " + artifact + " file = " + artifactFile);
-
-               copyToLib(artifactFile, commandLineStream);
-
+            for (File file : files) {
+               copyToLib(file, commandLineStream);
             }
          }
 
@@ -357,6 +307,30 @@ public class ArtemisCreatePlugin extends ArtemisAbstractPlugin {
       }
    }
 
+   private void copyConfigurationFiles(String[] list, Path sourcePath, Path targetPath, PrintStream commandLineStream) throws IOException {
+      for (String file : list) {
+         Path target = targetPath.resolve(file);
+
+         Path originalFile = sourcePath.resolve(file);
+         Files.copy(originalFile, target, StandardCopyOption.REPLACE_EXISTING);
+
+         commandLineStream.println("");
+
+         if (originalFile.toFile().isDirectory()) {
+            getLog().debug("Creating directory " + target);
+            commandLineStream.println("# creating directory " + originalFile.getFileName());
+            commandLineStream.println("mkdir " + target);
+
+            copyConfigurationFiles(originalFile.toFile().list(), originalFile, target, commandLineStream);
+         }
+         else {
+            getLog().debug("Copying " + file + " to " + target);
+            commandLineStream.println("# copying config file " + originalFile.getFileName());
+            commandLineStream.println("cp " + originalFile + " " + target);
+         }
+      }
+   }
+
    private String getCommandline(ArrayList<String> listCommands) {
       StringBuffer buffer = new StringBuffer();
       buffer.append(home.getAbsolutePath() + "/bin/artemis ");
@@ -368,7 +342,13 @@ public class ArtemisCreatePlugin extends ArtemisAbstractPlugin {
 
    private void copyToLib(File projectLib, PrintStream commandLineStream) throws IOException {
       Path target = instance.toPath().resolve("lib").resolve(projectLib.getName());
-      target.toFile().mkdirs();
+      File file = target.toFile();
+      File parent = file.getParentFile();
+      if (!parent.exists()) {
+         parent.mkdirs();
+         commandLineStream.println("mkdir " + file.getParent());
+      }
+
 
       commandLineStream.println("cp " + projectLib.getAbsolutePath() + " " + target);
       getLog().debug("Copying " + projectLib.getName() + " as " + target.toFile().getAbsolutePath());

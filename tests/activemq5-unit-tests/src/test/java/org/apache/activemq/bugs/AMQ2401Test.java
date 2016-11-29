@@ -56,7 +56,7 @@ public class AMQ2401Test extends TestCase implements MessageListener {
 
    private static final Logger LOG = LoggerFactory.getLogger(AMQ2401Test.class);
 
-   private final ArrayList<Service> services = new ArrayList<Service>(CONSUMER_COUNT + PRODUCER_COUNT);
+   private final ArrayList<Service> services = new ArrayList<>(CONSUMER_COUNT + PRODUCER_COUNT);
    private int count = 0;
    private CountDownLatch latch;
 
@@ -90,33 +90,20 @@ public class AMQ2401Test extends TestCase implements MessageListener {
 
    public void testDupsOk() throws Exception {
 
-      TestProducer p = null;
-      TestConsumer c = null;
-      try {
-         latch = new CountDownLatch(SEND_COUNT);
+      latch = new CountDownLatch(SEND_COUNT);
 
-         for (int i = 0; i < CONSUMER_COUNT; i++) {
-            TestConsumer consumer = new TestConsumer();
-            consumer.start();
-            services.add(consumer);
-         }
-         for (int i = 0; i < PRODUCER_COUNT; i++) {
-            TestProducer producer = new TestProducer();
-            producer.start();
-            services.add(producer);
-         }
-
-         waitForMessageReceipt(TimeUnit.SECONDS.toMillis(30));
+      for (int i = 0; i < CONSUMER_COUNT; i++) {
+         TestConsumer consumer = new TestConsumer();
+         consumer.start();
+         services.add(consumer);
       }
-      finally {
-         if (p != null) {
-            p.close();
-         }
-
-         if (c != null) {
-            c.close();
-         }
+      for (int i = 0; i < PRODUCER_COUNT; i++) {
+         TestProducer producer = new TestProducer();
+         producer.start();
+         services.add(producer);
       }
+
+      waitForMessageReceipt(TimeUnit.SECONDS.toMillis(30));
    }
 
    @Override

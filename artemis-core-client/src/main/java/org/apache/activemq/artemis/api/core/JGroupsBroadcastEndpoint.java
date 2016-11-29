@@ -46,6 +46,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       this.channelName = channelName;
    }
 
+   @Override
    public void broadcast(final byte[] data) throws Exception {
       if (broadcastOpened) {
          org.jgroups.Message msg = new org.jgroups.Message();
@@ -56,6 +57,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       }
    }
 
+   @Override
    public byte[] receiveBroadcast() throws Exception {
       if (clientOpened) {
          return receiver.receiveBroadcast();
@@ -65,6 +67,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       }
    }
 
+   @Override
    public byte[] receiveBroadcast(long time, TimeUnit unit) throws Exception {
       if (clientOpened) {
          return receiver.receiveBroadcast(time, unit);
@@ -74,6 +77,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       }
    }
 
+   @Override
    public synchronized void openClient() throws Exception {
       if (clientOpened) {
          return;
@@ -84,6 +88,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       clientOpened = true;
    }
 
+   @Override
    public synchronized void openBroadcaster() throws Exception {
       if (broadcastOpened)
          return;
@@ -102,6 +107,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       channel.connect();
    }
 
+   @Override
    public synchronized void close(boolean isBroadcast) throws Exception {
       if (isBroadcast) {
          broadcastOpened = false;
@@ -110,15 +116,16 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
          channel.removeReceiver(receiver);
          clientOpened = false;
       }
-      internalCloseChannel();
+      internalCloseChannel(channel);
    }
 
    /**
     * Closes the channel used in this JGroups Broadcast.
     * Can be overridden by implementations that use an externally managed channel.
+    * @param channel
     */
-   protected synchronized void internalCloseChannel() {
-      channel.close();
+   protected synchronized void internalCloseChannel(JChannelWrapper channel) {
+      channel.close(true);
    }
 
    /**
@@ -127,7 +134,7 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
     */
    private static final class JGroupsReceiver extends ReceiverAdapter {
 
-      private final BlockingQueue<byte[]> dequeue = new LinkedBlockingDeque<byte[]>();
+      private final BlockingQueue<byte[]> dequeue = new LinkedBlockingDeque<>();
 
       @Override
       public void receive(org.jgroups.Message msg) {
@@ -153,18 +160,38 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       int refCount = 1;
       JChannel channel;
       String channelName;
-      final List<JGroupsReceiver> receivers = new ArrayList<JGroupsReceiver>();
+      final List<JGroupsReceiver> receivers = new ArrayList<>();
 
       public JChannelWrapper(String channelName, JChannel channel) throws Exception {
          this.refCount = 1;
          this.channelName = channelName;
          this.channel = channel;
+
+         //we always add this for the first ref count
+         channel.setReceiver(new ReceiverAdapter() {
+
+            @Override
+            public void receive(org.jgroups.Message msg) {
+               synchronized (receivers) {
+                  for (JGroupsReceiver r : receivers) {
+                     r.receive(msg);
+                  }
+               }
+            }
+         });
       }
 
-      public synchronized void close() {
+      public synchronized void close(boolean closeWrappedChannel) {
          refCount--;
          if (refCount == 0) {
-            JChannelManager.closeChannel(this.channelName, channel);
+            if (closeWrappedChannel) {
+               JChannelManager.closeChannel(this.channelName, channel);
+            }
+            else {
+               JChannelManager.removeChannel(this.channelName);
+            }
+            //we always remove the receiver as its no longer needed
+            channel.setReceiver(null);
          }
       }
 
@@ -177,17 +204,6 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
       public synchronized void connect() throws Exception {
          if (channel.isConnected())
             return;
-         channel.setReceiver(new ReceiverAdapter() {
-
-            @Override
-            public void receive(org.jgroups.Message msg) {
-               synchronized (receivers) {
-                  for (JGroupsReceiver r : receivers) {
-                     r.receive(msg);
-                  }
-               }
-            }
-         });
          channel.connect(channelName);
       }
 
@@ -241,6 +257,13 @@ public abstract class JGroupsBroadcastEndpoint implements BroadcastEndpoint {
          channel.setReceiver(null);
          channel.disconnect();
          channel.close();
+         JChannelWrapper wrapper = channels.remove(channelName);
+         if (wrapper == null) {
+            throw new IllegalStateException("Did not find channel " + channelName);
+         }
+      }
+
+      public static void removeChannel(String channelName) {
          JChannelWrapper wrapper = channels.remove(channelName);
          if (wrapper == null) {
             throw new IllegalStateException("Did not find channel " + channelName);

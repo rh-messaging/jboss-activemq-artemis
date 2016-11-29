@@ -38,11 +38,11 @@ import org.apache.activemq.artemis.api.core.client.ActiveMQClient;
 import org.apache.activemq.artemis.api.core.client.ServerLocator;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.core.config.impl.ConfigurationImpl;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.core.remoting.impl.ssl.SSLSupport;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -69,12 +69,12 @@ public class CoreClientOverOneWaySSLTest extends ActiveMQTestBase {
     * These artifacts are required for testing 1-way SSL
     *
     * Commands to create the JKS artifacts:
-    * keytool -genkey -keystore server-side-keystore.jks -storepass secureexample -keypass secureexample -dname "CN=ActiveMQ Artemis, OU=ActiveMQ Artemis, O=ActiveMQ Artemis, L=ActiveMQ Artemis, S=ActiveMQ Artemis, C=AMQ"
+    * keytool -genkey -keystore server-side-keystore.jks -storepass secureexample -keypass secureexample -dname "CN=ActiveMQ Artemis Server, OU=Artemis, O=ActiveMQ, L=AMQ, S=AMQ, C=AMQ" -keyalg RSA
     * keytool -export -keystore server-side-keystore.jks -file activemq-jks.cer -storepass secureexample
     * keytool -import -keystore client-side-truststore.jks -file activemq-jks.cer -storepass secureexample -keypass secureexample -noprompt
     *
     * Commands to create the JCEKS artifacts:
-    * keytool -genkey -keystore server-side-keystore.jceks -storetype JCEKS -storepass secureexample -keypass secureexample -dname "CN=ActiveMQ Artemis, OU=ActiveMQ Artemis, O=ActiveMQ Artemis, L=ActiveMQ Artemis, S=ActiveMQ Artemis, C=AMQ"
+    * keytool -genkey -keystore server-side-keystore.jceks -storetype JCEKS -storepass secureexample -keypass secureexample -dname "CN=ActiveMQ Artemis Server, OU=Artemis, O=ActiveMQ, L=AMQ, S=AMQ, C=AMQ"
     * keytool -export -keystore server-side-keystore.jceks -file activemq-jceks.cer -storetype jceks -storepass secureexample
     * keytool -import -keystore client-side-truststore.jceks -storetype JCEKS -file activemq-jceks.cer -storepass secureexample -keypass secureexample -noprompt
     */
@@ -519,7 +519,7 @@ public class CoreClientOverOneWaySSLTest extends ActiveMQTestBase {
    }
 
    private void createCustomSslServer(String cipherSuites, String protocols) throws Exception {
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
       params.put(TransportConstants.SSL_ENABLED_PROP_NAME, true);
       params.put(TransportConstants.KEYSTORE_PROVIDER_PROP_NAME, storeType);
       params.put(TransportConstants.KEYSTORE_PATH_PROP_NAME, SERVER_SIDE_KEYSTORE);

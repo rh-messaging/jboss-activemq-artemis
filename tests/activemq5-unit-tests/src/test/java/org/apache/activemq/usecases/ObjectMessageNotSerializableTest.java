@@ -28,7 +28,6 @@ import javax.jms.Session;
 import junit.framework.Test;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.apache.activemq.ActiveMQSession;
 import org.apache.activemq.CombinationTestSupport;
 import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.command.ActiveMQDestination;
@@ -44,7 +43,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
 
    BrokerService broker;
    AtomicInteger numReceived = new AtomicInteger(0);
-   final Vector<Throwable> exceptions = new Vector<Throwable>();
+   final Vector<Throwable> exceptions = new Vector<>();
 
    public static Test suite() {
       return suite(ObjectMessageNotSerializableTest.class);
@@ -54,6 +53,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       junit.textui.TestRunner.run(suite());
    }
 
+   @Override
    protected void setUp() throws Exception {
       exceptions.clear();
       broker = createBroker();
@@ -67,6 +67,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       final CountDownLatch consumerStarted = new CountDownLatch(1);
 
       Thread vmConsumerThread = new Thread("Consumer Thread") {
+         @Override
          public void run() {
             try {
                ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory("vm://localhost");
@@ -75,7 +76,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setCopyMessageOnSend(false);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageConsumer consumer = session.createConsumer(destination);
                connection.start();
                consumerStarted.countDown();
@@ -95,6 +96,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       vmConsumerThread.start();
 
       Thread producingThread = new Thread("Producing Thread") {
+         @Override
          public void run() {
             try {
                ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory("vm://localhost");
@@ -103,7 +105,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setCopyMessageOnSend(false);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageProducer producer = session.createProducer(destination);
                ActiveMQObjectMessage message = (ActiveMQObjectMessage) session.createObjectMessage();
                message.setObject(obj);
@@ -135,8 +137,9 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       final MyObject obj = new MyObject("A message");
 
       final CountDownLatch consumerStarted = new CountDownLatch(3);
-      final Vector<Throwable> exceptions = new Vector<Throwable>();
+      final Vector<Throwable> exceptions = new Vector<>();
       Thread vmConsumerThread = new Thread("Consumer Thread") {
+         @Override
          public void run() {
             try {
                ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory("vm://localhost");
@@ -145,7 +148,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setCopyMessageOnSend(false);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageConsumer consumer = session.createConsumer(destination);
                connection.start();
                consumerStarted.countDown();
@@ -165,6 +168,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       vmConsumerThread.start();
 
       Thread tcpConsumerThread = new Thread("Consumer Thread") {
+         @Override
          public void run() {
             try {
 
@@ -172,7 +176,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setOptimizedMessageDispatch(true);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageConsumer consumer = session.createConsumer(destination);
                connection.start();
                consumerStarted.countDown();
@@ -193,6 +197,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       tcpConsumerThread.start();
 
       Thread notherVmConsumerThread = new Thread("Consumer Thread") {
+         @Override
          public void run() {
             try {
                ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory("vm://localhost");
@@ -201,7 +206,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setCopyMessageOnSend(false);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageConsumer consumer = session.createConsumer(destination);
                connection.start();
                consumerStarted.countDown();
@@ -221,6 +226,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       notherVmConsumerThread.start();
 
       Thread producingThread = new Thread("Producing Thread") {
+         @Override
          public void run() {
             try {
                ActiveMQConnectionFactory factory = new ActiveMQConnectionFactory("vm://localhost");
@@ -229,7 +235,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
                factory.setCopyMessageOnSend(false);
 
                Connection connection = factory.createConnection();
-               Session session = (ActiveMQSession) connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+               Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
                MessageProducer producer = session.createProducer(destination);
                ActiveMQObjectMessage message = (ActiveMQObjectMessage) session.createObjectMessage();
                message.setObject(obj);
@@ -269,6 +275,7 @@ public class ObjectMessageNotSerializableTest extends CombinationTestSupport {
       return broker;
    }
 
+   @Override
    protected void tearDown() throws Exception {
       broker.stop();
       broker.waitUntilStopped();

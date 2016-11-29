@@ -80,6 +80,7 @@ public class FakePostOffice implements PostOffice {
       return null;
    }
 
+   @Override
    public Bindings lookupBindingsForAddress(final SimpleString address) throws Exception {
 
       return null;
@@ -112,8 +113,7 @@ public class FakePostOffice implements PostOffice {
    }
 
    @Override
-   public Binding removeBinding(final SimpleString uniqueName, final Transaction tx) throws Exception {
-
+   public Binding removeBinding(SimpleString uniqueName, Transaction tx, boolean deleteData) throws Exception {
       return null;
    }
 
@@ -122,12 +122,14 @@ public class FakePostOffice implements PostOffice {
 
    }
 
+   @Override
    public Pair<RoutingContext, ServerMessage> redistribute(final ServerMessage message,
                                                            final Queue originatingQueue,
                                                            final Transaction tx) throws Exception {
       return null;
    }
 
+   @Override
    public MessageReference reroute(final ServerMessage message,
                                    final Queue queue,
                                    final Transaction tx) throws Exception {
@@ -135,6 +137,7 @@ public class FakePostOffice implements PostOffice {
       return new MessageReferenceImpl();
    }
 
+   @Override
    public void route(ServerMessage message,
                      QueueCreator creator,
                      RoutingContext context,
@@ -142,6 +145,7 @@ public class FakePostOffice implements PostOffice {
 
    }
 
+   @Override
    public void route(ServerMessage message, QueueCreator creator, Transaction tx, boolean direct) throws Exception {
 
    }

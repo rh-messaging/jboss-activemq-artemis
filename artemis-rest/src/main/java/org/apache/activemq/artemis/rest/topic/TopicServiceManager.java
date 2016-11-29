@@ -26,7 +26,7 @@ import java.util.List;
 public class TopicServiceManager extends DestinationServiceManager {
 
    protected TopicPushStore pushStore;
-   protected List<TopicDeployment> topics = new ArrayList<TopicDeployment>();
+   protected List<TopicDeployment> topics = new ArrayList<>();
    protected TopicDestinationsResource destination;
 
    public TopicPushStore getPushStore() {
@@ -53,6 +53,7 @@ public class TopicServiceManager extends DestinationServiceManager {
       this.destination = destination;
    }
 
+   @Override
    public void start() throws Exception {
       initDefaults();
 
@@ -90,6 +91,7 @@ public class TopicServiceManager extends DestinationServiceManager {
       destination.createTopicResource(queueName, defaultDurable, topicDeployment.getConsumerSessionTimeoutSeconds(), topicDeployment.isDuplicatesAllowed());
    }
 
+   @Override
    public void stop() {
       if (started == false)
          return;

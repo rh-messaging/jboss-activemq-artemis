@@ -37,7 +37,6 @@ import junit.framework.Test;
 
 import org.apache.activemq.broker.BrokerFactory;
 import org.apache.activemq.broker.BrokerService;
-import org.apache.activemq.broker.TransportConnector;
 import org.apache.activemq.command.ActiveMQDestination;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,11 +61,13 @@ public class LoadTestBurnIn extends JmsTestSupport {
       return suite(LoadTestBurnIn.class);
    }
 
+   @Override
    protected void setUp() throws Exception {
       LOG.info("Start: " + getName());
       super.setUp();
    }
 
+   @Override
    protected void tearDown() throws Exception {
       try {
          super.tearDown();
@@ -83,14 +84,16 @@ public class LoadTestBurnIn extends JmsTestSupport {
       junit.textui.TestRunner.run(suite());
    }
 
+   @Override
    protected BrokerService createBroker() throws Exception {
       return BrokerFactory.createBroker(new URI("broker://(tcp://localhost:0)?useJmx=true"));
       // return BrokerFactory.createBroker(new
       // URI("xbean:org/apache/activemq/broker/store/loadtester.xml"));
    }
 
+   @Override
    protected ConnectionFactory createConnectionFactory() throws URISyntaxException, IOException {
-      return new ActiveMQConnectionFactory(((TransportConnector) broker.getTransportConnectors().get(0)).getServer().getConnectURI());
+      return new ActiveMQConnectionFactory(broker.getTransportConnectors().get(0).getServer().getConnectURI());
    }
 
    public void initCombosForTestSendReceive() {
@@ -126,6 +129,7 @@ public class LoadTestBurnIn extends JmsTestSupport {
 
       // Send the messages, async
       new Thread() {
+         @Override
          public void run() {
             Connection connection2 = null;
             try {

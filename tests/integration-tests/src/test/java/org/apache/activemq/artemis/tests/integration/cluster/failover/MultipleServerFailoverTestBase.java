@@ -48,13 +48,13 @@ public abstract class MultipleServerFailoverTestBase extends ActiveMQTestBase {
 
    // Attributes ----------------------------------------------------
 
-   protected List<TestableServer> liveServers = new ArrayList<TestableServer>();
+   protected List<TestableServer> liveServers = new ArrayList<>();
 
-   protected List<TestableServer> backupServers = new ArrayList<TestableServer>();
+   protected List<TestableServer> backupServers = new ArrayList<>();
 
-   protected List<Configuration> backupConfigs = new ArrayList<Configuration>();
+   protected List<Configuration> backupConfigs = new ArrayList<>();
 
-   protected List<Configuration> liveConfigs = new ArrayList<Configuration>();
+   protected List<Configuration> liveConfigs = new ArrayList<>();
 
    protected List<NodeManager> nodeManagers;
 
@@ -72,17 +72,16 @@ public abstract class MultipleServerFailoverTestBase extends ActiveMQTestBase {
    @Before
    public void setUp() throws Exception {
       super.setUp();
-      liveServers = new ArrayList<TestableServer>();
-      backupServers = new ArrayList<TestableServer>();
-      backupConfigs = new ArrayList<Configuration>();
-      liveConfigs = new ArrayList<Configuration>();
+      liveServers = new ArrayList<>();
+      backupServers = new ArrayList<>();
+      backupConfigs = new ArrayList<>();
+      liveConfigs = new ArrayList<>();
 
       for (int i = 0; i < getLiveServerCount(); i++) {
          HAPolicyConfiguration haPolicyConfiguration = null;
 
          if (isSharedStore()) {
             haPolicyConfiguration = new SharedStoreMasterPolicyConfiguration();
-            ((SharedStoreMasterPolicyConfiguration) haPolicyConfiguration).setFailbackDelay(1000);
          }
          else {
             haPolicyConfiguration = new ReplicatedPolicyConfiguration();
@@ -105,7 +104,7 @@ public abstract class MultipleServerFailoverTestBase extends ActiveMQTestBase {
 
          TransportConfiguration livetc = getConnectorTransportConfiguration(true, i);
          configuration.addConnectorConfiguration(livetc.getName(), livetc);
-         List<String> connectors = new ArrayList<String>();
+         List<String> connectors = new ArrayList<>();
          for (int j = 0; j < getLiveServerCount(); j++) {
             if (j != i) {
                TransportConfiguration staticTc = getConnectorTransportConfiguration(true, j);
@@ -128,11 +127,9 @@ public abstract class MultipleServerFailoverTestBase extends ActiveMQTestBase {
 
          if (isSharedStore()) {
             haPolicyConfiguration = new SharedStoreSlavePolicyConfiguration();
-            ((SharedStoreSlavePolicyConfiguration) haPolicyConfiguration).setFailbackDelay(1000);
          }
          else {
             haPolicyConfiguration = new ReplicaPolicyConfiguration();
-            ((ReplicaPolicyConfiguration) haPolicyConfiguration).setFailbackDelay(1000);
             if (getNodeGroupName() != null) {
                ((ReplicaPolicyConfiguration) haPolicyConfiguration).setGroupName(getNodeGroupName() + "-" + i);
             }
@@ -152,7 +149,7 @@ public abstract class MultipleServerFailoverTestBase extends ActiveMQTestBase {
 
          TransportConfiguration backuptc = getConnectorTransportConfiguration(false, i);
          configuration.addConnectorConfiguration(backuptc.getName(), backuptc);
-         List<String> connectors = new ArrayList<String>();
+         List<String> connectors = new ArrayList<>();
          for (int j = 0; j < getBackupServerCount(); j++) {
             TransportConfiguration staticTc = getConnectorTransportConfiguration(true, j);
             configuration.addConnectorConfiguration(staticTc.getName(), staticTc);

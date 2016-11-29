@@ -72,7 +72,7 @@ public class AMQ4221Test extends TestSupport {
 
    final byte[] payload = new byte[PAYLOAD_SIZE_BYTES];
    final AtomicInteger counter = new AtomicInteger(0);
-   final HashSet<Throwable> exceptions = new HashSet<Throwable>();
+   final HashSet<Throwable> exceptions = new HashSet<>();
    BrokerService brokerService;
    private String brokerUrlString;
    ExecutorService executorService = Executors.newCachedThreadPool();
@@ -93,6 +93,7 @@ public class AMQ4221Test extends TestSupport {
                System.err.println("exit on error: " + event.getMessage());
                done.set(true);
                new Thread() {
+                  @Override
                   public void run() {
                      System.exit(787);
                   }

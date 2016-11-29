@@ -23,7 +23,7 @@ import org.apache.activemq.artemis.api.core.management.BroadcastGroupControl;
 import org.apache.activemq.artemis.core.config.Configuration;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServers;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.json.JSONArray;
 import org.junit.Assert;
 import org.junit.Before;
@@ -83,7 +83,7 @@ public class BroadcastGroupControlTest extends ManagementTestBase {
       super.setUp();
 
       TransportConfiguration connectorConfiguration = new TransportConfiguration(NETTY_CONNECTOR_FACTORY);
-      List<String> connectorInfos = new ArrayList<String>();
+      List<String> connectorInfos = new ArrayList<>();
       connectorInfos.add(connectorConfiguration.getName());
       broadcastGroupConfig = new BroadcastGroupConfiguration().setName(RandomUtil.randomString()).setBroadcastPeriod(RandomUtil.randomPositiveInt()).setConnectorInfos(connectorInfos).setEndpointFactory(new UDPBroadcastEndpointFactory().setGroupAddress("231.7.7.7").setGroupPort(1199).setLocalBindPort(1198));
 

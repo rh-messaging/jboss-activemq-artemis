@@ -68,6 +68,7 @@ public class QueueMemoryFullMultiBrokersTest extends JmsMultipleBrokersTestSuppo
       assertEquals("inflight source:" + internalQueue, 0, internalQueue.getDestinationStatistics().getInflight().getCount());
    }
 
+   @Override
    public void setUp() throws Exception {
       super.setAutoFail(true);
       super.setUp();
@@ -86,7 +87,7 @@ public class QueueMemoryFullMultiBrokersTest extends JmsMultipleBrokersTestSuppo
       memoryManager.getMemoryUsage().setLimit(1024 * 50); // 50 MB
       broker.setSystemUsage(memoryManager);
 
-      final List<PolicyEntry> policyEntries = new ArrayList<PolicyEntry>();
+      final List<PolicyEntry> policyEntries = new ArrayList<>();
       final PolicyEntry entry = new PolicyEntry();
       entry.setQueue(">");
       entry.setMemoryLimit(1024 * 4); // Set to 2 kb

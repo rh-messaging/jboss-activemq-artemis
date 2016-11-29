@@ -44,9 +44,9 @@ import org.apache.activemq.artemis.core.io.nio.NIOSequentialFileFactory;
 import org.apache.activemq.artemis.core.persistence.impl.journal.OperationContextImpl;
 import org.apache.activemq.artemis.jlibaio.LibaioContext;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.utils.ActiveMQThreadFactory;
 import org.apache.activemq.artemis.utils.OrderedExecutorFactory;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.SimpleIDGenerator;
 import org.junit.After;
 import org.junit.Before;
@@ -115,7 +115,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
          maxAIO = ActiveMQDefaultConfiguration.getDefaultJournalMaxIoNio();
       }
 
-      journal = new JournalImpl(50 * 1024, 20, 50, ActiveMQDefaultConfiguration.getDefaultJournalCompactPercentage(), factory, "activemq-data", "amq", maxAIO) {
+      journal = new JournalImpl(50 * 1024, 20, 20, 50, ActiveMQDefaultConfiguration.getDefaultJournalCompactPercentage(), factory, "activemq-data", "amq", maxAIO) {
          @Override
          protected void onCompactLockingTheJournal() throws Exception {
          }
@@ -123,6 +123,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
          @Override
          protected void onCompactStart() throws Exception {
             testExecutor.execute(new Runnable() {
+               @Override
                public void run() {
                   try {
                      // System.out.println("OnCompactStart enter");
@@ -226,6 +227,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
 
       final CountDownLatch latchExecutorDone = new CountDownLatch(1);
       testExecutor.execute(new Runnable() {
+         @Override
          public void run() {
             latchExecutorDone.countDown();
          }
@@ -263,9 +265,10 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
    private void reloadJournal() throws Exception {
       assertEquals(0, errors.get());
 
-      ArrayList<RecordInfo> committedRecords = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> preparedTransactions = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> committedRecords = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> preparedTransactions = new ArrayList<>();
       journal.load(committedRecords, preparedTransactions, new TransactionFailureCallback() {
+         @Override
          public void failedTransaction(long transactionID, List<RecordInfo> records, List<RecordInfo> recordsToDelete) {
          }
       });
@@ -294,7 +297,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
 
    class FastAppenderTx extends Thread {
 
-      LinkedBlockingDeque<Long> queue = new LinkedBlockingDeque<Long>();
+      LinkedBlockingDeque<Long> queue = new LinkedBlockingDeque<>();
 
       OperationContextImpl ctx = new OperationContextImpl(executorFactory.getExecutor());
 
@@ -332,9 +335,11 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
 
                ctx.executeOnCompletion(new IOCallback() {
 
+                  @Override
                   public void onError(final int errorCode, final String errorMessage) {
                   }
 
+                  @Override
                   public void done() {
                      numberOfRecords.addAndGet(txSize);
                      for (Long id : ids) {
@@ -434,6 +439,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
          this.ids = ids;
       }
 
+      @Override
       public void done() {
          rwLock.readLock().lock();
          numberOfUpdates.addAndGet(ids.length);
@@ -457,6 +463,7 @@ public class JournalCleanupCompactStressTest extends ActiveMQTestBase {
          }
       }
 
+      @Override
       public void onError(final int errorCode, final String errorMessage) {
       }
 

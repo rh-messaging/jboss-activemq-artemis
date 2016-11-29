@@ -259,6 +259,7 @@ public class ProducerFlowControlTest extends BasicOpenWireTest {
       // Once the send starts to block it will not reset the done flag
       // anymore.
       asyncThread = new Thread("Fill thread.") {
+         @Override
          public void run() {
             Session session = null;
             try {
@@ -299,6 +300,7 @@ public class ProducerFlowControlTest extends BasicOpenWireTest {
    private CountDownLatch asyncSendTo(final ActiveMQQueue queue, final String message) throws JMSException {
       final CountDownLatch done = new CountDownLatch(1);
       new Thread("Send thread.") {
+         @Override
          public void run() {
             Session session = null;
             try {
@@ -339,7 +341,7 @@ public class ProducerFlowControlTest extends BasicOpenWireTest {
    public void tearDown() throws Exception {
       try {
          if (flowControlConnection != null) {
-            TcpTransport t = (TcpTransport) flowControlConnection.getTransport().narrow(TcpTransport.class);
+            TcpTransport t = flowControlConnection.getTransport().narrow(TcpTransport.class);
             try {
                flowControlConnection.getTransport().stop();
                flowControlConnection.close();

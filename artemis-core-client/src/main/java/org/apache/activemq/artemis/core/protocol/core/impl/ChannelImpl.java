@@ -130,7 +130,7 @@ public final class ChannelImpl implements Channel {
       this.confWindowSize = confWindowSize;
 
       if (confWindowSize != -1) {
-         resendCache = new ConcurrentLinkedQueue<Packet>();
+         resendCache = new ConcurrentLinkedQueue<>();
       }
       else {
          resendCache = null;
@@ -139,6 +139,7 @@ public final class ChannelImpl implements Channel {
       this.interceptors = interceptors;
    }
 
+   @Override
    public boolean supports(final byte packetType) {
       int version = connection.getClientVersion();
 
@@ -160,26 +161,32 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public long getID() {
       return id;
    }
 
+   @Override
    public int getLastConfirmedCommandID() {
       return lastConfirmedCommandID.get();
    }
 
+   @Override
    public Lock getLock() {
       return lock;
    }
 
+   @Override
    public int getConfirmationWindowSize() {
       return confWindowSize;
    }
 
+   @Override
    public void returnBlocking() {
       returnBlocking(null);
    }
 
+   @Override
    public void returnBlocking(Throwable cause) {
       lock.lock();
 
@@ -193,18 +200,22 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public boolean sendAndFlush(final Packet packet) {
       return send(packet, true, false);
    }
 
+   @Override
    public boolean send(final Packet packet) {
       return send(packet, false, false);
    }
 
+   @Override
    public boolean sendBatched(final Packet packet) {
       return send(packet, false, true);
    }
 
+   @Override
    public void setTransferring(boolean transferring) {
       this.transferring = transferring;
    }
@@ -228,9 +239,15 @@ public final class ChannelImpl implements Channel {
 
          try {
             if (failingOver) {
-               // TODO - don't hardcode this timeout
                try {
-                  failoverCondition.await(10000, TimeUnit.MILLISECONDS);
+                  if (connection.getBlockingCallFailoverTimeout() < 0) {
+                     failoverCondition.await();
+                  }
+                  else {
+                     if (!failoverCondition.await(connection.getBlockingCallFailoverTimeout(), TimeUnit.MILLISECONDS)) {
+                        ActiveMQClientLogger.LOGGER.debug("timed-out waiting for fail-over condition on non-blocking send");
+                     }
+                  }
                }
                catch (InterruptedException e) {
                   throw new ActiveMQInterruptedException(e);
@@ -239,11 +256,11 @@ public final class ChannelImpl implements Channel {
 
             // Sanity check
             if (transferring) {
-               throw new IllegalStateException("Cannot send a packet while channel is doing failover");
+               throw ActiveMQClientMessageBundle.BUNDLE.cannotSendPacketDuringFailover();
             }
 
             if (resendCache != null && packet.isRequiresConfirmations()) {
-               resendCache.add(packet);
+               addResendPacket(packet);
             }
          }
          finally {
@@ -267,6 +284,7 @@ public final class ChannelImpl implements Channel {
     * and the client could eventually retry another call, but the server could then answer a previous command issuing a class-cast-exception.
     * The expectedPacket will be used to filter out undesirable packets that would belong to previous calls.
     */
+   @Override
    public Packet sendBlocking(final Packet packet, byte expectedPacket) throws ActiveMQException {
       String interceptionResult = invokeInterceptors(packet, interceptors, connection);
 
@@ -302,7 +320,7 @@ public final class ChannelImpl implements Channel {
                   }
                   else {
                      if (!failoverCondition.await(connection.getBlockingCallFailoverTimeout(), TimeUnit.MILLISECONDS)) {
-                        ActiveMQClientLogger.LOGGER.debug("timed-out waiting for failover condition");
+                        ActiveMQClientLogger.LOGGER.debug("timed-out waiting for fail-over condition on blocking send");
                      }
                   }
                }
@@ -314,7 +332,7 @@ public final class ChannelImpl implements Channel {
             response = null;
 
             if (resendCache != null && packet.isRequiresConfirmations()) {
-               resendCache.add(packet);
+               addResendPacket(packet);
             }
 
             connection.getTransportConnection().write(buffer, false, false);
@@ -402,6 +420,7 @@ public final class ChannelImpl implements Channel {
       return null;
    }
 
+   @Override
    public void setCommandConfirmationHandler(final CommandConfirmationHandler handler) {
       if (confWindowSize < 0) {
          final String msg = "You can't set confirmationHandler on a connection with confirmation-window-size < 0." + " Look at the documentation for more information.";
@@ -410,14 +429,17 @@ public final class ChannelImpl implements Channel {
       commandConfirmationHandler = handler;
    }
 
+   @Override
    public void setHandler(final ChannelHandler handler) {
       this.handler = handler;
    }
 
+   @Override
    public ChannelHandler getHandler() {
       return handler;
    }
 
+   @Override
    public void close() {
       if (closed) {
          return;
@@ -433,6 +455,7 @@ public final class ChannelImpl implements Channel {
       closed = true;
    }
 
+   @Override
    public void transferConnection(final CoreRemotingConnection newConnection) {
       // Needs to synchronize on the connection to make sure no packets from
       // the old connection get processed after transfer has occurred
@@ -451,6 +474,7 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public void replayCommands(final int otherLastConfirmedCommandID) {
       if (resendCache != null) {
          if (isTrace) {
@@ -464,6 +488,7 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public void lock() {
       lock.lock();
 
@@ -472,6 +497,7 @@ public final class ChannelImpl implements Channel {
       lock.unlock();
    }
 
+   @Override
    public void unlock() {
       lock.lock();
 
@@ -482,11 +508,13 @@ public final class ChannelImpl implements Channel {
       lock.unlock();
    }
 
+   @Override
    public CoreRemotingConnection getConnection() {
       return connection;
    }
 
    // Needs to be synchronized since can be called by remoting service timer thread too for timeout flush
+   @Override
    public synchronized void flushConfirmations() {
       if (resendCache != null && receivedBytes != 0) {
          receivedBytes = 0;
@@ -495,13 +523,22 @@ public final class ChannelImpl implements Channel {
 
          confirmed.setChannelID(id);
 
+         if (isTrace) {
+            ActiveMQClientLogger.LOGGER.trace("ChannelImpl::flushConfirmation flushing confirmation " + confirmed);
+         }
+
          doWrite(confirmed);
       }
    }
 
+   @Override
    public void confirm(final Packet packet) {
       if (resendCache != null && packet.isRequiresConfirmations()) {
          lastConfirmedCommandID.incrementAndGet();
+
+         if (isTrace) {
+            ActiveMQClientLogger.LOGGER.trace("ChannelImpl::confirming packet " + packet + " last commandID=" + lastConfirmedCommandID);
+         }
 
          receivedBytes += packet.getPacketSize();
 
@@ -517,6 +554,7 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public void clearCommands() {
       if (resendCache != null) {
          lastConfirmedCommandID.set(-1);
@@ -527,6 +565,7 @@ public final class ChannelImpl implements Channel {
       }
    }
 
+   @Override
    public void handlePacket(final Packet packet) {
       if (packet.getType() == PacketImpl.PACKETS_CONFIRMED) {
          if (resendCache != null) {
@@ -567,30 +606,35 @@ public final class ChannelImpl implements Channel {
       connection.getTransportConnection().write(buffer, false, false);
    }
 
+   private void addResendPacket(Packet packet) {
+      resendCache.add(packet);
+
+      if (isTrace) {
+         ActiveMQClientLogger.LOGGER.trace("ChannelImpl::addResendPacket adding packet " + packet + " stored commandID=" + firstStoredCommandID + " possible commandIDr=" + (firstStoredCommandID + resendCache.size()));
+      }
+   }
+
    private void clearUpTo(final int lastReceivedCommandID) {
       final int numberToClear = 1 + lastReceivedCommandID - firstStoredCommandID;
 
-      if (numberToClear == -1) {
-         throw ActiveMQClientMessageBundle.BUNDLE.invalidCommandID(lastReceivedCommandID);
+      if (isTrace) {
+         ActiveMQClientLogger.LOGGER.trace("ChannelImpl::clearUpTo lastReceived commandID=" + lastReceivedCommandID +
+                                              " first commandID=" + firstStoredCommandID +
+                                              " number to clear " + numberToClear);
       }
-
-      int sizeToFree = 0;
 
       for (int i = 0; i < numberToClear; i++) {
          final Packet packet = resendCache.poll();
 
          if (packet == null) {
-            if (lastReceivedCommandID > 0) {
-               ActiveMQClientLogger.LOGGER.cannotFindPacketToClear(lastReceivedCommandID, firstStoredCommandID);
-            }
+            ActiveMQClientLogger.LOGGER.cannotFindPacketToClear(lastReceivedCommandID, firstStoredCommandID);
             firstStoredCommandID = lastReceivedCommandID + 1;
             return;
          }
 
-         if (packet.getType() != PacketImpl.PACKETS_CONFIRMED) {
-            sizeToFree += packet.getPacketSize();
+         if (isTrace) {
+            ActiveMQClientLogger.LOGGER.trace("ChannelImpl::clearUpTo confirming " + packet + " towards " + commandConfirmationHandler);
          }
-
          if (commandConfirmationHandler != null) {
             commandConfirmationHandler.commandConfirmed(packet);
          }

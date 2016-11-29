@@ -62,7 +62,6 @@ import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.base64.Base64;
-import io.netty.handler.codec.http.ClientCookieEncoder;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -80,6 +79,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseDecoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ResourceLeakDetector;
@@ -135,7 +135,7 @@ public class NettyConnector extends AbstractConnector {
       ResourceLeakDetector.setEnabled(false);
 
       // Set default Configuration
-      Map<String, Object> config = new HashMap<String, Object>();
+      Map<String, Object> config = new HashMap<>();
       config.put(TransportConstants.HOST_PROP_NAME, TransportConstants.DEFAULT_HOST);
       config.put(TransportConstants.PORT_PROP_NAME, TransportConstants.DEFAULT_PORT);
       DEFAULT_CONFIG = Collections.unmodifiableMap(config);
@@ -202,7 +202,7 @@ public class NettyConnector extends AbstractConnector {
 
    private long batchDelay;
 
-   private ConcurrentMap<Object, Connection> connections = new ConcurrentHashMap<Object, Connection>();
+   private ConcurrentMap<Object, Connection> connections = new ConcurrentHashMap<>();
 
    private String servletPath;
 
@@ -346,6 +346,7 @@ public class NettyConnector extends AbstractConnector {
          "]";
    }
 
+   @Override
    public synchronized void start() {
       if (channelClazz != null) {
          return;
@@ -454,6 +455,7 @@ public class NettyConnector extends AbstractConnector {
       }
 
       bootstrap.handler(new ChannelInitializer<Channel>() {
+         @Override
          public void initChannel(Channel channel) throws Exception {
             final ChannelPipeline pipeline = channel.pipeline();
             if (sslEnabled && !useServlet) {
@@ -528,6 +530,7 @@ public class NettyConnector extends AbstractConnector {
       ActiveMQClientLogger.LOGGER.debug("Started Netty Connector version " + TransportConstants.NETTY_VERSION);
    }
 
+   @Override
    public synchronized void close() {
       if (channelClazz == null) {
          return;
@@ -559,10 +562,12 @@ public class NettyConnector extends AbstractConnector {
       connections.clear();
    }
 
+   @Override
    public boolean isStarted() {
       return channelClazz != null;
    }
 
+   @Override
    public Connection createConnection() {
       if (channelClazz == null) {
          return null;
@@ -820,7 +825,7 @@ public class NettyConnector extends AbstractConnector {
             Set<Cookie> cookieMap = CookieDecoder.decode(response.headers().get(HttpHeaders.Names.SET_COOKIE));
             for (Cookie cookie : cookieMap) {
                if (cookie.getName().equals("JSESSIONID")) {
-                  this.cookie = ClientCookieEncoder.encode(cookie);
+                  this.cookie = ClientCookieEncoder.LAX.encode(cookie);
                }
             }
             active = true;
@@ -866,6 +871,7 @@ public class NettyConnector extends AbstractConnector {
 
          private java.util.concurrent.Future<?> future;
 
+         @Override
          public synchronized void run() {
             if (closed) {
                return;
@@ -895,6 +901,7 @@ public class NettyConnector extends AbstractConnector {
 
    private class Listener implements ConnectionLifeCycleListener {
 
+      @Override
       public void connectionCreated(final ActiveMQComponent component,
                                     final Connection connection,
                                     final String protocol) {
@@ -903,10 +910,12 @@ public class NettyConnector extends AbstractConnector {
          }
       }
 
+      @Override
       public void connectionDestroyed(final Object connectionID) {
          if (connections.remove(connectionID) != null) {
             // Execute on different thread to avoid deadlocks
             closeExecutor.execute(new Runnable() {
+               @Override
                public void run() {
                   listener.connectionDestroyed(connectionID);
                }
@@ -914,16 +923,24 @@ public class NettyConnector extends AbstractConnector {
          }
       }
 
+      @Override
       public void connectionException(final Object connectionID, final ActiveMQException me) {
          // Execute on different thread to avoid deadlocks
          closeExecutor.execute(new Runnable() {
+            @Override
             public void run() {
                listener.connectionException(connectionID, me);
             }
          });
       }
 
+      @Override
       public void connectionReadyForWrites(Object connectionID, boolean ready) {
+         NettyConnection connection = (NettyConnection)connections.get(connectionID);
+         if (connection != null) {
+            connection.fireReady(ready);
+         }
+         listener.connectionReadyForWrites(connectionID, ready);
       }
 
    }
@@ -932,6 +949,7 @@ public class NettyConnector extends AbstractConnector {
 
       private boolean cancelled;
 
+      @Override
       public synchronized void run() {
          if (!cancelled) {
             for (Connection connection : connections.values()) {
@@ -945,6 +963,7 @@ public class NettyConnector extends AbstractConnector {
       }
    }
 
+   @Override
    public boolean isEquivalent(Map<String, Object> configuration) {
       //here we only check host and port because these two parameters
       //is sufficient to determine the target host
@@ -975,6 +994,7 @@ public class NettyConnector extends AbstractConnector {
       return result;
    }
 
+   @Override
    public void finalize() throws Throwable {
       close();
       super.finalize();
@@ -991,6 +1011,7 @@ public class NettyConnector extends AbstractConnector {
 
    private static ClassLoader getThisClassLoader() {
       return AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
+         @Override
          public ClassLoader run() {
             return ClientSessionFactoryImpl.class.getClassLoader();
          }

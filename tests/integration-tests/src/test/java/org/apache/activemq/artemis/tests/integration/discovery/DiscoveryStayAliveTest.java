@@ -28,8 +28,8 @@ import org.apache.activemq.artemis.api.core.BroadcastEndpointFactory;
 import org.apache.activemq.artemis.api.core.UDPBroadcastEndpointFactory;
 import org.apache.activemq.artemis.core.cluster.DiscoveryGroup;
 import org.apache.activemq.artemis.core.server.cluster.impl.BroadcastGroupImpl;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.utils.ActiveMQThreadFactory;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -48,6 +48,7 @@ public class DiscoveryStayAliveTest extends DiscoveryBaseTest {
 
    }
 
+   @Override
    public void tearDown() throws Exception {
       scheduledExecutorService.shutdown();
       super.tearDown();
@@ -63,6 +64,7 @@ public class DiscoveryStayAliveTest extends DiscoveryBaseTest {
 
       final AtomicInteger errors = new AtomicInteger(0);
       Thread t = new Thread() {
+         @Override
          public void run() {
             try {
                dg.internalRunning();

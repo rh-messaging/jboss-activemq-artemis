@@ -33,7 +33,7 @@ public class FakeConsumer implements Consumer {
 
    private int delayCountdown = 0;
 
-   private final LinkedList<MessageReference> references = new LinkedList<MessageReference>();
+   private final LinkedList<MessageReference> references = new LinkedList<>();
 
    private final Filter filter;
 
@@ -45,10 +45,12 @@ public class FakeConsumer implements Consumer {
       this.filter = filter;
    }
 
+   @Override
    public Filter getFilter() {
       return filter;
    }
 
+   @Override
    public String debug() {
       return toString();
    }
@@ -89,42 +91,49 @@ public class FakeConsumer implements Consumer {
       references.clear();
    }
 
+   @Override
    public synchronized HandleStatus handle(final MessageReference reference) {
-      if (statusToReturn == HandleStatus.BUSY) {
-         return HandleStatus.BUSY;
-      }
+      try {
+         if (statusToReturn == HandleStatus.BUSY) {
+            return HandleStatus.BUSY;
+         }
 
-      if (filter != null) {
-         if (filter.match(reference.getMessage())) {
-            references.addLast(reference);
+         if (filter != null) {
+            if (filter.match(reference.getMessage())) {
+               references.addLast(reference);
+               reference.getQueue().referenceHandled();
+               notify();
+
+               return HandleStatus.HANDLED;
+            }
+            else {
+               return HandleStatus.NO_MATCH;
+            }
+         }
+
+         if (newStatus != null) {
+            if (delayCountdown == 0) {
+               statusToReturn = newStatus;
+
+               newStatus = null;
+            }
+            else {
+               delayCountdown--;
+            }
+         }
+
+         if (statusToReturn == HandleStatus.HANDLED) {
             reference.getQueue().referenceHandled();
+            references.addLast(reference);
             notify();
+         }
 
-            return HandleStatus.HANDLED;
-         }
-         else {
-            return HandleStatus.NO_MATCH;
-         }
+         return statusToReturn;
       }
-
-      if (newStatus != null) {
-         if (delayCountdown == 0) {
-            statusToReturn = newStatus;
-
-            newStatus = null;
-         }
-         else {
-            delayCountdown--;
-         }
+      catch (Exception e) {
+         e.printStackTrace();
+         throw new IllegalStateException(e.getMessage(), e);
       }
-
-      if (statusToReturn == HandleStatus.HANDLED) {
-         reference.getQueue().referenceHandled();
-         references.addLast(reference);
-         notify();
-      }
-
-      return statusToReturn;
    }
 
    @Override
@@ -142,6 +151,7 @@ public class FakeConsumer implements Consumer {
       //To change body of implemented methods use File | Settings | File Templates.
    }
 
+   @Override
    public List<MessageReference> getDeliveringMessages() {
       return Collections.emptyList();
    }

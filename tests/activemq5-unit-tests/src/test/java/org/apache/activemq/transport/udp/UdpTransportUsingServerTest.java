@@ -23,7 +23,6 @@ import org.apache.activemq.command.Response;
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportFactory;
 import org.apache.activemq.transport.TransportServer;
-import org.apache.activemq.transport.tcp.WireformatNegociationTest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,16 +50,19 @@ public class UdpTransportUsingServerTest extends UdpTestSupport {
       assertTrue("Should not be an exception", !response.isException());
    }
 
+   @Override
    protected Transport createProducer() throws Exception {
       LOG.info("Producer using URI: " + producerURI);
       URI uri = new URI(producerURI);
       return TransportFactory.connect(uri);
    }
 
+   @Override
    protected TransportServer createServer() throws Exception {
       return TransportFactory.bind(new URI(serverURI));
    }
 
+   @Override
    protected Transport createConsumer() throws Exception {
       return null;
    }

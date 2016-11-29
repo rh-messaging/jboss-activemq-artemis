@@ -70,15 +70,17 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
 
    // AddressControlMBean implementation ----------------------------
 
+   @Override
    public String getAddress() {
       return address.toString();
    }
 
+   @Override
    public String[] getQueueNames() throws Exception {
       clearIO();
       try {
          Bindings bindings = postOffice.getBindingsForAddress(address);
-         List<String> queueNames = new ArrayList<String>();
+         List<String> queueNames = new ArrayList<>();
          for (Binding binding : bindings.getBindings()) {
             if (binding instanceof QueueBinding) {
                queueNames.add(binding.getUniqueName().toString());
@@ -94,6 +96,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public String[] getBindingNames() throws Exception {
       clearIO();
       try {
@@ -113,6 +116,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public Object[] getRoles() throws Exception {
       clearIO();
       try {
@@ -131,6 +135,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public String getRolesAsJSON() throws Exception {
       clearIO();
       try {
@@ -147,6 +152,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public long getNumberOfBytesPerPage() throws Exception {
       clearIO();
       try {
@@ -157,6 +163,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public long getAddressSize() throws Exception {
       clearIO();
       try {
@@ -167,12 +174,13 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public long getNumberOfMessages() throws Exception {
       clearIO();
       long totalMsgs = 0;
       try {
          Bindings bindings = postOffice.getBindingsForAddress(address);
-         List<String> queueNames = new ArrayList<String>();
+         List<String> queueNames = new ArrayList<>();
          for (Binding binding : bindings.getBindings()) {
             if (binding instanceof QueueBinding) {
                totalMsgs += ((QueueBinding) binding).getQueue().getMessageCount();
@@ -188,6 +196,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public boolean isPaging() throws Exception {
       clearIO();
       try {
@@ -198,6 +207,7 @@ public class AddressControlImpl extends AbstractControl implements AddressContro
       }
    }
 
+   @Override
    public int getNumberOfPages() throws Exception {
       clearIO();
       try {

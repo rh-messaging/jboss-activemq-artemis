@@ -113,6 +113,7 @@ public class AMQ4083Test {
       assertEquals(101, queueView.getInFlightCount());
 
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message message) {
             try {
                message.acknowledge();
@@ -132,6 +133,7 @@ public class AMQ4083Test {
 
       assertTrue("Inflight count should reach zero, currently: " + queueView.getInFlightCount(), Wait.waitFor(new Wait.Condition() {
 
+         @Override
          public boolean isSatisified() throws Exception {
             return queueView.getInFlightCount() == 0;
          }
@@ -175,6 +177,7 @@ public class AMQ4083Test {
       assertEquals(101, queueView.getInFlightCount());
 
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message message) {
             try {
                session.commit();
@@ -481,7 +484,7 @@ public class AMQ4083Test {
          producerNormal.send(queue, message);
       }
 
-      ArrayList<Message> messages = new ArrayList<Message>();
+      ArrayList<Message> messages = new ArrayList<>();
       Message received;
       while ((received = consumer.receive(1000)) != null) {
          messages.add(received);
@@ -490,15 +493,13 @@ public class AMQ4083Test {
          }
          received.acknowledge();
       }
-      ;
 
       assertEquals("got messages", messageCount + 1, messages.size());
 
-      ArrayList<Message> dlqMessages = new ArrayList<Message>();
+      ArrayList<Message> dlqMessages = new ArrayList<>();
       while ((received = dlqConsumer.receive(1000)) != null) {
          dlqMessages.add(received);
       }
-      ;
 
       assertEquals("got dlq messages", data.length - 1, dlqMessages.size());
 

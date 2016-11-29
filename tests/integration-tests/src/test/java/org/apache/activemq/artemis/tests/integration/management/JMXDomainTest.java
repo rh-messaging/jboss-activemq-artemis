@@ -40,7 +40,7 @@ public class JMXDomainTest extends ManagementTestBase {
 
       String jmxDomain_1 = ActiveMQDefaultConfiguration.getDefaultJmxDomain() + ".1";
 
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
       params.put(TransportConstants.SERVER_ID_PROP_NAME, 1);
       Configuration config_1 = createBasicConfig().addAcceptorConfiguration(new TransportConfiguration(InVMAcceptorFactory.class.getName(), params)).setJMXDomain(jmxDomain_1);
 
@@ -48,7 +48,7 @@ public class JMXDomainTest extends ManagementTestBase {
       server_1 = addServer(ActiveMQServers.newActiveMQServer(config_1, mbeanServer, false));
 
       ObjectNameBuilder builder_0 = ObjectNameBuilder.DEFAULT;
-      ObjectNameBuilder builder_1 = ObjectNameBuilder.create(jmxDomain_1);
+      ObjectNameBuilder builder_1 = ObjectNameBuilder.create(jmxDomain_1, "localhost");
 
       checkNoResource(builder_0.getActiveMQServerObjectName());
       checkNoResource(builder_1.getActiveMQServerObjectName());

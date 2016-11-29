@@ -46,8 +46,8 @@ import org.apache.activemq.artemis.core.server.Queue;
 import org.apache.activemq.artemis.core.server.RoutingContext;
 import org.apache.activemq.artemis.core.server.ServerMessage;
 import org.apache.activemq.artemis.core.transaction.Transaction;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
 import org.apache.activemq.artemis.utils.LinkedListIterator;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.ReferenceCounter;
 import org.apache.activemq.artemis.utils.TypedProperties;
 import org.apache.activemq.artemis.utils.UUID;
@@ -198,6 +198,7 @@ public class ScheduledDeliveryHandlerTest extends Assert {
 
       class ProducerThread implements Runnable {
 
+         @Override
          public void run() {
             try {
                for (int i = 0; i < NUMBER_OF_MESSAGES; i++) {
@@ -228,7 +229,7 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
    }
 
-   private void validateSequence(ScheduledDeliveryHandlerImpl handler) {
+   private void validateSequence(ScheduledDeliveryHandlerImpl handler) throws Exception {
       long lastSequence = -1;
       for (MessageReference ref : handler.getScheduledReferences()) {
          assertEquals(lastSequence + 1, ref.getMessage().getMessageID());
@@ -255,10 +256,10 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       handler.checkAndSchedule(refImpl, tail);
    }
 
-   private void debugList(boolean fail, ScheduledDeliveryHandlerImpl handler, long numberOfExpectedMessages) {
+   private void debugList(boolean fail, ScheduledDeliveryHandlerImpl handler, long numberOfExpectedMessages) throws Exception {
       List<MessageReference> refs = handler.getScheduledReferences();
 
-      HashSet<Long> messages = new HashSet<Long>();
+      HashSet<Long> messages = new HashSet<>();
 
       long lastTime = -1;
 
@@ -429,17 +430,7 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
 
       @Override
-      public void checkCopy() {
-
-      }
-
-      @Override
       public void bodyChanged() {
-
-      }
-
-      @Override
-      public void resetCopied() {
 
       }
 
@@ -579,7 +570,7 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
 
       @Override
-      public ActiveMQBuffer getBodyBufferCopy() {
+      public ActiveMQBuffer getBodyBufferDuplicate() {
          return null;
       }
 
@@ -834,6 +825,11 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
 
       @Override
+      public Map<String, Object> toPropertyMap() {
+         return null;
+      }
+
+      @Override
       public FakeMessage writeBodyBufferBytes(byte[] bytes) {
          return this;
       }
@@ -908,6 +904,11 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
 
       @Override
+      public int retryMessages(Filter filter) throws Exception {
+         return 0;
+      }
+
+      @Override
       public int getConsumerCount() {
          return 0;
       }
@@ -938,12 +939,12 @@ public class ScheduledDeliveryHandlerTest extends Assert {
       }
 
       @Override
-      public void addHead(MessageReference ref) {
+      public void addHead(MessageReference ref, boolean scheduling) {
 
       }
 
       @Override
-      public void addHead(List<MessageReference> refs) {
+      public void addHead(List<MessageReference> refs, boolean scheduling) {
          for (MessageReference ref : refs) {
             addFirst(ref);
          }

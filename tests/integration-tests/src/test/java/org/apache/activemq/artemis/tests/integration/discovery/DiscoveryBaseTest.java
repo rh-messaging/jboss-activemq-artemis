@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.UDPBroadcastEndpointFactory;
+import org.apache.activemq.artemis.core.server.ActivateCallback;
 import org.apache.activemq.artemis.tests.integration.IntegrationTestLogger;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
 import org.apache.activemq.artemis.core.cluster.DiscoveryEntry;
@@ -76,7 +77,7 @@ public class DiscoveryBaseTest extends ActiveMQTestBase {
    protected TransportConfiguration generateTC(String debug) {
       String className = "org.foo.bar." + debug + "|" + UUIDGenerator.getInstance().generateStringUUID() + "";
       String name = UUIDGenerator.getInstance().generateStringUUID();
-      Map<String, Object> params = new HashMap<String, Object>();
+      Map<String, Object> params = new HashMap<>();
       params.put(UUIDGenerator.getInstance().generateStringUUID(), 123);
       params.put(UUIDGenerator.getInstance().generateStringUUID(), UUIDGenerator.getInstance().generateStringUUID());
       params.put(UUIDGenerator.getInstance().generateStringUUID(), true);
@@ -88,6 +89,7 @@ public class DiscoveryBaseTest extends ActiveMQTestBase {
 
       volatile boolean called;
 
+      @Override
       public void connectorsChanged(List<DiscoveryEntry> newConnectors) {
          called = true;
       }
@@ -97,15 +99,17 @@ public class DiscoveryBaseTest extends ActiveMQTestBase {
                                                       List<DiscoveryEntry> actual) {
       assertNotNull(actual);
 
-      List<TransportConfiguration> sortedExpected = new ArrayList<TransportConfiguration>(expected);
+      List<TransportConfiguration> sortedExpected = new ArrayList<>(expected);
       Collections.sort(sortedExpected, new Comparator<TransportConfiguration>() {
 
+         @Override
          public int compare(TransportConfiguration o1, TransportConfiguration o2) {
             return o2.toString().compareTo(o1.toString());
          }
       });
-      List<DiscoveryEntry> sortedActual = new ArrayList<DiscoveryEntry>(actual);
+      List<DiscoveryEntry> sortedActual = new ArrayList<>(actual);
       Collections.sort(sortedActual, new Comparator<DiscoveryEntry>() {
+         @Override
          public int compare(DiscoveryEntry o1, DiscoveryEntry o2) {
             return o2.getConnector().toString().compareTo(o1.getConnector().toString());
          }
@@ -181,11 +185,32 @@ public class DiscoveryBaseTest extends ActiveMQTestBase {
       }
 
       @Override
+      public void awaitLiveStatus() throws Exception {
+      }
+
+      @Override
       public void startBackup() throws Exception {
       }
 
       @Override
-      public void startLiveNode() throws Exception {
+      public ActivateCallback startLiveNode() throws Exception {
+         return new ActivateCallback() {
+            @Override
+            public void preActivate() {
+            }
+
+            @Override
+            public void activated() {
+            }
+
+            @Override
+            public void deActivate() {
+            }
+
+            @Override
+            public void activationComplete() {
+            }
+         };
       }
 
       @Override

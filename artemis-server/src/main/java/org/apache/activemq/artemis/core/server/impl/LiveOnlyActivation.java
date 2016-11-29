@@ -53,6 +53,7 @@ public class LiveOnlyActivation extends Activation {
       this.liveOnlyPolicy = liveOnlyPolicy;
    }
 
+   @Override
    public void run() {
       try {
          activeMQServer.initialisePart1(false);
@@ -81,6 +82,7 @@ public class LiveOnlyActivation extends Activation {
       }
    }
 
+   @Override
    public void freezeConnections(RemotingService remotingService) {
       // connect to the scale-down target first so that when we freeze/disconnect the clients we can tell them where
       // we're sending the messages
@@ -115,7 +117,7 @@ public class LiveOnlyActivation extends Activation {
       try {
          scaleDownServerLocator = ScaleDownPolicy.getScaleDownConnector(scaleDownPolicy, activeMQServer);
          //use a Node Locator to connect to the cluster
-         scaleDownServerLocator.setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance());
+         scaleDownServerLocator.setProtocolManagerFactory(ActiveMQServerSideProtocolManagerFactory.getInstance(scaleDownServerLocator));
          LiveNodeLocator nodeLocator = scaleDownPolicy.getGroupName() == null ? new AnyLiveNodeLocatorForScaleDown(activeMQServer) : new NamedLiveNodeLocatorForScaleDown(scaleDownPolicy.getGroupName(), activeMQServer);
          scaleDownServerLocator.addClusterTopologyListener(nodeLocator);
 

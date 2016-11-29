@@ -16,6 +16,25 @@
  */
 package org.apache.activemq.artemis.tests.integration.jms.server.management;
 
+import javax.jms.BytesMessage;
+import javax.jms.Connection;
+import javax.jms.JMSException;
+import javax.jms.MapMessage;
+import javax.jms.Message;
+import javax.jms.MessageConsumer;
+import javax.jms.MessageProducer;
+import javax.jms.Session;
+import javax.management.Notification;
+import javax.management.openmbean.CompositeData;
+import javax.naming.Context;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.ClientConsumer;
@@ -39,31 +58,19 @@ import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQDestination;
 import org.apache.activemq.artemis.jms.client.ActiveMQJMSConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQQueue;
+import org.apache.activemq.artemis.jms.client.ActiveMQTopic;
 import org.apache.activemq.artemis.jms.server.impl.JMSServerManagerImpl;
 import org.apache.activemq.artemis.jms.server.management.JMSNotificationType;
+import org.apache.activemq.artemis.reader.MessageUtil;
 import org.apache.activemq.artemis.tests.integration.management.ManagementControlHelper;
 import org.apache.activemq.artemis.tests.integration.management.ManagementTestBase;
 import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.activemq.artemis.utils.UUIDGenerator;
 import org.apache.activemq.artemis.utils.json.JSONArray;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import javax.jms.Connection;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.management.Notification;
-import javax.naming.Context;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * A QueueControlTest
@@ -147,6 +154,229 @@ public class JMSQueueControlTest extends ManagementTestBase {
 
       data = queueControl.listMessages(null);
       Assert.assertEquals(0, data.length);
+   }
+
+   @Test
+   public void testSendTextMessage() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+
+      String id = queueControl.sendTextMessage(new HashMap<String, String>(), "theBody", "myUser", "myPassword");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertEquals("ID:" + id, data[0].get("JMSMessageID"));
+      Assert.assertEquals("theBody", data[0].get("Text"));
+      System.out.println(data[0]);
+
+   }
+
+   @Test
+   public void testBrowseMessagesWithNullFilter() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+
+      String[] ids = JMSUtil.sendMessages(queue, 2);
+
+      Assert.assertEquals(2, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(2, data.length);
+      System.out.println(data[0]);
+      Assert.assertEquals(ids[0], data[0].get("JMSMessageID").toString());
+      Assert.assertEquals(ids[1], data[1].get("JMSMessageID").toString());
+
+      JMSUtil.consumeMessages(2, queue);
+
+      data = queueControl.browse();
+      Assert.assertEquals(0, data.length);
+   }
+
+   @Test
+   public void testBrowseMessagesWithNullFilterReplyTo() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+      Connection connection = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+      Message m = JMSUtil.sendMessageWithReplyTo(session, queue, "foo");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("JMSReplyTo"));
+      Assert.assertEquals("jms.queue.foo", data[0].get("JMSReplyTo"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      data = queueControl.browse();
+      Assert.assertEquals(0, data.length);
+      connection.close();
+   }
+
+   @Test
+   public void testBrowseMessagesWithAllProps() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+      Connection connection = JMSUtil.createConnection(InVMConnectorFactory.class.getName());
+      Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+      JMSUtil.sendMessageWithProperty(session, queue, MessageUtil.CORRELATIONID_HEADER_NAME.toString(), "foo");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("JMSCorrelationID"));
+      Assert.assertEquals("foo", data[0].get("JMSCorrelationID"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      JMSUtil.sendMessageWithProperty(session, queue, MessageUtil.JMSXGROUPID.toString(), "myGroupID");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("JMSXGroupID"));
+      Assert.assertEquals("myGroupID", data[0].get("JMSXGroupID"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      JMSUtil.sendMessageWithProperty(session, queue, "JMSXGroupSeq", 33);
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("JMSXGroupID"));
+      Assert.assertEquals(33, data[0].get("JMSXGroupSeq"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      JMSUtil.sendMessageWithProperty(session, queue, "JMSXUserID", "theheadhonch");
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("JMSXUserID"));
+      Assert.assertEquals("theheadhonch", data[0].get("JMSXUserID"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      data = queueControl.browse();
+      Assert.assertEquals(0, data.length);
+      connection.close();
+   }
+
+   @Test
+   public void testBrowseBytesMessages() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+
+      ActiveMQJMSConnectionFactory cf = (ActiveMQJMSConnectionFactory) ActiveMQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(InVMConnectorFactory.class.getName()));
+
+      Connection conn = cf.createConnection();
+      conn.start();
+      Session session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+      byte[] bytes = RandomUtil.randomBytes(201);
+
+      BytesMessage message = JMSUtil.sendByteMessage(session, queue, bytes);
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("BodyLength"));
+      Assert.assertEquals(201L, data[0].get("BodyLength"));
+      Assert.assertNotNull(data[0].get("BodyPreview"));
+      Assert.assertArrayEquals(message.getBody(byte[].class), (byte[]) data[0].get("BodyPreview"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      bytes = RandomUtil.randomBytes(301);
+
+      message = JMSUtil.sendByteMessage(session, queue, bytes);
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      Assert.assertNotNull(data[0].get("BodyLength"));
+      Assert.assertEquals(301L, data[0].get("BodyLength"));
+      Assert.assertNotNull(data[0].get("BodyPreview"));
+      byte[] body = message.getBody(byte[].class);
+      Assert.assertArrayEquals(Arrays.copyOf(body, 255), (byte[]) data[0].get("BodyPreview"));
+      System.out.println(data[0]);
+      JMSUtil.consumeMessages(1, queue);
+
+      data = queueControl.browse();
+      Assert.assertEquals(0, data.length);
+      conn.close();
+   }
+
+   @Test
+   public void testBrowseMapMessages() throws Exception {
+      JMSQueueControl queueControl = createManagementControl();
+
+      Assert.assertEquals(0, getMessageCount(queueControl));
+
+      ActiveMQJMSConnectionFactory cf = (ActiveMQJMSConnectionFactory) ActiveMQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, new TransportConfiguration(InVMConnectorFactory.class.getName()));
+
+      Connection conn = cf.createConnection();
+      conn.start();
+      Session session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+      MessageProducer producer = session.createProducer(queue);
+      MapMessage message = session.createMapMessage();
+      message.setString("stringP", "aStringP");
+      message.setBoolean("booleanP", true);
+      message.setByte("byteP", (byte) 1);
+      message.setChar("charP", 'q');
+      message.setDouble("doubleP", 3.2);
+      message.setFloat("floatP", 4.5F);
+      message.setInt("intP", 8);
+      message.setLong("longP", 7);
+      message.setShort("shortP", (short) 777);
+      producer.send(message);
+
+      Assert.assertEquals(1, getMessageCount(queueControl));
+
+      CompositeData[] data = queueControl.browse();
+      Assert.assertEquals(1, data.length);
+      String contentMap = (String) data[0].get("ContentMap");
+      Assert.assertNotNull(contentMap);
+      Assert.assertTrue(contentMap.contains("intP=8"));
+      Assert.assertTrue(contentMap.contains("floatP=4.5"));
+      Assert.assertTrue(contentMap.contains("longP=7"));
+      Assert.assertTrue(contentMap.contains("charP=q"));
+      Assert.assertTrue(contentMap.contains("byteP=1"));
+      Assert.assertTrue(contentMap.contains("doubleP=3.2"));
+      Assert.assertTrue(contentMap.contains("stringP=aStringP"));
+      Assert.assertTrue(contentMap.contains("booleanP=true"));
+      Assert.assertTrue(contentMap.contains("shortP=777"));
+      System.out.println(data[0]);
+
+      JMSUtil.consumeMessages(1, queue);
+
+      data = queueControl.browse();
+      Assert.assertEquals(0, data.length);
+      conn.close();
    }
 
    @Test
@@ -792,6 +1022,148 @@ public class JMSQueueControlTest extends ManagementTestBase {
       connection.close();
    }
 
+
+   protected ActiveMQQueue createDLQ(final String deadLetterQueueName) throws Exception {
+      serverManager.createQueue(false, deadLetterQueueName, null, true, deadLetterQueueName);
+      return (ActiveMQQueue) ActiveMQJMSClient.createQueue(deadLetterQueueName);
+   }
+
+   protected ActiveMQQueue createTestQueueWithDLQ(final String queueName, final ActiveMQQueue dlq) throws Exception {
+      serverManager.createQueue(false,queueName,null,true,queueName);
+      ActiveMQQueue testQueue = (ActiveMQQueue) ActiveMQJMSClient.createQueue(queueName);
+      AddressSettings addressSettings = new AddressSettings();
+      addressSettings.setDeadLetterAddress(new SimpleString(dlq.getAddress()));
+      addressSettings.setMaxDeliveryAttempts(1);
+      server.getAddressSettingsRepository().addMatch(testQueue.getAddress(), addressSettings);
+      return testQueue;
+   }
+
+   protected ActiveMQTopic createTestTopicWithDLQ(final String queueName, final ActiveMQQueue dlq) throws Exception {
+      serverManager.createTopic(false, queueName);
+      ActiveMQTopic testQueue = (ActiveMQTopic) ActiveMQJMSClient.createTopic(queueName);
+      AddressSettings addressSettings = new AddressSettings();
+      addressSettings.setDeadLetterAddress(new SimpleString(dlq.getAddress()));
+      addressSettings.setMaxDeliveryAttempts(1);
+      server.getAddressSettingsRepository().addMatch(testQueue.getAddress(), addressSettings);
+      return testQueue;
+   }
+
+   /**
+    * Test retrying all messages put on DLQ - i.e. they should appear on the original queue.
+    * @throws Exception
+    */
+   @Test
+   public void testRetryMessages() throws Exception {
+      ActiveMQQueue dlq = createDLQ(RandomUtil.randomString());
+      ActiveMQQueue testQueue = createTestQueueWithDLQ(RandomUtil.randomString(),dlq);
+
+      final int numMessagesToTest = 10;
+      JMSUtil.sendMessages(testQueue, numMessagesToTest);
+
+      Connection connection = createConnection();
+      connection.start();
+      Session session = connection.createSession(true,Session.AUTO_ACKNOWLEDGE);
+      MessageConsumer consumer = session.createConsumer(testQueue);
+      for (int i = 0;i < numMessagesToTest;i++) {
+         Message msg = consumer.receive(500L);
+      }
+      session.rollback(); // All <numMessagesToTest> messages should now be on DLQ
+
+      JMSQueueControl testQueueControl = createManagementControl(testQueue);
+      JMSQueueControl dlqQueueControl = createManagementControl(dlq);
+      Assert.assertEquals(0, getMessageCount(testQueueControl));
+      Assert.assertEquals(numMessagesToTest,getMessageCount(dlqQueueControl));
+
+      Assert.assertEquals(10,getMessageCount(dlqQueueControl));
+
+      dlqQueueControl.retryMessages();
+
+      Assert.assertEquals(numMessagesToTest, getMessageCount(testQueueControl));
+      Assert.assertEquals(0,getMessageCount(dlqQueueControl));
+
+      connection.close();
+   }
+
+   /**
+    * Test retrying all messages put on DLQ - i.e. they should appear on the original queue.
+    * @throws Exception
+    */
+   @Test
+   public void testRetryMessagesOnTopic() throws Exception {
+      ActiveMQQueue dlq = createDLQ(RandomUtil.randomString());
+      ActiveMQTopic testTopic = createTestTopicWithDLQ(RandomUtil.randomString(), dlq);
+
+      Connection connectionConsume = createConnection();
+      connectionConsume.setClientID("ID");
+      Session sessionConsume = connectionConsume.createSession(true, Session.SESSION_TRANSACTED);
+      MessageConsumer cons1 = sessionConsume.createDurableSubscriber(testTopic, "sub1");
+      MessageConsumer cons2 = sessionConsume.createDurableSubscriber(testTopic, "sub2");
+
+
+      final int numMessagesToTest = 10;
+      JMSUtil.sendMessages(testTopic, numMessagesToTest);
+
+
+      connectionConsume.start();
+      for (int i = 0; i < numMessagesToTest; i++) {
+         Assert.assertNotNull(cons1.receive(500));
+      }
+      sessionConsume.commit();
+
+      Assert.assertNull(cons1.receiveNoWait());
+
+      connectionConsume.start();
+      for (int i = 0; i < numMessagesToTest; i++) {
+         cons2.receive(500);
+      }
+      sessionConsume.rollback();
+      Assert.assertNull(cons2.receiveNoWait());
+
+      JMSQueueControl dlqQueueControl = createManagementControl(dlq);
+      dlqQueueControl.retryMessages();
+
+      Assert.assertNull("Retry is sending back to cons1 even though it succeeded", cons1.receiveNoWait());
+
+      for (int i = 0; i < numMessagesToTest; i++) {
+         Assert.assertNotNull(cons2.receive(500));
+      }
+      sessionConsume.commit();
+      Assert.assertNull(cons1.receiveNoWait());
+
+      connectionConsume.close();
+
+   }
+
+   /**
+    * Test retrying a specific message on DLQ.
+    * Expected to be sent back to original queue.
+    * @throws Exception
+    */
+   @Test
+   public void testRetryMessage() throws Exception {
+      ActiveMQQueue dlq = createDLQ(RandomUtil.randomString());
+      ActiveMQQueue testQueue = createTestQueueWithDLQ(RandomUtil.randomString(),dlq);
+      String messageID = JMSUtil.sendMessages(testQueue,1)[0];
+
+      Connection connection = createConnection();
+      connection.start();
+      Session session = connection.createSession(true,Session.AUTO_ACKNOWLEDGE);
+      MessageConsumer consumer = session.createConsumer(testQueue);
+      consumer.receive(500L);
+      session.rollback(); // All <numMessagesToTest> messages should now be on DLQ
+
+      JMSQueueControl testQueueControl = createManagementControl(testQueue);
+      JMSQueueControl dlqQueueControl = createManagementControl(dlq);
+      Assert.assertEquals(0, getMessageCount(testQueueControl));
+      Assert.assertEquals(1,getMessageCount(dlqQueueControl));
+
+      dlqQueueControl.retryMessage(messageID);
+
+      Assert.assertEquals(1, getMessageCount(testQueueControl));
+      Assert.assertEquals(0,getMessageCount(dlqQueueControl));
+
+   }
+
    @Test
    public void testMoveMessage() throws Exception {
       String otherQueueName = RandomUtil.randomString();
@@ -1231,7 +1603,7 @@ public class JMSQueueControlTest extends ManagementTestBase {
       JMSUtil.JMXListener listener = new JMSUtil.JMXListener();
       this.mbeanServer.addNotificationListener(ObjectNameBuilder.DEFAULT.getJMSServerObjectName(), listener, null, null);
 
-      List<String> connectors = new ArrayList<String>();
+      List<String> connectors = new ArrayList<>();
       connectors.add("invm");
 
       String testQueueName = "newQueue";

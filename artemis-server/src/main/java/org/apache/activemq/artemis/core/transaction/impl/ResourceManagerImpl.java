@@ -16,6 +16,7 @@
  */
 package org.apache.activemq.artemis.core.transaction.impl;
 
+import javax.transaction.xa.Xid;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,17 +30,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.transaction.xa.Xid;
-
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.transaction.ResourceManager;
 import org.apache.activemq.artemis.core.transaction.Transaction;
 
 public class ResourceManagerImpl implements ResourceManager {
 
-   private final ConcurrentMap<Xid, Transaction> transactions = new ConcurrentHashMap<Xid, Transaction>();
+   private final ConcurrentMap<Xid, Transaction> transactions = new ConcurrentHashMap<>();
 
-   private final List<HeuristicCompletionHolder> heuristicCompletions = new ArrayList<HeuristicCompletionHolder>();
+   private final List<HeuristicCompletionHolder> heuristicCompletions = new ArrayList<>();
 
    private final int defaultTimeoutSeconds;
 
@@ -92,24 +91,29 @@ public class ResourceManagerImpl implements ResourceManager {
 
    // ResourceManager implementation ---------------------------------------------
 
+   @Override
    public Transaction getTransaction(final Xid xid) {
       return transactions.get(xid);
    }
 
+   @Override
    public boolean putTransaction(final Xid xid, final Transaction tx) {
       return transactions.putIfAbsent(xid, tx) == null;
    }
 
+   @Override
    public Transaction removeTransaction(final Xid xid) {
       return transactions.remove(xid);
    }
 
+   @Override
    public int getTimeoutSeconds() {
       return defaultTimeoutSeconds;
    }
 
+   @Override
    public List<Xid> getPreparedTransactions() {
-      List<Xid> xids = new ArrayList<Xid>();
+      List<Xid> xids = new ArrayList<>();
 
       for (Map.Entry<Xid, Transaction> entry : transactions.entrySet()) {
          if (entry.getValue().getState() == Transaction.State.PREPARED) {
@@ -119,8 +123,9 @@ public class ResourceManagerImpl implements ResourceManager {
       return xids;
    }
 
+   @Override
    public Map<Xid, Long> getPreparedTransactionsWithCreationTime() {
-      Map<Xid, Long> xidsWithCreationTime = new HashMap<Xid, Long>();
+      Map<Xid, Long> xidsWithCreationTime = new HashMap<>();
 
       for (Map.Entry<Xid, Transaction> entry : transactions.entrySet()) {
          xidsWithCreationTime.put(entry.getKey(), entry.getValue().getCreateTime());
@@ -128,18 +133,22 @@ public class ResourceManagerImpl implements ResourceManager {
       return xidsWithCreationTime;
    }
 
+   @Override
    public void putHeuristicCompletion(final long recordID, final Xid xid, final boolean isCommit) {
       heuristicCompletions.add(new HeuristicCompletionHolder(recordID, xid, isCommit));
    }
 
+   @Override
    public List<Xid> getHeuristicCommittedTransactions() {
       return getHeuristicCompletedTransactions(true);
    }
 
+   @Override
    public List<Xid> getHeuristicRolledbackTransactions() {
       return getHeuristicCompletedTransactions(false);
    }
 
+   @Override
    public long removeHeuristicCompletion(final Xid xid) {
       Iterator<HeuristicCompletionHolder> iterator = heuristicCompletions.iterator();
       while (iterator.hasNext()) {
@@ -153,7 +162,7 @@ public class ResourceManagerImpl implements ResourceManager {
    }
 
    private List<Xid> getHeuristicCompletedTransactions(final boolean isCommit) {
-      List<Xid> xids = new ArrayList<Xid>();
+      List<Xid> xids = new ArrayList<>();
       for (HeuristicCompletionHolder holder : heuristicCompletions) {
          if (holder.isCommit == isCommit) {
             xids.add(holder.xid);
@@ -168,20 +177,24 @@ public class ResourceManagerImpl implements ResourceManager {
 
       private Future<?> future;
 
+      @Override
       public void run() {
          if (closed) {
             return;
          }
 
-         Set<Transaction> timedoutTransactions = new HashSet<Transaction>();
+         Set<Transaction> timedoutTransactions = new HashSet<>();
 
          long now = System.currentTimeMillis();
 
          for (Transaction tx : transactions.values()) {
+
             if (tx.hasTimedOut(now, defaultTimeoutSeconds)) {
-               transactions.remove(tx.getXid());
-               ActiveMQServerLogger.LOGGER.unexpectedXid(tx.getXid());
-               timedoutTransactions.add(tx);
+               Transaction removedTX = removeTransaction(tx.getXid());
+               if (removedTX != null) {
+                  ActiveMQServerLogger.LOGGER.timedOutXID(removedTX.getXid());
+                  timedoutTransactions.add(removedTX);
+               }
             }
          }
 
@@ -194,7 +207,6 @@ public class ResourceManagerImpl implements ResourceManager {
             }
          }
       }
-
       synchronized void setFuture(final Future<?> future) {
          this.future = future;
       }
@@ -208,6 +220,7 @@ public class ResourceManagerImpl implements ResourceManager {
       }
 
    }
+
 
    private static final class HeuristicCompletionHolder {
 

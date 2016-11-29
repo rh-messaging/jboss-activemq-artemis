@@ -17,11 +17,6 @@
  */
 package org.apache.activemq.openwire.v5;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-import org.apache.activemq.openwire.*;
 import org.apache.activemq.command.*;
 
 /**
@@ -37,12 +32,14 @@ public class ConsumerControlTest extends BaseCommandTestSupport {
 
    public static ConsumerControlTest SINGLETON = new ConsumerControlTest();
 
+   @Override
    public Object createObject() throws Exception {
       ConsumerControl info = new ConsumerControl();
       populateObject(info);
       return info;
    }
 
+   @Override
    protected void populateObject(Object object) throws Exception {
       super.populateObject(object);
       ConsumerControl info = (ConsumerControl) object;

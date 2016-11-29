@@ -17,6 +17,7 @@
 package org.apache.activemq.artemis.core.management.impl;
 
 import javax.management.MBeanOperationInfo;
+import javax.management.openmbean.CompositeData;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -31,19 +32,28 @@ import org.apache.activemq.artemis.api.core.management.MessageCounterInfo;
 import org.apache.activemq.artemis.api.core.management.QueueControl;
 import org.apache.activemq.artemis.core.filter.Filter;
 import org.apache.activemq.artemis.core.filter.impl.FilterImpl;
+import org.apache.activemq.artemis.core.management.impl.openmbean.OpenTypeSupport;
 import org.apache.activemq.artemis.core.messagecounter.MessageCounter;
 import org.apache.activemq.artemis.core.messagecounter.impl.MessageCounterHelper;
 import org.apache.activemq.artemis.core.persistence.StorageManager;
 import org.apache.activemq.artemis.core.postoffice.Binding;
 import org.apache.activemq.artemis.core.postoffice.PostOffice;
-import org.apache.activemq.artemis.core.server.Consumer;
+import org.apache.activemq.artemis.core.security.CheckType;
+import org.apache.activemq.artemis.core.security.SecurityAuth;
+import org.apache.activemq.artemis.core.security.SecurityStore;
 import org.apache.activemq.artemis.core.server.ActiveMQMessageBundle;
+import org.apache.activemq.artemis.core.server.Consumer;
 import org.apache.activemq.artemis.core.server.MessageReference;
 import org.apache.activemq.artemis.core.server.Queue;
 import org.apache.activemq.artemis.core.server.ServerConsumer;
+import org.apache.activemq.artemis.core.server.ServerMessage;
+import org.apache.activemq.artemis.core.server.impl.ServerMessageImpl;
 import org.apache.activemq.artemis.core.settings.HierarchicalRepository;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
+import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
+import org.apache.activemq.artemis.utils.Base64;
 import org.apache.activemq.artemis.utils.LinkedListIterator;
+import org.apache.activemq.artemis.utils.UUID;
 import org.apache.activemq.artemis.utils.json.JSONArray;
 import org.apache.activemq.artemis.utils.json.JSONException;
 import org.apache.activemq.artemis.utils.json.JSONObject;
@@ -61,6 +71,8 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    private final PostOffice postOffice;
 
+   private final StorageManager storageManager;
+   private final SecurityStore securityStore;
    private final HierarchicalRepository<AddressSettings> addressSettingsRepository;
 
    private MessageCounter counter;
@@ -103,11 +115,14 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
                            final String address,
                            final PostOffice postOffice,
                            final StorageManager storageManager,
+                           final SecurityStore securityStore,
                            final HierarchicalRepository<AddressSettings> addressSettingsRepository) throws Exception {
       super(QueueControl.class, storageManager);
       this.queue = queue;
       this.address = address;
       this.postOffice = postOffice;
+      this.storageManager = storageManager;
+      this.securityStore = securityStore;
       this.addressSettingsRepository = addressSettingsRepository;
    }
 
@@ -119,6 +134,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    // QueueControlMBean implementation ------------------------------
 
+   @Override
    public String getName() {
       clearIO();
       try {
@@ -129,12 +145,14 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String getAddress() {
       checkStarted();
 
       return address;
    }
 
+   @Override
    public String getFilter() {
       checkStarted();
 
@@ -149,6 +167,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean isDurable() {
       checkStarted();
 
@@ -161,6 +180,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean isTemporary() {
       checkStarted();
 
@@ -173,6 +193,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public long getMessageCount() {
       checkStarted();
 
@@ -185,6 +206,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public int getConsumerCount() {
       checkStarted();
 
@@ -197,6 +219,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public int getDeliveringCount() {
       checkStarted();
 
@@ -209,6 +232,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public long getMessagesAdded() {
       checkStarted();
 
@@ -221,6 +245,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public long getMessagesAcknowledged() {
       checkStarted();
 
@@ -233,6 +258,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public long getID() {
       checkStarted();
 
@@ -245,6 +271,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public long getScheduledCount() {
       checkStarted();
 
@@ -257,6 +284,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String getDeadLetterAddress() {
       checkStarted();
 
@@ -274,6 +302,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String getExpiryAddress() {
       checkStarted();
 
@@ -293,6 +322,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public Map<String, Object>[] listScheduledMessages() throws Exception {
       checkStarted();
 
@@ -306,6 +336,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listScheduledMessagesAsJSON() throws Exception {
       checkStarted();
 
@@ -322,7 +353,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
     * @param refs
     * @return
     */
-   private Map<String, Object>[] convertMessagesToMaps(List<MessageReference> refs) {
+   private Map<String, Object>[] convertMessagesToMaps(List<MessageReference> refs) throws ActiveMQException {
       Map<String, Object>[] messages = new Map[refs.size()];
       int i = 0;
       for (MessageReference ref : refs) {
@@ -332,14 +363,15 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       return messages;
    }
 
-   public Map<String, Map<String, Object>[]> listDeliveringMessages() {
+   @Override
+   public Map<String, Map<String, Object>[]> listDeliveringMessages() throws ActiveMQException {
       checkStarted();
 
       clearIO();
       try {
          Map<String, List<MessageReference>> msgs = queue.getDeliveringMessages();
 
-         Map<String, Map<String, Object>[]> msgRet = new HashMap<String, Map<String, Object>[]>();
+         Map<String, Map<String, Object>[]> msgRet = new HashMap<>();
 
          for (Map.Entry<String, List<MessageReference>> entry : msgs.entrySet()) {
             msgRet.put(entry.getKey(), convertMessagesToMaps(entry.getValue()));
@@ -352,6 +384,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    }
 
+   @Override
    public String listDeliveringMessagesAsJSON() throws Exception {
       checkStarted();
 
@@ -364,13 +397,14 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public Map<String, Object>[] listMessages(final String filterStr) throws Exception {
       checkStarted();
 
       clearIO();
       try {
          Filter filter = FilterImpl.createFilter(filterStr);
-         List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
+         List<Map<String, Object>> messages = new ArrayList<>();
          queue.flushExecutor();
          LinkedListIterator<MessageReference> iterator = queue.totalIterator();
          try {
@@ -395,6 +429,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listMessagesAsJSON(final String filter) throws Exception {
       checkStarted();
 
@@ -412,7 +447,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
       clearIO();
       try {
-         List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
+         List<Map<String, Object>> messages = new ArrayList<>();
          queue.flushExecutor();
          LinkedListIterator<MessageReference> iterator = queue.totalIterator();
          try {
@@ -434,10 +469,12 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    }
 
+   @Override
    public String getFirstMessageAsJSON() throws Exception {
       return toJSON(getFirstMessage()).toString();
    }
 
+   @Override
    public Long getFirstMessageTimestamp() throws Exception {
       Map<String, Object>[] _message = getFirstMessage();
       if (_message == null || _message.length == 0 || _message[0] == null) {
@@ -450,6 +487,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       return (Long) message.get("timestamp");
    }
 
+   @Override
    public Long getFirstMessageAge() throws Exception {
       Long firstMessageTimestamp = getFirstMessageTimestamp();
       if (firstMessageTimestamp == null) {
@@ -459,6 +497,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       return now - firstMessageTimestamp.longValue();
    }
 
+   @Override
    public long countMessages(final String filterStr) throws Exception {
       checkStarted();
 
@@ -490,6 +529,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean removeMessage(final long messageID) throws Exception {
       checkStarted();
 
@@ -505,10 +545,12 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public int removeMessages(final String filterStr) throws Exception {
       return removeMessages(FLUSH_LIMIT, filterStr);
    }
 
+   @Override
    public int removeMessages(final int flushLimit, final String filterStr) throws Exception {
       checkStarted();
 
@@ -523,6 +565,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean expireMessage(final long messageID) throws Exception {
       checkStarted();
 
@@ -535,6 +578,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public int expireMessages(final String filterStr) throws Exception {
       checkStarted();
 
@@ -551,10 +595,51 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
+   public boolean retryMessage(final long messageID) throws Exception {
+
+      checkStarted();
+      clearIO();
+
+      try {
+         Filter singleMessageFilter = new Filter() {
+            @Override
+            public boolean match(ServerMessage message) {
+               return message.getMessageID() == messageID;
+            }
+
+            @Override
+            public SimpleString getFilterString() {
+               return new SimpleString("custom filter for MESSAGEID= messageID");
+            }
+         };
+
+         return queue.retryMessages(singleMessageFilter) > 0;
+      }
+      finally {
+         blockOnIO();
+      }
+   }
+
+   @Override
+   public int retryMessages() throws Exception {
+      checkStarted();
+      clearIO();
+
+      try {
+         return queue.retryMessages(null);
+      }
+      finally {
+         blockOnIO();
+      }
+   }
+
+   @Override
    public boolean moveMessage(final long messageID, final String otherQueueName) throws Exception {
       return moveMessage(messageID, otherQueueName, false);
    }
 
+   @Override
    public boolean moveMessage(final long messageID,
                               final String otherQueueName,
                               final boolean rejectDuplicates) throws Exception {
@@ -576,10 +661,12 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    }
 
+   @Override
    public int moveMessages(final String filterStr, final String otherQueueName) throws Exception {
       return moveMessages(filterStr, otherQueueName, false);
    }
 
+   @Override
    public int moveMessages(final int flushLimit,
                            final String filterStr,
                            final String otherQueueName,
@@ -606,12 +693,14 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    }
 
+   @Override
    public int moveMessages(final String filterStr,
                            final String otherQueueName,
                            final boolean rejectDuplicates) throws Exception {
       return moveMessages(FLUSH_LIMIT, filterStr, otherQueueName, rejectDuplicates);
    }
 
+   @Override
    public int sendMessagesToDeadLetterAddress(final String filterStr) throws Exception {
       checkStarted();
 
@@ -626,6 +715,46 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
+   public String sendMessage(final Map<String, String> headers,
+                             final int type,
+                             final String body,
+                             final String userID,
+                             boolean durable, final String user,
+                             final String password) throws Exception {
+      securityStore.check(queue.getAddress(), CheckType.SEND, new SecurityAuth() {
+         @Override
+         public String getUsername() {
+            return user;
+         }
+
+         @Override
+         public String getPassword() {
+            return password;
+         }
+
+         @Override
+         public RemotingConnection getRemotingConnection() {
+            return null;
+         }
+      });
+      ServerMessageImpl message = new ServerMessageImpl(storageManager.generateID(), 50);
+      for (String header : headers.keySet()) {
+         message.putStringProperty(new SimpleString(header), new SimpleString(headers.get(header)));
+      }
+      message.setType((byte) type);
+      message.setDurable(durable);
+      message.setTimestamp(System.currentTimeMillis());
+      message.setUserID(new UUID(UUID.TYPE_TIME_BASED, UUID.stringToBytes(userID)));
+      if (body != null) {
+         message.getBodyBuffer().writeBytes(Base64.decode(body));
+      }
+      message.setAddress(queue.getAddress());
+      postOffice.route(message, null, true);
+      return ""  + message.getMessageID();
+   }
+
+   @Override
    public boolean sendMessageToDeadLetterAddress(final long messageID) throws Exception {
       checkStarted();
 
@@ -638,6 +767,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public int changeMessagesPriority(final String filterStr, final int newPriority) throws Exception {
       checkStarted();
 
@@ -655,6 +785,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean changeMessagePriority(final long messageID, final int newPriority) throws Exception {
       checkStarted();
 
@@ -670,6 +801,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listMessageCounter() {
       checkStarted();
 
@@ -685,6 +817,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public void resetMessageCounter() {
       checkStarted();
 
@@ -697,6 +830,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listMessageCounterAsHTML() {
       checkStarted();
 
@@ -709,6 +843,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listMessageCounterHistory() throws Exception {
       checkStarted();
 
@@ -721,6 +856,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public String listMessageCounterHistoryAsHTML() {
       checkStarted();
 
@@ -733,6 +869,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public void pause() {
       checkStarted();
 
@@ -745,6 +882,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public void resume() {
       checkStarted();
 
@@ -757,6 +895,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
    public boolean isPaused() throws Exception {
       checkStarted();
 
@@ -769,6 +908,43 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       }
    }
 
+   @Override
+   public CompositeData[] browse(String filterStr) throws Exception {
+      checkStarted();
+
+      clearIO();
+      try {
+         int pageSize = addressSettingsRepository.getMatch(queue.getName().toString()).getManagementBrowsePageSize();
+         int currentPageSize = 0;
+         ArrayList<CompositeData> c = new ArrayList<>();
+         Filter filter = FilterImpl.createFilter(filterStr);
+         queue.flushExecutor();
+         LinkedListIterator<MessageReference> iterator = queue.totalIterator();
+         try {
+            while (iterator.hasNext() && currentPageSize++ < pageSize) {
+               MessageReference ref = iterator.next();
+               if (filter == null || filter.match(ref.getMessage())) {
+                  c.add(OpenTypeSupport.convert(ref));
+
+               }
+            }
+            CompositeData[] rc = new CompositeData[c.size()];
+            c.toArray(rc);
+            return rc;
+         }
+         finally {
+            iterator.close();
+         }
+      }
+      catch (ActiveMQException e) {
+         throw new IllegalStateException(e.getMessage());
+      }
+      finally {
+         blockOnIO();
+      }
+   }
+
+   @Override
    public void flushExecutor() {
       checkStarted();
 
@@ -820,6 +996,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
       return MBeanInfoHelper.getMBeanOperationsInfo(QueueControl.class);
    }
 
+   @Override
    public void resetMessagesAdded() throws Exception {
       checkStarted();
 
@@ -833,6 +1010,7 @@ public class QueueControlImpl extends AbstractControl implements QueueControl {
 
    }
 
+   @Override
    public void resetMessagesAcknowledged() throws Exception {
       checkStarted();
 

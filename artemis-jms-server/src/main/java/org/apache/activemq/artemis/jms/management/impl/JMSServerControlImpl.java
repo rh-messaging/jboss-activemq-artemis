@@ -27,12 +27,14 @@ import javax.management.NotificationFilter;
 import javax.management.NotificationListener;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.client.ClientSession;
 import org.apache.activemq.artemis.api.core.management.Parameter;
 import org.apache.activemq.artemis.api.jms.JMSFactoryType;
@@ -41,11 +43,15 @@ import org.apache.activemq.artemis.api.jms.management.DestinationControl;
 import org.apache.activemq.artemis.api.jms.management.JMSQueueControl;
 import org.apache.activemq.artemis.api.jms.management.JMSServerControl;
 import org.apache.activemq.artemis.api.jms.management.TopicControl;
+import org.apache.activemq.artemis.core.client.impl.Topology;
+import org.apache.activemq.artemis.core.client.impl.TopologyMemberImpl;
 import org.apache.activemq.artemis.core.filter.Filter;
 import org.apache.activemq.artemis.core.management.impl.AbstractControl;
 import org.apache.activemq.artemis.core.management.impl.MBeanInfoHelper;
 import org.apache.activemq.artemis.core.server.ServerConsumer;
 import org.apache.activemq.artemis.core.server.ServerSession;
+import org.apache.activemq.artemis.core.server.cluster.ClusterConnection;
+import org.apache.activemq.artemis.core.server.cluster.ClusterManager;
 import org.apache.activemq.artemis.jms.client.ActiveMQDestination;
 import org.apache.activemq.artemis.jms.server.ActiveMQJMSServerLogger;
 import org.apache.activemq.artemis.jms.server.JMSServerManager;
@@ -143,6 +149,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
    /**
     * See the interface definition for the javadoc.
     */
+   @Override
    public void createConnectionFactory(String name,
                                        boolean ha,
                                        boolean useDiscovery,
@@ -161,7 +168,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
             server.createConnectionFactory(name, ha, JMSFactoryType.valueOf(cfType), connectorNames[0], JMSServerControlImpl.convert(bindings));
          }
          else {
-            List<String> connectorList = new ArrayList<String>(connectorNames.length);
+            List<String> connectorList = new ArrayList<>(connectorNames.length);
 
             for (String str : connectorNames) {
                connectorList.add(str);
@@ -261,7 +268,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
             configuration.setDiscoveryGroupName(connectorNames[0]);
          }
          else {
-            ArrayList<String> connectorNamesList = new ArrayList<String>();
+            ArrayList<String> connectorNamesList = new ArrayList<>();
             for (String nameC : connectorNames) {
                connectorNamesList.add(nameC);
             }
@@ -284,6 +291,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
     * <br>
     * The ConnectionFactory is bound to the Registry for all the specified bindings Strings.
     */
+   @Override
    public void createConnectionFactory(String name,
                                        boolean ha,
                                        boolean useDiscovery,
@@ -293,10 +301,12 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       createConnectionFactory(name, ha, useDiscovery, cfType, toArray(connectors), toArray(bindings));
    }
 
+   @Override
    public boolean createQueue(final String name) throws Exception {
       return createQueue(name, null, null, true);
    }
 
+   @Override
    public boolean createQueue(final String name, final String bindings) throws Exception {
       return createQueue(name, bindings, null, true);
    }
@@ -306,6 +316,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       return createQueue(name, bindings, selector, true);
    }
 
+   @Override
    public boolean createQueue(@Parameter(name = "name", desc = "Name of the queue to create") String name,
                               @Parameter(name = "bindings", desc = "comma-separated list of Registry bindings (use '&comma;' if u need to use commas in your bindings name)") String bindings,
                               @Parameter(name = "selector", desc = "the jms selector") String selector,
@@ -322,10 +333,12 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean destroyQueue(final String name) throws Exception {
       return destroyQueue(name, false);
    }
 
+   @Override
    public boolean destroyQueue(final String name, final boolean removeConsumers) throws Exception {
       checkStarted();
 
@@ -339,10 +352,12 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean createTopic(String name) throws Exception {
       return createTopic(name, null);
    }
 
+   @Override
    public boolean createTopic(final String topicName, final String bindings) throws Exception {
       checkStarted();
 
@@ -356,10 +371,12 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean destroyTopic(final String name) throws Exception {
       return destroyTopic(name, true);
    }
 
+   @Override
    public boolean destroyTopic(final String name, final boolean removeConsumers) throws Exception {
       checkStarted();
 
@@ -373,6 +390,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public void destroyConnectionFactory(final String name) throws Exception {
       checkStarted();
 
@@ -386,16 +404,19 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean isStarted() {
       return server.isStarted();
    }
 
+   @Override
    public String getVersion() {
       checkStarted();
 
       return server.getVersion();
    }
 
+   @Override
    public String[] getQueueNames() {
       checkStarted();
 
@@ -415,6 +436,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String[] getTopicNames() {
       checkStarted();
 
@@ -434,6 +456,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String[] getConnectionFactoryNames() {
       checkStarted();
 
@@ -453,28 +476,38 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
+   public String getNodeID() {
+      return server.getActiveMQServer().getNodeID().toString();
+   }
+
    // NotificationEmitter implementation ----------------------------
 
+   @Override
    public void removeNotificationListener(final NotificationListener listener,
                                           final NotificationFilter filter,
                                           final Object handback) throws ListenerNotFoundException {
       broadcaster.removeNotificationListener(listener, filter, handback);
    }
 
+   @Override
    public void removeNotificationListener(final NotificationListener listener) throws ListenerNotFoundException {
       broadcaster.removeNotificationListener(listener);
    }
 
+   @Override
    public void addNotificationListener(final NotificationListener listener,
                                        final NotificationFilter filter,
                                        final Object handback) throws IllegalArgumentException {
       broadcaster.addNotificationListener(listener, filter, handback);
    }
 
+   @Override
    public MBeanNotificationInfo[] getNotificationInfo() {
       return JMSServerControlImpl.getNotificationInfos();
    }
 
+   @Override
    public String[] listRemoteAddresses() throws Exception {
       checkStarted();
 
@@ -488,6 +521,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String[] listRemoteAddresses(final String ipAddress) throws Exception {
       checkStarted();
 
@@ -501,6 +535,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean closeConnectionsForAddress(final String ipAddress) throws Exception {
       checkStarted();
 
@@ -514,6 +549,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean closeConsumerConnectionsForAddress(final String address) throws Exception {
       checkStarted();
 
@@ -527,6 +563,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public boolean closeConnectionsForUser(final String userName) throws Exception {
       checkStarted();
 
@@ -540,6 +577,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String[] listConnectionIDs() throws Exception {
       checkStarted();
 
@@ -553,6 +591,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String listConnectionsAsJSON() throws Exception {
       checkStarted();
 
@@ -565,7 +604,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
 
          Set<ServerSession> sessions = server.getActiveMQServer().getSessions();
 
-         Map<Object, ServerSession> jmsSessions = new HashMap<Object, ServerSession>();
+         Map<Object, ServerSession> jmsSessions = new HashMap<>();
 
          // First separate the real jms sessions, after all we are only interested in those here on the *jms* server controller
          for (ServerSession session : sessions) {
@@ -594,6 +633,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String listConsumersAsJSON(String connectionID) throws Exception {
       checkStarted();
 
@@ -624,6 +664,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String listAllConsumersAsJSON() throws Exception {
       checkStarted();
 
@@ -649,6 +690,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String[] listSessions(final String connectionID) throws Exception {
       checkStarted();
 
@@ -662,6 +704,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String listPreparedTransactionDetailsAsJSON() throws Exception {
       checkStarted();
 
@@ -675,6 +718,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       }
    }
 
+   @Override
    public String listPreparedTransactionDetailsAsHTML() throws Exception {
       checkStarted();
 
@@ -709,9 +753,10 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
 
    // Inner classes -------------------------------------------------
 
+   @Override
    public String[] listTargetDestinations(String sessionID) throws Exception {
       String[] addresses = server.getActiveMQServer().getActiveMQServerControl().listTargetAddresses(sessionID);
-      Map<String, DestinationControl> allDests = new HashMap<String, DestinationControl>();
+      Map<String, DestinationControl> allDests = new HashMap<>();
 
       Object[] queueControls = server.getActiveMQServer().getManagementService().getResources(JMSQueueControl.class);
       for (Object queueControl2 : queueControls) {
@@ -725,7 +770,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
          allDests.put(topicControl.getAddress(), topicControl);
       }
 
-      List<String> destinations = new ArrayList<String>();
+      List<String> destinations = new ArrayList<>();
       for (String addresse : addresses) {
          DestinationControl control = allDests.get(addresse);
          if (control != null) {
@@ -735,6 +780,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       return destinations.toArray(new String[0]);
    }
 
+   @Override
    public String getLastSentMessageID(String sessionID, String address) throws Exception {
       ServerSession session = server.getActiveMQServer().getSessionByID(sessionID);
       if (session != null) {
@@ -743,6 +789,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       return null;
    }
 
+   @Override
    public String getSessionCreationTime(String sessionID) throws Exception {
       ServerSession session = server.getActiveMQServer().getSessionByID(sessionID);
       if (session != null) {
@@ -751,6 +798,7 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       return null;
    }
 
+   @Override
    public String listSessionsAsJSON(final String connectionID) throws Exception {
       checkStarted();
 
@@ -772,6 +820,43 @@ public class JMSServerControlImpl extends AbstractControl implements JMSServerCo
       return array.toString();
    }
 
+   @Override
+   public String listNetworkTopology() throws Exception {
+      checkStarted();
+
+      clearIO();
+      try {
+         JSONArray brokers = new JSONArray();
+         ClusterManager clusterManager = server.getActiveMQServer().getClusterManager();
+         if (clusterManager != null) {
+            Set<ClusterConnection> clusterConnections = clusterManager.getClusterConnections();
+            for (ClusterConnection clusterConnection : clusterConnections) {
+               Topology topology = clusterConnection.getTopology();
+               Collection<TopologyMemberImpl> members = topology.getMembers();
+               for (TopologyMemberImpl member : members) {
+
+                  JSONObject obj = new JSONObject();
+                  TransportConfiguration live = member.getLive();
+                  if (live != null) {
+                     obj.put("nodeID", member.getNodeId());
+                     obj.put("live", live.getParams().get("host") + ":" + live.getParams().get("port"));
+                     TransportConfiguration backup = member.getBackup();
+                     if (backup != null) {
+                        obj.put("backup", backup.getParams().get("host") + ":" + backup.getParams().get("port"));
+                     }
+                  }
+                  brokers.put(obj);
+               }
+            }
+         }
+         return brokers.toString();
+      }
+      finally {
+         blockOnIO();
+      }
+   }
+
+   @Override
    public String closeConnectionWithClientID(final String clientID) throws Exception {
       return server.getActiveMQServer().destroyConnectionWithSessionMetadata(ClientSession.JMS_SESSION_CLIENT_ID_PROPERTY, clientID);
    }

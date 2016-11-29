@@ -35,7 +35,6 @@ import javax.jms.TextMessage;
 
 import junit.framework.AssertionFailedError;
 
-import org.apache.activemq.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +66,7 @@ public abstract class JmsSendReceiveTestSupport extends org.apache.activemq.Test
    /*
     * @see junit.framework.TestCase#setUp()
     */
+   @Override
    protected void setUp() throws Exception {
       super.setUp();
       String temp = System.getProperty("messageCount");
@@ -229,6 +229,7 @@ public abstract class JmsSendReceiveTestSupport extends org.apache.activemq.Test
    /**
     * @see javax.jms.MessageListener#onMessage(javax.jms.Message)
     */
+   @Override
    public synchronized void onMessage(Message message) {
       consumeMessage(message, messages);
    }

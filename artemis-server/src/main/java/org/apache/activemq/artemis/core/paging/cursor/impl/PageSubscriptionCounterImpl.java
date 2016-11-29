@@ -62,17 +62,18 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
 
    private final AtomicLong pendingValue = new AtomicLong(0);
 
-   private final LinkedList<Long> incrementRecords = new LinkedList<Long>();
+   private final LinkedList<Long> incrementRecords = new LinkedList<>();
 
    // We are storing pending counters for non transactional writes on page
    // we will recount a page case we still see pending records
    // as soon as we close a page we remove these records replacing by a regular page increment record
    // A Map per pageID, each page will have a set of IDs, with the increment on each one
-   private final Map<Long, Pair<Long, AtomicInteger>> pendingCounters = new HashMap<Long, Pair<Long, AtomicInteger>>();
+   private final Map<Long, Pair<Long, AtomicInteger>> pendingCounters = new HashMap<>();
 
    private LinkedList<Pair<Long, Integer>> loadList;
 
    private final Runnable cleanupCheck = new Runnable() {
+      @Override
       public void run() {
          cleanup();
       }
@@ -114,7 +115,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
          // not syncing this to disk may cause the page files to be out of sync on pages.
          // we can't afford the case where a page file is written without a record here
          long id = storage.storePendingCounter(this.subscriptionID, page.getPageId(), increment);
-         pendingInfo = new Pair<Long, AtomicInteger>(id, new AtomicInteger(1));
+         pendingInfo = new Pair<>(id, new AtomicInteger(1));
          pendingCounters.put((long) page.getPageId(), pendingInfo);
       }
       else {
@@ -131,6 +132,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
     *
     * @param pageID
     */
+   @Override
    public void cleanupNonTXCounters(final long pageID) throws Exception {
       Pair<Long, AtomicInteger> pendingInfo;
       synchronized (this) {
@@ -186,6 +188,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
     * @param recordID1
     * @param add
     */
+   @Override
    public void applyIncrementOnTX(Transaction tx, long recordID1, int add) {
       CounterOperations oper = (CounterOperations) tx.getProperty(TransactionPropertyIndexes.PAGE_COUNT_INC);
 
@@ -198,6 +201,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
       oper.operations.add(new ItemOper(this, recordID1, add));
    }
 
+   @Override
    public synchronized void loadValue(final long recordID1, final long value1) {
       if (this.subscription != null) {
          // it could be null on testcases... which is ok
@@ -215,6 +219,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
 
    }
 
+   @Override
    public void delete() throws Exception {
       Transaction tx = new TransactionImpl(storage);
 
@@ -223,6 +228,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
       tx.commit();
    }
 
+   @Override
    public void delete(Transaction tx) throws Exception {
       // always lock the StorageManager first.
       storage.readLock();
@@ -248,14 +254,16 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
       }
    }
 
+   @Override
    public void loadInc(long id, int add) {
       if (loadList == null) {
-         loadList = new LinkedList<Pair<Long, Integer>>();
+         loadList = new LinkedList<>();
       }
 
-      loadList.add(new Pair<Long, Integer>(id, add));
+      loadList.add(new Pair<>(id, add));
    }
 
+   @Override
    public void processReload() {
       if (loadList != null) {
          if (subscription != null) {
@@ -272,6 +280,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
       }
    }
 
+   @Override
    public synchronized void addInc(long id, int variance) {
       value.addAndGet(variance);
 
@@ -299,7 +308,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
             return;
          }
          valueReplace = value.get();
-         deleteList = new ArrayList<Long>(incrementRecords);
+         deleteList = new ArrayList<>(incrementRecords);
          incrementRecords.clear();
       }
 
@@ -356,7 +365,7 @@ public class PageSubscriptionCounterImpl implements PageSubscriptionCounter {
 
    private static class CounterOperations extends TransactionOperationAbstract implements TransactionOperation {
 
-      LinkedList<ItemOper> operations = new LinkedList<ItemOper>();
+      LinkedList<ItemOper> operations = new LinkedList<>();
 
       @Override
       public void afterCommit(Transaction tx) {

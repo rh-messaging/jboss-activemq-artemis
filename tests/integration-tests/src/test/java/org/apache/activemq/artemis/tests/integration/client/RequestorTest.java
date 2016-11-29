@@ -32,7 +32,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.settings.impl.AddressFullMessagePolicy;
 import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -166,6 +166,7 @@ public class RequestorTest extends ActiveMQTestBase {
       ClientConsumer requestConsumer = session.createConsumer(requestQueue);
       requestConsumer.setMessageHandler(new MessageHandler() {
          // return a message with the negative request's value
+         @Override
          public void onMessage(final ClientMessage request) {
             // do nothing -> no reply
          }
@@ -190,6 +191,7 @@ public class RequestorTest extends ActiveMQTestBase {
       session.close();
 
       ActiveMQAction activeMQAction = new ActiveMQAction() {
+         @Override
          public void run() throws Exception {
             new ClientRequestor(session, requestAddress);
          }
@@ -229,6 +231,7 @@ public class RequestorTest extends ActiveMQTestBase {
       requestor.close();
 
       ActiveMQAction activeMQAction = new ActiveMQAction() {
+         @Override
          public void run() throws Exception {
             requestor.request(session.createMessage(false), 500);
          }
@@ -258,6 +261,7 @@ public class RequestorTest extends ActiveMQTestBase {
          this.session = session;
       }
 
+      @Override
       public void onMessage(final ClientMessage request) {
          try {
             ClientMessage reply = session.createMessage(false);

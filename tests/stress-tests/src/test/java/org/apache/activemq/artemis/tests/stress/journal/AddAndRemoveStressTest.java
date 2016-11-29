@@ -36,18 +36,23 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
 
    private static final LoaderCallback dummyLoader = new LoaderCallback() {
 
+      @Override
       public void addPreparedTransaction(final PreparedTransactionInfo preparedTransaction) {
       }
 
+      @Override
       public void addRecord(final RecordInfo info) {
       }
 
+      @Override
       public void deleteRecord(final long id) {
       }
 
+      @Override
       public void updateRecord(final RecordInfo info) {
       }
 
+      @Override
       public void failedTransaction(final long transactionID,
                                     final List<RecordInfo> records,
                                     final List<RecordInfo> recordsToDelete) {
@@ -70,7 +75,7 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
    public void testInsertAndLoad() throws Exception {
 
       SequentialFileFactory factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      JournalImpl impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
+      JournalImpl impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
@@ -86,7 +91,7 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
       impl.stop();
 
       factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
+      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
@@ -103,12 +108,12 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
       impl.stop();
 
       factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
+      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
-      ArrayList<RecordInfo> info = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> trans = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> info = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> trans = new ArrayList<>();
 
       impl.load(info, trans, null);
 
@@ -131,7 +136,7 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
    public void testInsertUpdateAndLoad() throws Exception {
 
       SequentialFileFactory factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      JournalImpl impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
+      JournalImpl impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
@@ -148,7 +153,7 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
       impl.stop();
 
       factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      impl = new JournalImpl(10 * 1024 * 1024, 10, 0, 0, factory, "amq", "amq", 1000);
+      impl = new JournalImpl(10 * 1024 * 1024, 10, 10, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
@@ -165,12 +170,12 @@ public class AddAndRemoveStressTest extends ActiveMQTestBase {
       impl.stop();
 
       factory = new AIOSequentialFileFactory(getTestDirfile(), 1000);
-      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
+      impl = new JournalImpl(10 * 1024 * 1024, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, AddAndRemoveStressTest.NUMBER_OF_FILES_ON_JOURNAL, 0, 0, factory, "amq", "amq", 1000);
 
       impl.start();
 
-      ArrayList<RecordInfo> info = new ArrayList<RecordInfo>();
-      ArrayList<PreparedTransactionInfo> trans = new ArrayList<PreparedTransactionInfo>();
+      ArrayList<RecordInfo> info = new ArrayList<>();
+      ArrayList<PreparedTransactionInfo> trans = new ArrayList<>();
 
       impl.load(info, trans, null);
 

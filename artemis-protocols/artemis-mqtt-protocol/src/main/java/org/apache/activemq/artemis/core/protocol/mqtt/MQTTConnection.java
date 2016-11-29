@@ -28,6 +28,7 @@ import org.apache.activemq.artemis.core.remoting.CloseListener;
 import org.apache.activemq.artemis.core.remoting.FailureListener;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.Connection;
+import org.apache.activemq.artemis.spi.core.remoting.ReadyListener;
 
 public class MQTTConnection implements RemotingConnection {
 
@@ -52,6 +53,12 @@ public class MQTTConnection implements RemotingConnection {
       this.destroyed = false;
    }
 
+   @Override
+   public boolean isWritable(ReadyListener callback) {
+      return transportConnection.isWritable(callback);
+   }
+
+   @Override
    public Object getID() {
       return transportConnection.getID();
    }
@@ -89,7 +96,7 @@ public class MQTTConnection implements RemotingConnection {
    @Override
    public List<CloseListener> removeCloseListeners() {
       synchronized (closeListeners) {
-         List<CloseListener> deletedCloseListeners = new ArrayList<CloseListener>(closeListeners);
+         List<CloseListener> deletedCloseListeners = new ArrayList<>(closeListeners);
          closeListeners.clear();
          return deletedCloseListeners;
       }
@@ -108,7 +115,7 @@ public class MQTTConnection implements RemotingConnection {
    @Override
    public List<FailureListener> removeFailureListeners() {
       synchronized (failureListeners) {
-         List<FailureListener> deletedFailureListeners = new ArrayList<FailureListener>(failureListeners);
+         List<FailureListener> deletedFailureListeners = new ArrayList<>(failureListeners);
          failureListeners.clear();
          return deletedFailureListeners;
       }

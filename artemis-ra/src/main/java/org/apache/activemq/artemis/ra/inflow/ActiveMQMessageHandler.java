@@ -32,13 +32,15 @@ import org.apache.activemq.artemis.api.core.SimpleString;
 import org.apache.activemq.artemis.api.core.client.ClientMessage;
 import org.apache.activemq.artemis.api.core.client.ClientSession.QueueQuery;
 import org.apache.activemq.artemis.api.core.client.ClientSessionFactory;
+import org.apache.activemq.artemis.api.core.client.FailoverEventListener;
+import org.apache.activemq.artemis.api.core.client.FailoverEventType;
 import org.apache.activemq.artemis.api.core.client.MessageHandler;
 import org.apache.activemq.artemis.core.client.impl.ClientConsumerInternal;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionFactoryInternal;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
-import org.apache.activemq.artemis.ra.ActiveMQRALogger;
 import org.apache.activemq.artemis.jms.client.ActiveMQDestination;
 import org.apache.activemq.artemis.jms.client.ActiveMQMessage;
+import org.apache.activemq.artemis.ra.ActiveMQRALogger;
 import org.apache.activemq.artemis.ra.ActiveMQResourceAdapter;
 import org.apache.activemq.artemis.service.extensions.ServiceUtils;
 import org.apache.activemq.artemis.service.extensions.xa.ActiveMQXAResourceWrapper;
@@ -48,7 +50,7 @@ import org.apache.activemq.artemis.utils.VersionLoader;
 /**
  * The message handler
  */
-public class ActiveMQMessageHandler implements MessageHandler {
+public class ActiveMQMessageHandler implements MessageHandler, FailoverEventListener {
 
    /**
     * Trace enabled
@@ -79,6 +81,8 @@ public class ActiveMQMessageHandler implements MessageHandler {
    private final TransactionManager tm;
 
    private ClientSessionFactory cf;
+
+   private volatile boolean connected;
 
    public ActiveMQMessageHandler(final ActiveMQActivation activation,
                                  final TransactionManager tm,
@@ -173,7 +177,7 @@ public class ActiveMQMessageHandler implements MessageHandler {
       useLocalTx = !activation.isDeliveryTransacted() && activation.getActivationSpec().isUseLocalTx();
       transacted = activation.isDeliveryTransacted();
       if (activation.isDeliveryTransacted() && !activation.getActivationSpec().isUseLocalTx()) {
-         Map<String, Object> xaResourceProperties = new HashMap<String, Object>();
+         Map<String, Object> xaResourceProperties = new HashMap<>();
          xaResourceProperties.put(ActiveMQXAResourceWrapper.ACTIVEMQ_JNDI_NAME, ((ActiveMQResourceAdapter) spec.getResourceAdapter()).getJndiName());
          xaResourceProperties.put(ActiveMQXAResourceWrapper.ACTIVEMQ_NODE_ID, ((ClientSessionFactoryInternal) cf).getLiveNodeId());
          xaResourceProperties.put(ActiveMQXAResourceWrapper.ACTIVEMQ_PRODUCT_NAME, ActiveMQResourceAdapter.PRODUCT_NAME);
@@ -187,6 +191,8 @@ public class ActiveMQMessageHandler implements MessageHandler {
          endpoint = endpointFactory.createEndpoint(null);
          useXA = false;
       }
+      connected = true;
+      session.addFailoverListener(this);
       consumer.setMessageHandler(this);
    }
 
@@ -224,42 +230,57 @@ public class ActiveMQMessageHandler implements MessageHandler {
          ActiveMQRALogger.LOGGER.debug("Error releasing endpoint " + endpoint, t);
       }
 
-      try {
-         consumer.close();
-         if (activation.getTopicTemporaryQueue() != null) {
-            // We need to delete temporary topics when the activation is stopped or messages will build up on the server
-            SimpleString tmpQueue = activation.getTopicTemporaryQueue();
-            QueueQuery subResponse = session.queueQuery(tmpQueue);
-            if (subResponse.getConsumerCount() == 0) {
-               // This is optional really, since we now use temporaryQueues, we could simply ignore this
-               // and the server temporary queue would remove this as soon as the queue was removed
-               session.deleteQueue(tmpQueue);
+      //only do this if we haven't been disconnected at some point whilst failing over
+      if (connected) {
+         try {
+            consumer.close();
+            if (activation.getTopicTemporaryQueue() != null) {
+               // We need to delete temporary topics when the activation is stopped or messages will build up on the server
+               SimpleString tmpQueue = activation.getTopicTemporaryQueue();
+               QueueQuery subResponse = session.queueQuery(tmpQueue);
+               if (subResponse.getConsumerCount() == 0) {
+                  // This is optional really, since we now use temporaryQueues, we could simply ignore this
+                  // and the server temporary queue would remove this as soon as the queue was removed
+                  session.deleteQueue(tmpQueue);
+               }
             }
          }
-      }
-      catch (Throwable t) {
-         ActiveMQRALogger.LOGGER.debug("Error closing core-queue consumer", t);
-      }
+         catch (Throwable t) {
+            ActiveMQRALogger.LOGGER.debug("Error closing core-queue consumer", t);
+         }
 
-      try {
-         if (session != null) {
-            session.close();
+         try {
+            if (session != null) {
+               session.close();
+            }
+         }
+         catch (Throwable t) {
+            ActiveMQRALogger.LOGGER.debug("Error releasing session " + session, t);
+         }
+         try {
+            if (cf != null) {
+               cf.close();
+            }
+         }
+         catch (Throwable t) {
+            ActiveMQRALogger.LOGGER.debug("Error releasing session factory " + session, t);
          }
       }
-      catch (Throwable t) {
-         ActiveMQRALogger.LOGGER.debug("Error releasing session " + session, t);
-      }
-
-      try {
-         if (cf != null) {
-            cf.close();
+      else {
+         //otherwise we just clean up
+         try {
+            if (cf != null) {
+               cf.cleanup();
+            }
          }
-      }
-      catch (Throwable t) {
-         ActiveMQRALogger.LOGGER.debug("Error releasing session factory " + session, t);
+         catch (Throwable t) {
+            ActiveMQRALogger.LOGGER.debug("Error releasing session factory " + session, t);
+         }
+
       }
    }
 
+   @Override
    public void onMessage(final ClientMessage message) {
       if (ActiveMQMessageHandler.trace) {
          ActiveMQRALogger.LOGGER.trace("onMessage(" + message + ")");
@@ -272,6 +293,11 @@ public class ActiveMQMessageHandler implements MessageHandler {
          if (activation.getActivationSpec().getTransactionTimeout() > 0 && tm != null) {
             tm.setTransactionTimeout(activation.getActivationSpec().getTransactionTimeout());
          }
+
+         if (trace) {
+            ActiveMQRALogger.LOGGER.trace("HornetQMessageHandler::calling beforeDelivery on message " + message);
+         }
+
          endpoint.beforeDelivery(ActiveMQActivation.ONMESSAGE);
          beforeDelivery = true;
          msg.doBeforeReceive();
@@ -279,13 +305,17 @@ public class ActiveMQMessageHandler implements MessageHandler {
          //In the transacted case the message must be acked *before* onMessage is called
 
          if (transacted) {
-            message.acknowledge();
+            message.individualAcknowledge();
          }
 
          ((MessageListener) endpoint).onMessage(msg);
 
          if (!transacted) {
-            message.acknowledge();
+            message.individualAcknowledge();
+         }
+
+         if (trace) {
+            ActiveMQRALogger.LOGGER.trace("HornetQMessageHandler::calling afterDelivery on message " + message);
          }
 
          try {
@@ -293,6 +323,10 @@ public class ActiveMQMessageHandler implements MessageHandler {
          }
          catch (ResourceException e) {
             ActiveMQRALogger.LOGGER.unableToCallAfterDelivery(e);
+            // If we get here, The TX was already rolled back
+            // However we must do some stuff now to make sure the client message buffer is cleared
+            // so we mark this as rollbackonly
+            session.markRollbackOnly();
             return;
          }
          if (useLocalTx) {
@@ -320,13 +354,6 @@ public class ActiveMQMessageHandler implements MessageHandler {
                }
                catch (Exception e1) {
                   ActiveMQRALogger.LOGGER.warn("unnable to clear the transaction", e1);
-                  try {
-                     session.rollback();
-                  }
-                  catch (ActiveMQException e2) {
-                     ActiveMQRALogger.LOGGER.warn("Unable to rollback", e2);
-                     return;
-                  }
                }
             }
 
@@ -349,13 +376,18 @@ public class ActiveMQMessageHandler implements MessageHandler {
                ActiveMQRALogger.LOGGER.unableToRollbackTX();
             }
          }
+
+         // This is to make sure we will issue a rollback after failures
+         // so that would cleanup consumer buffers among other things
+         session.markRollbackOnly();
       }
       finally {
          try {
             session.resetIfNeeded();
          }
          catch (ActiveMQException e) {
-            ActiveMQRALogger.LOGGER.unableToResetSession();
+            ActiveMQRALogger.LOGGER.unableToResetSession(activation.toString(), e);
+            activation.startReconnectThread("Reset MessageHandler after Failure Thread");
          }
       }
 
@@ -363,5 +395,10 @@ public class ActiveMQMessageHandler implements MessageHandler {
 
    public void start() throws ActiveMQException {
       session.start();
+   }
+
+   @Override
+   public void failoverEvent(FailoverEventType eventType) {
+      connected = eventType == FailoverEventType.FAILOVER_COMPLETED;
    }
 }

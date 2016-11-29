@@ -54,7 +54,7 @@ public class ConsumerStuckTest extends ActiveMQTestBase {
    @Test
    public void testClientStuckTest() throws Exception {
 
-      ServerLocator locator = createNettyNonHALocator().setConnectionTTL(1000).setClientFailureCheckPeriod(100).setConsumerWindowSize(10 * 1024 * 1024);
+      ServerLocator locator = createNettyNonHALocator().setConnectionTTL(1000).setClientFailureCheckPeriod(100).setConsumerWindowSize(10 * 1024 * 1024).setCallTimeout(1000);
       ClientSessionFactory sf = locator.createSessionFactory();
       ((ClientSessionFactoryImpl) sf).stopPingingAfterOne();
 
@@ -78,6 +78,7 @@ public class ConsumerStuckTest extends ActiveMQTestBase {
       final NettyConnection nettyConnection = (NettyConnection) remotingConnection.getTransportConnection();
 
       Thread tReceive = new Thread() {
+         @Override
          public void run() {
             boolean first = true;
             try {
@@ -145,7 +146,7 @@ public class ConsumerStuckTest extends ActiveMQTestBase {
    @Test
    public void testClientStuckTestWithDirectDelivery() throws Exception {
 
-      ServerLocator locator = createNettyNonHALocator().setConnectionTTL(1000).setClientFailureCheckPeriod(100).setConsumerWindowSize(10 * 1024 * 1024);
+      ServerLocator locator = createNettyNonHALocator().setConnectionTTL(1000).setClientFailureCheckPeriod(100).setConsumerWindowSize(10 * 1024 * 1024).setCallTimeout(1000);
       ClientSessionFactory sf = locator.createSessionFactory();
       ((ClientSessionFactoryImpl) sf).stopPingingAfterOne();
 
@@ -162,6 +163,7 @@ public class ConsumerStuckTest extends ActiveMQTestBase {
       final NettyConnection nettyConnection = (NettyConnection) remotingConnection.getTransportConnection();
 
       Thread tReceive = new Thread() {
+         @Override
          public void run() {
             boolean first = true;
             try {
@@ -187,6 +189,7 @@ public class ConsumerStuckTest extends ActiveMQTestBase {
       tReceive.start();
 
       Thread sender = new Thread() {
+         @Override
          public void run() {
             try (
                ServerLocator locator = createNettyNonHALocator();

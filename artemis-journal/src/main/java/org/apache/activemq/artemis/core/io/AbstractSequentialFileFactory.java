@@ -82,6 +82,7 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       this.maxIO = maxIO;
    }
 
+   @Override
    public void stop() {
       if (timedBuffer != null) {
          timedBuffer.stop();
@@ -106,16 +107,23 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       return journalDir;
    }
 
+   @Override
    public void start() {
       if (timedBuffer != null) {
          timedBuffer.start();
       }
 
       if (isSupportsCallbacks()) {
-         writeExecutor = Executors.newSingleThreadExecutor(new ActiveMQThreadFactory("ActiveMQ-Asynchronous-Persistent-Writes" + System.identityHashCode(this), true, AbstractSequentialFileFactory.getThisClassLoader()));
+         writeExecutor = Executors.newSingleThreadExecutor(AccessController.doPrivileged(new PrivilegedAction<ActiveMQThreadFactory>() {
+            @Override
+            public ActiveMQThreadFactory run() {
+               return new ActiveMQThreadFactory("ActiveMQ-Asynchronous-Persistent-Writes" + System.identityHashCode(this), true, AbstractSequentialFileFactory.class.getClassLoader());
+            }
+         }));
       }
    }
 
+   @Override
    public int getMaxIO() {
       return maxIO;
    }
@@ -134,12 +142,14 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       }
    }
 
+   @Override
    public void flush() {
       if (timedBuffer != null) {
          timedBuffer.flush();
       }
    }
 
+   @Override
    public void deactivateBuffer() {
       if (timedBuffer != null) {
          // When moving to a new file, we need to make sure any pending buffer will be transferred to the buffer
@@ -148,12 +158,14 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       }
    }
 
+   @Override
    public void releaseBuffer(final ByteBuffer buffer) {
    }
 
    /**
     * Create the directory if it doesn't exist yet
     */
+   @Override
    public void createDirs() throws Exception {
       boolean ok = journalDir.mkdirs();
       if (!ok) {
@@ -161,8 +173,10 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       }
    }
 
+   @Override
    public List<String> listFiles(final String extension) throws Exception {
       FilenameFilter fnf = new FilenameFilter() {
+         @Override
          public boolean accept(final File file, final String name) {
             return name.endsWith("." + extension);
          }
@@ -175,15 +189,6 @@ public abstract class AbstractSequentialFileFactory implements SequentialFileFac
       }
 
       return Arrays.asList(fileNames);
-   }
-
-   private static ClassLoader getThisClassLoader() {
-      return AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
-         public ClassLoader run() {
-            return AbstractSequentialFileFactory.class.getClassLoader();
-         }
-      });
-
    }
 
 }

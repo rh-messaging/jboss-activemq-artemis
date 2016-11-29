@@ -36,12 +36,12 @@ import org.apache.activemq.util.ServiceSupport;
 
 public class StubConnection implements Service {
 
-   private final BlockingQueue<Object> dispatchQueue = new LinkedBlockingQueue<Object>();
+   private final BlockingQueue<Object> dispatchQueue = new LinkedBlockingQueue<>();
    private Connection connection;
    private Transport transport;
    private boolean shuttingDown;
    private TransportListener listener;
-   public AtomicReference<Throwable> error = new AtomicReference<Throwable>();
+   public AtomicReference<Throwable> error = new AtomicReference<>();
 
    public StubConnection(BrokerService broker) throws Exception {
       this(TransportFactory.connect(broker.getVmConnectorURI()));
@@ -59,6 +59,7 @@ public class StubConnection implements Service {
       listener = transportListener;
       this.transport = transport;
       transport.setTransportListener(new DefaultTransportListener() {
+         @Override
          public void onCommand(Object command) {
             try {
                if (command.getClass() == ShutdownInfo.class) {
@@ -71,6 +72,7 @@ public class StubConnection implements Service {
             }
          }
 
+         @Override
          public void onException(IOException e) {
             if (listener != null) {
                listener.onException(e);
@@ -143,9 +145,11 @@ public class StubConnection implements Service {
       return transport;
    }
 
+   @Override
    public void start() throws Exception {
    }
 
+   @Override
    public void stop() throws Exception {
       shuttingDown = true;
       if (transport != null) {

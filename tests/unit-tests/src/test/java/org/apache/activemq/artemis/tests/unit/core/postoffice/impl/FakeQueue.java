@@ -45,8 +45,14 @@ public class FakeQueue implements Queue {
    public void deleteQueue(boolean removeConsumers) throws Exception {
    }
 
+   @Override
    public void unproposed(SimpleString groupID) {
 
+   }
+
+   @Override
+   public int retryMessages(Filter filter) throws Exception {
+      return 0;
    }
 
    @Override
@@ -67,11 +73,13 @@ public class FakeQueue implements Queue {
 
    PageSubscription subs;
 
+   @Override
    public boolean isDirectDeliver() {
       // no-op
       return false;
    }
 
+   @Override
    public void close() {
       // no-op
 
@@ -82,35 +90,42 @@ public class FakeQueue implements Queue {
 
    }
 
+   @Override
    public void reload(MessageReference ref) {
       // no-op
 
    }
 
+   @Override
    public boolean flushExecutor() {
       return true;
    }
 
-   public void addHead(MessageReference ref) {
+   @Override
+   public void addHead(MessageReference ref, boolean scheduling) {
       // no-op
 
    }
 
-   public void addHead(List<MessageReference> ref) {
+   @Override
+   public void addHead(List<MessageReference> ref, boolean scheduling) {
       // no-op
 
    }
 
+   @Override
    public void addTail(MessageReference ref, boolean direct) {
       // no-op
 
    }
 
+   @Override
    public void addTail(MessageReference ref) {
       // no-op
 
    }
 
+   @Override
    public void resetAllIterators() {
       // no-op
 
@@ -318,6 +333,7 @@ public class FakeQueue implements Queue {
       return name;
    }
 
+   @Override
    public SimpleString getAddress() {
       // no-op
       return null;
@@ -399,11 +415,13 @@ public class FakeQueue implements Queue {
 
    }
 
+   @Override
    public void referenceHandled() {
       // no-op
 
    }
 
+   @Override
    public void removeConsumer(final Consumer consumer) {
    }
 
@@ -412,21 +430,25 @@ public class FakeQueue implements Queue {
       return null;
    }
 
+   @Override
    public MessageReference removeReferenceWithID(final long id1) throws Exception {
       // no-op
       return null;
    }
 
+   @Override
    public void resume() {
       // no-op
 
    }
 
+   @Override
    public boolean sendMessageToDeadLetterAddress(final long messageID) throws Exception {
       // no-op
       return false;
    }
 
+   @Override
    public int sendMessagesToDeadLetterAddress(Filter filter) throws Exception {
       // no-op
       return 0;
@@ -448,11 +470,13 @@ public class FakeQueue implements Queue {
 
    }
 
+   @Override
    public boolean hasMatchingConsumer(final ServerMessage message) {
       // no-op
       return false;
    }
 
+   @Override
    public Executor getExecutor() {
       // no-op
       return null;
@@ -510,6 +534,7 @@ public class FakeQueue implements Queue {
    /* (non-Javadoc)
    * @see org.apache.activemq.artemis.core.server.Queue#destroyPaging()
    */
+   @Override
    public void destroyPaging() {
    }
 

@@ -32,6 +32,7 @@ import org.apache.activemq.artemis.core.persistence.StorageManager;
 import org.apache.activemq.artemis.core.postoffice.PostOffice;
 import org.apache.activemq.artemis.core.remoting.server.RemotingService;
 import org.apache.activemq.artemis.core.security.Role;
+import org.apache.activemq.artemis.core.security.SecurityStore;
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.Divert;
 import org.apache.activemq.artemis.core.server.Queue;
@@ -102,7 +103,7 @@ public class ClusteredResetMockTest extends ActiveMQTestBase {
 
          assertTrue(latchSends.await(10, TimeUnit.SECONDS));
 
-         HashSet<SimpleString> codesAsked = new HashSet<SimpleString>();
+         HashSet<SimpleString> codesAsked = new HashSet<>();
 
          for (Notification notification : fake.pendingNotifications) {
             codesAsked.add(notification.getProperties().getSimpleStringProperty(ManagementHelper.HDR_PROPOSAL_GROUP_ID));
@@ -148,6 +149,7 @@ public class ClusteredResetMockTest extends ActiveMQTestBase {
          this.handler = handler;
       }
 
+      @Override
       public void run() {
          Proposal proposal = new Proposal(code, ANYCLUSTER);
 
@@ -171,7 +173,7 @@ public class ClusteredResetMockTest extends ActiveMQTestBase {
 
    class FakeManagement implements ManagementService {
 
-      public ConcurrentHashSet<Notification> pendingNotifications = new ConcurrentHashSet<Notification>();
+      public ConcurrentHashSet<Notification> pendingNotifications = new ConcurrentHashSet<>();
 
       final ReusableLatch latch;
 
@@ -206,6 +208,7 @@ public class ClusteredResetMockTest extends ActiveMQTestBase {
 
       @Override
       public ActiveMQServerControlImpl registerServer(PostOffice postOffice,
+                                                      SecurityStore securityStore,
                                                       StorageManager storageManager,
                                                       Configuration configuration,
                                                       HierarchicalRepository<AddressSettings> addressSettingsRepository,

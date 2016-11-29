@@ -26,6 +26,7 @@ import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,6 +38,8 @@ import org.apache.activemq.artemis.api.core.TransportConfiguration;
 import org.apache.activemq.artemis.api.core.UDPBroadcastEndpointFactory;
 import org.apache.activemq.artemis.api.jms.ActiveMQJMSClient;
 import org.apache.activemq.artemis.api.jms.JMSFactoryType;
+import org.apache.activemq.artemis.core.client.impl.ServerLocatorImpl;
+import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnector;
 import org.apache.activemq.artemis.core.remoting.impl.netty.NettyConnectorFactory;
 import org.apache.activemq.artemis.core.remoting.impl.netty.TransportConstants;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
@@ -45,7 +48,7 @@ import org.apache.activemq.artemis.jms.client.ActiveMQQueueConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQTopicConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQXAQueueConnectionFactory;
 import org.apache.activemq.artemis.jms.client.ActiveMQXATopicConnectionFactory;
-import org.apache.activemq.artemis.tests.util.RandomUtil;
+import org.apache.activemq.artemis.utils.RandomUtil;
 import org.apache.commons.beanutils.BeanUtilsBean;
 import org.junit.Assert;
 import org.junit.Test;
@@ -54,34 +57,60 @@ public class ConnectionFactoryURITest {
 
    ConnectionFactoryParser parser = new ConnectionFactoryParser();
 
-   private static final String IPV6 = "fe80::baf6:b1ff:fe12:daf7%eth0";
+   private static final String[] V6IPs = {"fe80::baf6:b1ff:fe12:daf7%eth0", "2620:db8:1:2::1%em1"};
+
+   private static Set<String> ignoreList = new HashSet<>();
+
+   static {
+      ignoreList.add("protocolManagerFactoryStr");
+      ignoreList.add("incomingInterceptorList");
+      ignoreList.add("outgoingInterceptorList");
+   }
 
    @Test
    public void testIPv6() throws Exception {
-      Map<String,Object> params = new HashMap<>();
-      params.put("host", IPV6);
-      params.put("port", 5445);
-      TransportConfiguration transport = new TransportConfiguration(NettyConnectorFactory.class.getName(), params);
-      ActiveMQConnectionFactory factory = ActiveMQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, transport);
+      for (String IPV6 : V6IPs) {
+         Map<String, Object> params = new HashMap<>();
+         params.put("host", IPV6);
+         params.put("port", 5445);
+         TransportConfiguration transport = new TransportConfiguration(NettyConnectorFactory.class.getName(), params);
+         ActiveMQConnectionFactory factory = ActiveMQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, transport);
 
-      persistIP6(IPV6, factory);
+         persistIP6(IPV6, factory);
+      }
    }
 
-
    @Test
-   public void testIPv6_2() throws Exception {
-      Map<String,Object> params = new HashMap<>();
-      params.put("host", "[" + IPV6 + "]");
-      params.put("port", 5445);
-      TransportConfiguration transport = new TransportConfiguration(NettyConnectorFactory.class.getName(), params);
-      ActiveMQConnectionFactory factory = ActiveMQJMSClient.createConnectionFactoryWithoutHA(JMSFactoryType.CF, transport);
+   public void testWeirdEncodingsOnIP() throws Exception {
+      // This is to make things worse. Having & and = on the property shouldn't break it
+      final String BROKEN_PROPERTY = "e80::56ee:75ff:fe53:e6a7%25enp0s25&host=[fe80::56ee:75ff:fe53:e6a7]#";
 
-      persistIP6(IPV6, factory);
+      Map<String, Object> params = new HashMap<>();
+      params.put(TransportConstants.LOCAL_ADDRESS_PROP_NAME, BROKEN_PROPERTY);
+
+      TransportConfiguration configuration = new TransportConfiguration(NettyConnector.class.getName(), params);
+
+
+      ActiveMQConnectionFactory factory = ActiveMQJMSClient.createConnectionFactoryWithHA(JMSFactoryType.CF, configuration);
+
+      URI uri = factory.toURI();
+
+      ActiveMQConnectionFactory newFactory = ActiveMQJMSClient.createConnectionFactory(uri.toString(), "somefactory");
+
+
+      TransportConfiguration[] initialConnectors = ((ServerLocatorImpl)newFactory.getServerLocator()).getInitialConnectors();
+
+      Assert.assertEquals(1, initialConnectors.length);
+
+
+      Assert.assertEquals(BROKEN_PROPERTY, initialConnectors[0].getParams().get(TransportConstants.LOCAL_ADDRESS_PROP_NAME).toString());
    }
 
    @Test
    public void testIPv6NewURI() throws Exception {
-      persistIP6(IPV6, new ActiveMQConnectionFactory("tcp://[" + IPV6 + "]:5445"));
+      for (String IPV6 : V6IPs) {
+         persistIP6(IPV6, new ActiveMQConnectionFactory("tcp://[" + IPV6 + "]:5445"));
+      }
    }
 
    private void persistIP6(String ipv6, ActiveMQConnectionFactory factory) throws IOException, ClassNotFoundException {
@@ -379,6 +408,10 @@ public class ConnectionFactoryURITest {
                          ActiveMQConnectionFactory factory) throws IllegalAccessException, InvocationTargetException {
       PropertyDescriptor[] descriptors = bean.getPropertyUtils().getPropertyDescriptors(factory);
       for (PropertyDescriptor descriptor : descriptors) {
+         if (ignoreList.contains(descriptor.getName())) {
+            continue;
+         }
+         System.err.println("name::" + descriptor.getName());
          if (descriptor.getWriteMethod() != null && descriptor.getReadMethod() != null) {
             if (descriptor.getPropertyType() == String.class) {
                String value = RandomUtil.randomString();

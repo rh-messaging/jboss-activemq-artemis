@@ -952,9 +952,8 @@ public class StompV12Test extends StompV11TestBase {
 
       Assert.assertEquals("ERROR", error.getCommand());
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message should be still there
       MessageConsumer consumer = session.createConsumer(queue);
@@ -982,9 +981,8 @@ public class StompV12Test extends StompV11TestBase {
 
       System.out.println("Receiver error: " + error);
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message should still there
       MessageConsumer consumer = session.createConsumer(queue);
@@ -1040,9 +1038,8 @@ public class StompV12Test extends StompV11TestBase {
 
       Assert.assertEquals("ERROR", frame.getCommand());
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message still there.
       MessageConsumer consumer = session.createConsumer(queue);
@@ -1068,9 +1065,8 @@ public class StompV12Test extends StompV11TestBase {
 
       System.out.println("Receiver error: " + error);
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message should still there
       MessageConsumer consumer = session.createConsumer(queue);
@@ -1104,9 +1100,8 @@ public class StompV12Test extends StompV11TestBase {
 
       Assert.assertEquals("answer-me", error.getHeader("receipt-id"));
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message should still there
       MessageConsumer consumer = session.createConsumer(queue);
@@ -1140,14 +1135,21 @@ public class StompV12Test extends StompV11TestBase {
 
       Assert.assertEquals("answer-me", error.getHeader("receipt-id"));
 
-      unsubscribe(connV12, "sub1");
-
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
 
       //message should still there
       MessageConsumer consumer = session.createConsumer(queue);
       Message message = consumer.receive(1000);
       Assert.assertNotNull(message);
+   }
+
+   protected void waitDisconnect(StompClientConnectionV12 connection) throws Exception {
+
+      long timeout = System.currentTimeMillis() + 10000;
+      while (timeout > System.currentTimeMillis() && connection.isConnected()) {
+         Thread.sleep(10);
+      }
    }
 
    @Test
@@ -1468,6 +1470,7 @@ public class StompV12Test extends StompV11TestBase {
       final CountDownLatch latch = new CountDownLatch(1);
 
       Thread thr = new Thread() {
+         @Override
          public void run() {
             ClientStompFrame sendFrame = connV12.createFrame("SEND");
             sendFrame.addHeader("destination", getQueuePrefix() + getQueueName());
@@ -1520,7 +1523,8 @@ public class StompV12Test extends StompV11TestBase {
       ClientStompFrame frame = connV12.receiveFrame();
       Assert.assertTrue(frame.getCommand().equals("ERROR"));
 
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
    }
 
    @Test
@@ -1659,6 +1663,7 @@ public class StompV12Test extends StompV11TestBase {
       int count = 1000;
       final CountDownLatch latch = new CountDownLatch(count);
       consumer.setMessageListener(new MessageListener() {
+         @Override
          public void onMessage(Message arg0) {
             TextMessage m = (TextMessage) arg0;
             latch.countDown();
@@ -2511,7 +2516,8 @@ public class StompV12Test extends StompV11TestBase {
       Assert.assertEquals("1234", frame.getHeader("receipt-id"));
       System.out.println("message: " + frame.getHeader("message"));
 
-      connV12.disconnect();
+      waitDisconnect(connV12);
+      Assert.assertFalse("Should be disconnected in STOMP 1.2 after ERROR", connV12.isConnected());
    }
 
    @Test

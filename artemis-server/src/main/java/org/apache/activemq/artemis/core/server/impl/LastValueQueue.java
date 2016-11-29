@@ -44,7 +44,7 @@ import org.apache.activemq.artemis.core.settings.impl.AddressSettings;
  */
 public class LastValueQueue extends QueueImpl {
 
-   private final Map<SimpleString, HolderReference> map = new ConcurrentHashMap<SimpleString, HolderReference>();
+   private final Map<SimpleString, HolderReference> map = new ConcurrentHashMap<>();
 
    public LastValueQueue(final long persistenceID,
                          final SimpleString address,
@@ -66,6 +66,10 @@ public class LastValueQueue extends QueueImpl {
 
    @Override
    public synchronized void addTail(final MessageReference ref, final boolean direct) {
+      if (scheduleIfPossible(ref)) {
+         return;
+      }
+
       SimpleString prop = ref.getMessage().getSimpleStringProperty(Message.HDR_LAST_VALUE_NAME);
 
       if (prop != null) {
@@ -74,18 +78,7 @@ public class LastValueQueue extends QueueImpl {
          if (hr != null) {
             // We need to overwrite the old ref with the new one and ack the old one
 
-            MessageReference oldRef = hr.getReference();
-
-            referenceHandled();
-
-            try {
-               oldRef.acknowledge();
-            }
-            catch (Exception e) {
-               ActiveMQServerLogger.LOGGER.errorAckingOldReference(e);
-            }
-
-            hr.setReference(ref);
+            replaceLVQMessage(ref, hr);
 
          }
          else {
@@ -102,34 +95,59 @@ public class LastValueQueue extends QueueImpl {
    }
 
    @Override
-   public synchronized void addHead(final MessageReference ref) {
+   public synchronized void addHead(final MessageReference ref, boolean scheduling) {
       SimpleString prop = ref.getMessage().getSimpleStringProperty(Message.HDR_LAST_VALUE_NAME);
 
       if (prop != null) {
          HolderReference hr = map.get(prop);
 
          if (hr != null) {
-            // We keep the current ref and ack the one we are returning
+            if (scheduling) {
+               // We need to overwrite the old ref with the new one and ack the old one
 
-            super.referenceHandled();
-
-            try {
-               super.acknowledge(ref);
+               replaceLVQMessage(ref, hr);
             }
-            catch (Exception e) {
-               ActiveMQServerLogger.LOGGER.errorAckingOldReference(e);
+            else {
+               // We keep the current ref and ack the one we are returning
+
+               super.referenceHandled();
+
+               try {
+                  super.acknowledge(ref);
+               }
+               catch (Exception e) {
+                  ActiveMQServerLogger.LOGGER.errorAckingOldReference(e);
+               }
             }
          }
          else {
-            map.put(prop, (HolderReference) ref);
+            hr = new HolderReference(prop, ref);
 
-            super.addHead(ref);
+            map.put(prop, hr);
+
+            super.addHead(hr, scheduling);
          }
       }
       else {
-         super.addHead(ref);
+         super.addHead(ref, scheduling);
       }
    }
+
+   private void replaceLVQMessage(MessageReference ref, HolderReference hr) {
+      MessageReference oldRef = hr.getReference();
+
+      referenceHandled();
+
+      try {
+         oldRef.acknowledge();
+      }
+      catch (Exception e) {
+         ActiveMQServerLogger.LOGGER.errorAckingOldReference(e);
+      }
+
+      hr.setReference(ref);
+   }
+
 
    @Override
    protected void refRemoved(MessageReference ref) {
@@ -162,6 +180,7 @@ public class LastValueQueue extends QueueImpl {
          return ref;
       }
 
+      @Override
       public void handled() {
          ref.handled();
          // We need to remove the entry from the map just before it gets delivered
@@ -182,50 +201,62 @@ public class LastValueQueue extends QueueImpl {
          this.ref = ref;
       }
 
+      @Override
       public MessageReference copy(final Queue queue) {
          return ref.copy(queue);
       }
 
+      @Override
       public void decrementDeliveryCount() {
          ref.decrementDeliveryCount();
       }
 
+      @Override
       public int getDeliveryCount() {
          return ref.getDeliveryCount();
       }
 
+      @Override
       public ServerMessage getMessage() {
          return ref.getMessage();
       }
 
+      @Override
       public Queue getQueue() {
          return ref.getQueue();
       }
 
+      @Override
       public long getScheduledDeliveryTime() {
          return ref.getScheduledDeliveryTime();
       }
 
+      @Override
       public void incrementDeliveryCount() {
          ref.incrementDeliveryCount();
       }
 
+      @Override
       public void setDeliveryCount(final int deliveryCount) {
          ref.setDeliveryCount(deliveryCount);
       }
 
+      @Override
       public void setScheduledDeliveryTime(final long scheduledDeliveryTime) {
          ref.setScheduledDeliveryTime(scheduledDeliveryTime);
       }
 
+      @Override
       public void setPersistedCount(int count) {
          ref.setPersistedCount(count);
       }
 
+      @Override
       public int getPersistedCount() {
          return ref.getPersistedCount();
       }
 
+      @Override
       public boolean isPaged() {
          return false;
       }
@@ -241,6 +272,7 @@ public class LastValueQueue extends QueueImpl {
       /* (non-Javadoc)
        * @see org.apache.activemq.artemis.core.server.MessageReference#getMessageMemoryEstimate()
        */
+      @Override
       public int getMessageMemoryEstimate() {
          return ref.getMessage().getMemoryEstimate();
       }

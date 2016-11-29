@@ -530,12 +530,13 @@ public class SelectorTest extends ActiveMQServerTestCase {
 
          conn.start();
 
-         final List<Message> received = new ArrayList<Message>();
-         final List<Message> received2 = new ArrayList<Message>();
+         final List<Message> received = new ArrayList<>();
+         final List<Message> received2 = new ArrayList<>();
          final CountDownLatch latch = new CountDownLatch(1);
          final CountDownLatch latch2 = new CountDownLatch(1);
 
          new Thread(new Runnable() {
+            @Override
             public void run() {
                try {
                   while (true) {
@@ -556,6 +557,7 @@ public class SelectorTest extends ActiveMQServerTestCase {
          }, "consumer thread 1").start();
 
          new Thread(new Runnable() {
+            @Override
             public void run() {
                try {
                   while (true) {

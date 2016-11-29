@@ -44,10 +44,11 @@ public class FailoverOnFlowControlTest extends FailoverTestBase {
    @Test
    public void testOverflowSend() throws Exception {
       ServerLocator locator = getServerLocator().setBlockOnNonDurableSend(true).setBlockOnDurableSend(true).setReconnectAttempts(-1).setProducerWindowSize(1000).setRetryInterval(123);
-      final ArrayList<ClientSession> sessionList = new ArrayList<ClientSession>();
+      final ArrayList<ClientSession> sessionList = new ArrayList<>();
       Interceptor interceptorClient = new Interceptor() {
          AtomicInteger count = new AtomicInteger(0);
 
+         @Override
          public boolean intercept(Packet packet, RemotingConnection connection) throws ActiveMQException {
             log.debug("Intercept..." + packet.getClass().getName());
 
