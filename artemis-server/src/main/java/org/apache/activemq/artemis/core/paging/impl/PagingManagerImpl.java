@@ -130,6 +130,7 @@ public final class PagingManagerImpl implements PagingManager {
             // store
             PagingStore oldStore = stores.remove(store.getStoreName());
             if (oldStore != null) {
+               oldStore.disableCleanup();
                oldStore.stop();
                oldStore = null;
             }
