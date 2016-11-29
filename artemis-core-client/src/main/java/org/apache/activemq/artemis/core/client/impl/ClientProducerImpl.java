@@ -256,7 +256,6 @@ public class ClientProducerImpl implements ClientProducerInternal {
          }
          else {
             sendRegularMessage(msgI, sendBlocking, theCredits, handler);
-            session.checkDefaultAddress(sendingAddress);
          }
       }
       finally {
@@ -280,6 +279,7 @@ public class ClientProducerImpl implements ClientProducerInternal {
 
       theCredits.acquireCredits(creditSize);
 
+      session.checkDefaultAddress(address);
       sessionContext.sendFullMessage(msgI, sendBlocking, handler, address);
    }
 
