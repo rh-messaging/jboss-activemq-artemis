@@ -80,6 +80,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseDecoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
@@ -351,7 +352,17 @@ public class NettyConnector extends AbstractConnector {
          sslEnabled +
          ", useNio=" +
          true +
+         getHttpUpgradeInfo() +
          "]";
+   }
+
+   private String getHttpUpgradeInfo() {
+      if (!httpUpgradeEnabled) {
+         return "";
+      }
+      String serverName = ConfigurationHelper.getStringProperty(TransportConstants.ACTIVEMQ_SERVER_NAME, null, configuration);
+      String acceptor = ConfigurationHelper.getStringProperty(TransportConstants.HTTP_UPGRADE_ENDPOINT_PROP_NAME, null, configuration);
+      return ", activemqServerName=" + serverName + ", httpUpgradeEndpoint=" + acceptor;
    }
 
    @Override
@@ -735,8 +746,21 @@ public class NettyConnector extends AbstractConnector {
          this.httpClientCodec = httpClientCodec;
       }
 
+      /**
+       * HTTP upgrade response will be decode by Netty as 2 objects:
+       * - 1 HttpObject corresponding to the 101 SWITCHING PROTOCOL headers
+       * - 1 EMPTY_LAST_CONTENT
+       *
+       * The HTTP upgrade is successful whne the 101 SWITCHING PROTOCOL has been received (handshakeComplete = true)
+       * but the latch is count down only when the following EMPTY_LAST_CONTENT is also received.
+       * Otherwise this ChannelHandler would be removed too soon and the ActiveMQChannelHandler would handle the
+       * EMPTY_LAST_CONTENT (while it is expecitng only ByteBuf).
+       */
       @Override
       public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
+         if (logger.isDebugEnabled()) {
+            logger.debug("Received msg=" + msg);
+         }
          if (msg instanceof HttpResponse) {
             HttpResponse response = (HttpResponse) msg;
             if (response.getStatus().code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code() && response.headers().get(HttpHeaders.Names.UPGRADE).equals(ACTIVEMQ_REMOTING)) {
@@ -744,22 +768,28 @@ public class NettyConnector extends AbstractConnector {
                String expectedResponse = createExpectedResponse(MAGIC_NUMBER, ctx.channel().attr(REMOTING_KEY).get());
 
                if (expectedResponse.equals(accept)) {
-                  // remove the http handlers and flag the activemq channel handler as active
-                  pipeline.remove(httpClientCodec);
-                  pipeline.remove(this);
+                  // HTTP upgrade is successful but let's wait to receive the EMPTY_LAST_CONTENT to count down the latch
                   handshakeComplete = true;
-                  ActiveMQChannelHandler channelHandler = pipeline.get(ActiveMQChannelHandler.class);
-                  channelHandler.active = true;
                } else {
-                  ActiveMQClientLogger.LOGGER.httpHandshakeFailed(accept, expectedResponse);
+                  // HTTP upgrade failed
+                  ActiveMQClientLogger.LOGGER.httpHandshakeFailed(msg);
                   ctx.close();
+                  latch.countDown();
                }
-            } else if (response.getStatus().code() == HttpResponseStatus.FORBIDDEN.code()) {
-               ActiveMQClientLogger.LOGGER.httpUpgradeNotSupportedByRemoteAcceptor();
-               ctx.close();
+               return;
             }
-            latch.countDown();
+         } else if (msg == LastHttpContent.EMPTY_LAST_CONTENT && handshakeComplete) {
+            // remove the http handlers and flag the activemq channel handler as active
+            pipeline.remove(httpClientCodec);
+            pipeline.remove(this);
+            ActiveMQChannelHandler channelHandler = pipeline.get(ActiveMQChannelHandler.class);
+            channelHandler.active = true;
          }
+         if (!handshakeComplete) {
+            ActiveMQClientLogger.LOGGER.httpHandshakeFailed(msg);
+            ctx.close();
+         }
+         latch.countDown();
       }
 
       @Override
@@ -970,6 +1000,20 @@ public class NettyConnector extends AbstractConnector {
 
    @Override
    public boolean isEquivalent(Map<String, Object> configuration) {
+      Boolean httpUpgradeEnabled = ConfigurationHelper.getBooleanProperty(TransportConstants.HTTP_UPGRADE_ENABLED_PROP_NAME, TransportConstants.DEFAULT_HTTP_UPGRADE_ENABLED, configuration);
+      if (httpUpgradeEnabled) {
+         // we need to look at the activemqServerName to distinguish between ActiveMQ servers that could be proxied behind the same
+         // HTTP upgrade handler in the Web server
+         String otherActiveMQServerName = ConfigurationHelper.getStringProperty(TransportConstants.ACTIVEMQ_SERVER_NAME, null, configuration);
+         String activeMQServerName = ConfigurationHelper.getStringProperty(TransportConstants.ACTIVEMQ_SERVER_NAME, null, this.configuration);
+         boolean equivalent = isSameHostAndPort(configuration) && otherActiveMQServerName != null && otherActiveMQServerName.equals(activeMQServerName);
+         return equivalent;
+      } else {
+         return isSameHostAndPort(configuration);
+      }
+   }
+
+   private boolean isSameHostAndPort(Map<String, Object> configuration) {
       //here we only check host and port because these two parameters
       //is sufficient to determine the target host
       String host = ConfigurationHelper.getStringProperty(TransportConstants.HOST_PROP_NAME, TransportConstants.DEFAULT_HOST, configuration);

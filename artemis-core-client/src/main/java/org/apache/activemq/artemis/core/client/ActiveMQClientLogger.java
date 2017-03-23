@@ -404,8 +404,8 @@ public interface ActiveMQClientLogger extends BasicLogger {
    void invalidProtocol(String validProtocols);
 
    @LogMessage(level = Logger.Level.ERROR)
-   @Message(id = 214023, value = "HTTP Handshake failed, the received accept value %s does not match the expected response %s")
-   void httpHandshakeFailed(String response, String expectedResponse);
+   @Message(id = 214023, value = "HTTP Handshake failed, received %s")
+   void httpHandshakeFailed(Object msg);
 
    @LogMessage(level = Logger.Level.ERROR)
    @Message(id = 214024, value = "HTTP upgrade not supported by remote acceptor")
@@ -432,5 +432,9 @@ public interface ActiveMQClientLogger extends BasicLogger {
       value = "Couldn't reattach session {0}, performing as a failover operation now and recreating objects",
       format = Message.Format.MESSAGE_FORMAT)
    void reconnectCreatingNewSession(long id);
+
+   @LogMessage(level = Logger.Level.ERROR)
+   @Message(id = 214029, value = "Unexpected response from HTTP server: %s")
+   void unexpectedResponseFromHttpServer(Object response);
 
 }
