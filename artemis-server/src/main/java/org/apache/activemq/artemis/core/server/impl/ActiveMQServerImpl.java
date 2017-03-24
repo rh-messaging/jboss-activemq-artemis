@@ -1244,13 +1244,18 @@ public class ActiveMQServerImpl implements ActiveMQServer {
    }
 
    public Queue deployQueue(final SimpleString address,
-                            final SimpleString queueName,
+                            final SimpleString resourceName,
                             final SimpleString filterString,
                             final boolean durable,
                             final boolean temporary) throws Exception {
-      ActiveMQServerLogger.LOGGER.deployQueue(queueName);
+      
+       if(resourceName.toString().toLowerCase().startsWith("jms.topic")){
+           ActiveMQServerLogger.LOGGER.deployTopic(resourceName);
+       }else{
+           ActiveMQServerLogger.LOGGER.deployQueue(resourceName);
+       }
 
-      return createQueue(address, queueName, filterString, null, durable, temporary, true, false, false);
+      return createQueue(address, resourceName, filterString, null, durable, temporary, true, false, false);
    }
 
    public void destroyQueue(final SimpleString queueName) throws Exception {
