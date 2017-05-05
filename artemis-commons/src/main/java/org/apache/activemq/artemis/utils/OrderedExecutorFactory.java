@@ -19,6 +19,7 @@ package org.apache.activemq.artemis.utils;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
@@ -79,6 +80,16 @@ public final class OrderedExecutorFactory implements ExecutorFactory {
 
       @Override
       public void execute(Runnable command) {
+         // In case of a tear down, the delegate is an instance of a ThreadPoolExecutor and we need to avoid sending
+         // tasks to be executed when the delegate is TERMINATED or SHUTDOWN and just run the command, avoiding
+         // RejectedExecutionExceptions
+         if (delegate instanceof ThreadPoolExecutor) {
+            if (((ThreadPoolExecutor) delegate).isTerminated() && ((ThreadPoolExecutor) delegate).isShutdown()) {
+               command.run();
+               return;
+            }
+         }
+
          tasks.add(command);
          if (stateUpdater.get(this) == STATE_NOT_RUNNING) {
             //note that this can result in multiple tasks being queued
