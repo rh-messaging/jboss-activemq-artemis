@@ -58,16 +58,14 @@ import org.apache.activemq.artemis.ra.ActiveMQResourceAdapter;
 import org.apache.activemq.artemis.service.extensions.xa.recovery.XARecoveryConfig;
 import org.apache.activemq.artemis.utils.FutureLatch;
 import org.apache.activemq.artemis.utils.SensitiveDataCodec;
+import org.jboss.logging.Logger;
 
 /**
  * The activation.
  */
 public class ActiveMQActivation {
 
-   /**
-    * Trace enabled
-    */
-   private static boolean trace = ActiveMQRALogger.LOGGER.isTraceEnabled();
+   private static final Logger logger = Logger.getLogger(ActiveMQActivation.class);
 
    /**
     * The onMessage method
@@ -147,7 +145,7 @@ public class ActiveMQActivation {
                              final ActiveMQActivationSpec spec) throws ResourceException {
       spec.validate();
 
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("constructor(" + ra + ", " + endpointFactory + ", " + spec + ")");
       }
 
@@ -182,7 +180,7 @@ public class ActiveMQActivation {
     * @return The value
     */
    public ActiveMQActivationSpec getActivationSpec() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("getActivationSpec()");
       }
 
@@ -195,7 +193,7 @@ public class ActiveMQActivation {
     * @return The value
     */
    public MessageEndpointFactory getMessageEndpointFactory() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("getMessageEndpointFactory()");
       }
 
@@ -208,7 +206,7 @@ public class ActiveMQActivation {
     * @return The value
     */
    public boolean isDeliveryTransacted() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("isDeliveryTransacted()");
       }
 
@@ -221,7 +219,7 @@ public class ActiveMQActivation {
     * @return The value
     */
    public WorkManager getWorkManager() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("getWorkManager()");
       }
 
@@ -234,7 +232,7 @@ public class ActiveMQActivation {
     * @return The value
     */
    public boolean isTopic() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("isTopic()");
       }
 
@@ -247,7 +245,7 @@ public class ActiveMQActivation {
     * @throws ResourceException Thrown if an error occurs
     */
    public void start() throws ResourceException {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("start()");
       }
       deliveryActive.set(true);
@@ -286,7 +284,7 @@ public class ActiveMQActivation {
     * Stop the activation
     */
    public void stop() {
-      if (ActiveMQActivation.trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("stop()");
       }
 
@@ -300,7 +298,7 @@ public class ActiveMQActivation {
     * @throws Exception Thrown if an error occurs
     */
    protected synchronized void setup() throws Exception {
-      ActiveMQRALogger.LOGGER.debug("Setting up " + spec);
+      logger.debug("Setting up " + spec);
 
       setupCF();
 
@@ -352,14 +350,14 @@ public class ActiveMQActivation {
          factory.getServerLocator().addClusterTopologyListener(new RebalancingListener());
       }
 
-      ActiveMQRALogger.LOGGER.debug("Setup complete " + this);
+      logger.debug("Setup complete " + this);
    }
 
    /**
     * Teardown the activation
     */
    protected synchronized void teardown() {
-      ActiveMQRALogger.LOGGER.debug("Tearing down " + spec);
+      logger.debug("Tearing down " + spec);
 
       long timeout = factory == null ? ActiveMQClient.DEFAULT_CALL_TIMEOUT : factory.getCallTimeout();
 
@@ -451,7 +449,7 @@ public class ActiveMQActivation {
       nodes.clear();
       lastReceived = false;
 
-      ActiveMQRALogger.LOGGER.debug("Tearing down complete " + this);
+      logger.debug("Tearing down complete " + this);
    }
 
    protected void setupCF() throws Exception {
@@ -498,7 +496,7 @@ public class ActiveMQActivation {
             result.addMetaData(ClientSession.JMS_SESSION_CLIENT_ID_PROPERTY, clientID);
          }
 
-         ActiveMQRALogger.LOGGER.debug("Using queue connection " + result);
+         logger.debug("Using queue connection " + result);
 
          return result;
       }
@@ -534,14 +532,14 @@ public class ActiveMQActivation {
          else {
             ctx = new InitialContext(spec.getParsedJndiParams());
          }
-         ActiveMQRALogger.LOGGER.debug("Using context " + ctx.getEnvironment() + " for " + spec);
-         if (ActiveMQActivation.trace) {
+         logger.debug("Using context " + ctx.getEnvironment() + " for " + spec);
+         if (logger.isTraceEnabled()) {
             ActiveMQRALogger.LOGGER.trace("setupDestination(" + ctx + ")");
          }
 
          String destinationTypeString = spec.getDestinationType();
          if (destinationTypeString != null && !destinationTypeString.trim().equals("")) {
-            ActiveMQRALogger.LOGGER.debug("Destination type defined as " + destinationTypeString);
+            logger.debug("Destination type defined as " + destinationTypeString);
 
             Class<?> destinationType;
             if (Topic.class.getName().equals(destinationTypeString)) {
@@ -552,7 +550,7 @@ public class ActiveMQActivation {
                destinationType = Queue.class;
             }
 
-            ActiveMQRALogger.LOGGER.debug("Retrieving " + destinationType.getName() + " \"" + destinationName + "\" from JNDI");
+            logger.debug("Retrieving " + destinationType.getName() + " \"" + destinationName + "\" from JNDI");
 
             try {
                destination = (ActiveMQDestination) ActiveMQRaUtils.lookup(ctx, destinationName, destinationType);
@@ -564,7 +562,7 @@ public class ActiveMQActivation {
 
                String calculatedDestinationName = destinationName.substring(destinationName.lastIndexOf('/') + 1);
 
-               ActiveMQRALogger.LOGGER.debug("Unable to retrieve " + destinationName +
+               logger.debug("Unable to retrieve " + destinationName +
                                                 " from JNDI. Creating a new " + destinationType.getName() +
                                                 " named " + calculatedDestinationName + " to be used by the MDB.");
 
@@ -578,8 +576,8 @@ public class ActiveMQActivation {
             }
          }
          else {
-            ActiveMQRALogger.LOGGER.debug("Destination type not defined in MDB activation configuration.");
-            ActiveMQRALogger.LOGGER.debug("Retrieving " + Destination.class.getName() + " \"" + destinationName + "\" from JNDI");
+            logger.debug("Destination type not defined in MDB activation configuration.");
+            logger.debug("Retrieving " + Destination.class.getName() + " \"" + destinationName + "\" from JNDI");
 
             destination = (ActiveMQDestination) ActiveMQRaUtils.lookup(ctx, destinationName, Destination.class);
             if (destination instanceof Topic) {
@@ -621,7 +619,7 @@ public class ActiveMQActivation {
    }
 
    public void startReconnectThread(final String threadName) {
-      if (trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("Starting reconnect Thread " + threadName + " on MDB activation " + this);
       }
       Runnable runnable = new Runnable() {
@@ -640,7 +638,7 @@ public class ActiveMQActivation {
     * @param failure if reconnecting in the event of a failure
     */
    public void reconnect(Throwable failure) {
-      if (trace) {
+      if (logger.isTraceEnabled()) {
          ActiveMQRALogger.LOGGER.trace("reconnecting activation " + this);
       }
       if (failure != null) {
@@ -670,7 +668,7 @@ public class ActiveMQActivation {
                Thread.sleep(setupInterval);
             }
             catch (InterruptedException e) {
-               ActiveMQRALogger.LOGGER.debug("Interrupted trying to reconnect " + spec, e);
+               logger.debug("Interrupted trying to reconnect " + spec, e);
                break;
             }
 
