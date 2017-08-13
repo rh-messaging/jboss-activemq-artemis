@@ -28,6 +28,8 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.activemq.artemis.core.client.ActiveMQClientLogger;
+
 public class ObjectInputStreamWithClassLoader extends ObjectInputStream {
 
    // Constants ------------------------------------------------------------------------------------
@@ -39,6 +41,10 @@ public class ObjectInputStreamWithClassLoader extends ObjectInputStream {
 
    public static final String WHITELIST_PROPERTY = "org.apache.activemq.artemis.jms.deserialization.whitelist";
    public static final String BLACKLIST_PROPERTY = "org.apache.activemq.artemis.jms.deserialization.blacklist";
+
+   private static final String JMS_EXCEPTION_NAME = "javax.jms.JMSException";
+   private static final Long JMS_EXCEPTION_SYNC_UID = 8951994251593378324L;
+   private static final Long JMS_EXCEPTION_NONSYNC_UID = 2368476267211489441L;
 
    // Attributes -----------------------------------------------------------------------------------
 
@@ -140,6 +146,33 @@ public class ObjectInputStreamWithClassLoader extends ObjectInputStream {
             throw unwrapException(e);
          }
       }
+   }
+
+   @Override
+   protected ObjectStreamClass readClassDescriptor() throws IOException, ClassNotFoundException {
+      ObjectStreamClass classDescriptor = super.readClassDescriptor();
+
+      // fix for different UID of JMSException in JMS API 2.0 v1.0.0 (was fixed in v1.0.1)
+      if (JMS_EXCEPTION_NAME.equals(classDescriptor.getName())
+              && (classDescriptor.getSerialVersionUID() == JMS_EXCEPTION_NONSYNC_UID
+                      || classDescriptor.getSerialVersionUID() == JMS_EXCEPTION_SYNC_UID)) {
+         // the class is javax.jms.JMSException and UID is one of the two known options, that we know are equivalent
+         try {
+            Class<?> cl = getClass().getClassLoader().loadClass(classDescriptor.getName());
+            ObjectStreamClass classOnCPDescriptor = ObjectStreamClass.lookup(cl);
+            if (classOnCPDescriptor.getSerialVersionUID() != classDescriptor.getSerialVersionUID()) {
+               // the version we received is different from the version on class path => return the descriptor of the
+               // version on class path, to avoid serialization exception
+               classDescriptor = classOnCPDescriptor;
+            }
+         } catch (ClassNotFoundException e) {
+            ActiveMQClientLogger.LOGGER.warnf("Class %s not found by class loader %s", classDescriptor.getName(),
+                    getClass().getClassLoader());
+            // return the original descriptor
+         }
+      }
+
+      return classDescriptor;
    }
 
    // Private --------------------------------------------------------------------------------------
