@@ -93,23 +93,29 @@ public class AIOSequentialFile extends AbstractSequentialFile {
    }
 
    @Override
-   public synchronized void close() throws IOException, InterruptedException, ActiveMQException {
+   public synchronized void close() throws InterruptedException, ActiveMQException {
       if (!opened) {
          return;
       }
 
-      super.close();
+      try {
+         super.close();
 
-      if (!pendingCallbacks.await(10, TimeUnit.SECONDS)) {
-         factory.onIOError(new IOException("Timeout on close"), "Timeout on close", this);
+         if (!pendingCallbacks.await(10, TimeUnit.SECONDS)) {
+            factory.onIOError(new IOException("Timeout on close"), "Timeout on close", this);
+         }
+
+         opened = false;
+
+         timedBuffer = null;
+
+         aioFile.close();
+         aioFile = null;
       }
-
-      opened = false;
-
-      timedBuffer = null;
-
-      aioFile.close();
-      aioFile = null;
+      catch (IOException e) {
+         factory.onIOError(e, "Error closing AIO File", this);
+         throw new ActiveMQNativeIOError(e.getMessage(), e);
+      }
    }
 
    @Override
