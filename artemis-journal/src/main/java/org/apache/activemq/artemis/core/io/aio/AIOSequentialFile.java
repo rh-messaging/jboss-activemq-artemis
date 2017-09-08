@@ -34,8 +34,11 @@ import org.apache.activemq.artemis.core.journal.impl.SimpleWaitIOCallback;
 import org.apache.activemq.artemis.jlibaio.LibaioFile;
 import org.apache.activemq.artemis.journal.ActiveMQJournalLogger;
 import org.apache.activemq.artemis.utils.ReusableLatch;
+import org.jboss.logging.Logger;
 
 public class AIOSequentialFile extends AbstractSequentialFile {
+
+   private static final Logger logger = Logger.getLogger(AIOSequentialFileFactory.class);
 
    private boolean opened = false;
 
@@ -98,7 +101,12 @@ public class AIOSequentialFile extends AbstractSequentialFile {
          return;
       }
 
+
       try {
+         if (logger.isTraceEnabled()) {
+            logger.trace("Closing file" + getFileName());
+         }
+
          super.close();
 
          if (!pendingCallbacks.await(10, TimeUnit.SECONDS)) {
@@ -113,6 +121,7 @@ public class AIOSequentialFile extends AbstractSequentialFile {
          aioFile = null;
       }
       catch (IOException e) {
+         logger.error("IOException when closing file: " + getFileName(), e);
          factory.onIOError(e, "Error closing AIO File", this);
          throw new ActiveMQNativeIOError(e.getMessage(), e);
       }
@@ -120,6 +129,10 @@ public class AIOSequentialFile extends AbstractSequentialFile {
 
    @Override
    public synchronized void fill(final int size) throws Exception {
+      if (logger.isTraceEnabled()) {
+         logger.trace("Filling file: " + getFileName());
+      }
+
       checkOpened();
       aioFile.fill(size);
 
@@ -135,9 +148,14 @@ public class AIOSequentialFile extends AbstractSequentialFile {
    public synchronized void open(final int maxIO, final boolean useExecutor) throws ActiveMQException {
       opened = true;
 
+      if (logger.isTraceEnabled()) {
+         logger.trace("Opening file: " + getFileName());
+      }
+
       try {
          aioFile = aioFactory.libaioContext.openFile(getFile(), factory.isDatasync());
       } catch (IOException e) {
+         logger.error("Error opening file: " + getFileName());
          factory.onIOError(e, e.getMessage(), this);
          throw new ActiveMQNativeIOError(e.getMessage(), e);
       }
@@ -162,6 +180,7 @@ public class AIOSequentialFile extends AbstractSequentialFile {
          // Sending it through the callback would make it released
          aioFile.read(positionToRead, bytesToRead, bytes, getCallback(callback, null));
       } catch (IOException e) {
+         logger.error("IOError reading file: " + getFileName(), e);
          factory.onIOError(e, e.getMessage(), this);
          throw new ActiveMQNativeIOError(e.getMessage(), e);
       }
@@ -182,6 +201,10 @@ public class AIOSequentialFile extends AbstractSequentialFile {
 
    @Override
    public void writeDirect(final ByteBuffer bytes, final boolean sync) throws Exception {
+      if (logger.isTraceEnabled()) {
+         logger.trace("Write Direct, Sync: " + sync + " File: " + getFileName());
+      }
+
       if (sync) {
          SimpleWaitIOCallback completion = new SimpleWaitIOCallback();
 
@@ -201,6 +224,7 @@ public class AIOSequentialFile extends AbstractSequentialFile {
       try {
          checkOpened();
       } catch (Exception e) {
+         logger.error("Error performing checkOpened()");
          ActiveMQJournalLogger.LOGGER.warn(e.getMessage(), e);
          callback.onError(-1, e.getMessage());
          return;
