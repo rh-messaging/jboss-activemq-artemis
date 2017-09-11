@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.activemq.artemis.ArtemisConstants;
+import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
 import org.apache.activemq.artemis.core.io.AbstractSequentialFileFactory;
 import org.apache.activemq.artemis.core.io.IOCallback;
@@ -357,6 +358,7 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
 
          if (error) {
             callback.onError(errorCode, errorMessage);
+            onIOError(new ActiveMQException(errorCode, "Call backs out of seq: " + errorMessage), errorMessage, null);
             errorMessage = null;
          } else {
             if (callback != null) {
@@ -384,6 +386,10 @@ public final class AIOSequentialFileFactory extends AbstractSequentialFileFactor
             try {
                libaioContext.poll();
             } catch (Throwable e) {
+               if (logger.isTraceEnabled()) {
+                  logger.trace("Error occurred while polling LibAIOContext");
+               }
+               onIOError(new ActiveMQException("Error on libaio poll"), "Error on LibAIO poll", null);
                ActiveMQJournalLogger.LOGGER.warn(e.getMessage(), e);
             }
          }
