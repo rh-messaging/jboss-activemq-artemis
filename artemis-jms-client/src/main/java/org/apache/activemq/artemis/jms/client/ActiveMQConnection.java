@@ -33,8 +33,12 @@ import javax.jms.Topic;
 import javax.jms.TopicConnection;
 import javax.jms.TopicSession;
 import java.lang.ref.WeakReference;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.ActiveMQExceptionType;
@@ -48,6 +52,7 @@ import org.apache.activemq.artemis.api.jms.ActiveMQJMSConstants;
 import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
 import org.apache.activemq.artemis.core.version.Version;
 import org.apache.activemq.artemis.reader.MessageUtil;
+import org.apache.activemq.artemis.utils.ActiveMQThreadFactory;
 import org.apache.activemq.artemis.utils.ConcurrentHashSet;
 import org.apache.activemq.artemis.utils.UUIDGenerator;
 import org.apache.activemq.artemis.utils.VersionLoader;
@@ -112,6 +117,8 @@ public class ActiveMQConnection extends ActiveMQConnectionForContextImpl impleme
    private final SessionFailureListener listener = new JMSFailureListener(this);
 
    private final FailoverEventListener failoverListener = new FailoverEventListenerImpl(this);
+
+   private final ExecutorService failoverListenerExecutor = Executors.newFixedThreadPool(1, ActiveMQThreadFactory.defaultThreadFactory());
 
    private final Version thisVersion;
 
@@ -348,6 +355,14 @@ public class ActiveMQConnection extends ActiveMQConnectionForContextImpl impleme
                initialSession.close();
             }
          }
+
+         AccessController.doPrivileged(new PrivilegedAction() {
+            @Override
+            public Object run() {
+               failoverListenerExecutor.shutdown();
+               return null;
+            }
+         });
 
          closed = true;
       }
@@ -755,11 +770,12 @@ public class ActiveMQConnection extends ActiveMQConnectionForContextImpl impleme
 
                if (failoverListener != null) {
 
-                  new Thread(new Runnable() {
+                  conn.failoverListenerExecutor.execute(new Runnable() {
+                     @Override
                      public void run() {
                         failoverListener.failoverEvent(eventType);
                      }
-                  }).start();
+                  });
                }
             }
             catch (JMSException e) {
