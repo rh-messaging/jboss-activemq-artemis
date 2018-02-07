@@ -71,6 +71,7 @@ import org.apache.activemq.artemis.tests.integration.management.ManagementContro
 import org.apache.activemq.artemis.tests.integration.management.ManagementTestBase;
 import org.apache.activemq.artemis.tests.unit.util.InVMNamingContext;
 import org.apache.activemq.artemis.tests.util.ActiveMQTestBase;
+import org.apache.activemq.artemis.utils.JsonLoader;
 import org.apache.activemq.artemis.utils.RandomUtil;
 import org.junit.Assert;
 import org.junit.Before;
@@ -860,7 +861,9 @@ public class JMSServerControlTest extends ManagementTestBase {
 
       ss.close();
 
-      control.listPreparedTransactionDetailsAsJSON();
+      String result = control.listPreparedTransactionDetailsAsJSON();
+
+      Assert.assertTrue("".equals(result) || (JsonUtil.readJsonArray(result) instanceof JsonArray));
    }
 
    @Test
