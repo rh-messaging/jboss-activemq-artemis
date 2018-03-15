@@ -473,12 +473,6 @@ public final class JMSBridgeImpl implements JMSBridge {
          if (JMSBridgeImpl.trace) {
             ActiveMQJMSBridgeLogger.LOGGER.trace("Stopping " + this);
          }
-         if (!connectedSource && sourceConn != null) {
-            sourceConn.close();
-         }
-         if (!connectedTarget && targetConn != null) {
-            targetConn.close();
-         }
          synchronized (lock) {
             started = false;
 
