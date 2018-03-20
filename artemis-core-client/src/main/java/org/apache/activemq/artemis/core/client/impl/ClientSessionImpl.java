@@ -1789,4 +1789,9 @@ public final class ClientSessionImpl implements ClientSessionInternal, FailureLi
          }
       });
    }
+
+   @Override
+   public SessionContext getSessionContext() {
+      return sessionContext;
+   }
 }

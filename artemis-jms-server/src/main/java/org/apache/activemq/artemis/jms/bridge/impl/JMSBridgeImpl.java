@@ -16,28 +16,6 @@
  */
 package org.apache.activemq.artemis.jms.bridge.impl;
 
-import org.apache.activemq.artemis.api.core.ActiveMQException;
-import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
-import org.apache.activemq.artemis.api.core.client.FailoverEventListener;
-import org.apache.activemq.artemis.api.core.client.FailoverEventType;
-import org.apache.activemq.artemis.api.jms.ActiveMQJMSConstants;
-import org.apache.activemq.artemis.jms.bridge.ActiveMQJMSBridgeLogger;
-import org.apache.activemq.artemis.jms.bridge.ConnectionFactoryFactory;
-import org.apache.activemq.artemis.jms.bridge.DestinationFactory;
-import org.apache.activemq.artemis.jms.bridge.JMSBridge;
-import org.apache.activemq.artemis.jms.bridge.JMSBridgeControl;
-import org.apache.activemq.artemis.jms.bridge.QualityOfServiceMode;
-import org.apache.activemq.artemis.jms.client.ActiveMQConnection;
-import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
-import org.apache.activemq.artemis.jms.client.ActiveMQMessage;
-import org.apache.activemq.artemis.jms.server.ActiveMQJMSServerBundle;
-import org.apache.activemq.artemis.service.extensions.ServiceUtils;
-import org.apache.activemq.artemis.service.extensions.xa.recovery.ActiveMQRegistry;
-import org.apache.activemq.artemis.service.extensions.xa.recovery.XARecoveryConfig;
-import org.apache.activemq.artemis.utils.DefaultSensitiveStringCodec;
-import org.apache.activemq.artemis.utils.PasswordMaskingUtil;
-import org.apache.activemq.artemis.utils.SensitiveDataCodec;
-
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
@@ -71,6 +49,29 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.activemq.artemis.api.core.ActiveMQException;
+import org.apache.activemq.artemis.api.core.ActiveMQInterruptedException;
+import org.apache.activemq.artemis.api.core.client.FailoverEventListener;
+import org.apache.activemq.artemis.api.core.client.FailoverEventType;
+import org.apache.activemq.artemis.api.jms.ActiveMQJMSConstants;
+import org.apache.activemq.artemis.core.client.impl.ClientSessionInternal;
+import org.apache.activemq.artemis.jms.bridge.ActiveMQJMSBridgeLogger;
+import org.apache.activemq.artemis.jms.bridge.ConnectionFactoryFactory;
+import org.apache.activemq.artemis.jms.bridge.DestinationFactory;
+import org.apache.activemq.artemis.jms.bridge.JMSBridge;
+import org.apache.activemq.artemis.jms.bridge.JMSBridgeControl;
+import org.apache.activemq.artemis.jms.bridge.QualityOfServiceMode;
+import org.apache.activemq.artemis.jms.client.ActiveMQConnection;
+import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
+import org.apache.activemq.artemis.jms.client.ActiveMQMessage;
+import org.apache.activemq.artemis.jms.server.ActiveMQJMSServerBundle;
+import org.apache.activemq.artemis.service.extensions.ServiceUtils;
+import org.apache.activemq.artemis.service.extensions.xa.recovery.ActiveMQRegistry;
+import org.apache.activemq.artemis.service.extensions.xa.recovery.XARecoveryConfig;
+import org.apache.activemq.artemis.utils.DefaultSensitiveStringCodec;
+import org.apache.activemq.artemis.utils.PasswordMaskingUtil;
+import org.apache.activemq.artemis.utils.SensitiveDataCodec;
 
 public final class JMSBridgeImpl implements JMSBridge {
 
@@ -483,6 +484,8 @@ public final class JMSBridgeImpl implements JMSBridge {
                ActiveMQJMSBridgeLogger.LOGGER.trace("Rolling back remaining tx");
             }
 
+            stopSessionFailover();
+
             try {
                tx.rollback();
             }
@@ -523,6 +526,15 @@ public final class JMSBridgeImpl implements JMSBridge {
       }
    }
 
+   private void stopSessionFailover() {
+      XASession xaSource = (XASession) sourceSession;
+      XASession xaTarget = (XASession) targetSession;
+
+      ((ClientSessionInternal) xaSource.getXAResource()).getSessionContext().releaseCommunications();
+      ((ClientSessionInternal) xaTarget.getXAResource()).getSessionContext().releaseCommunications();
+   }
+
+   @Override
    public synchronized boolean isStarted() {
       return started;
    }
