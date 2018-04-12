@@ -499,8 +499,9 @@ public class ServerConsumerImpl implements ServerConsumer, ReadyListener {
       boolean performACK = lastConsumedAsDelivered;
 
       try {
-         if (largeMessageDeliverer != null) {
-            largeMessageDeliverer.finish();
+         LargeMessageDeliverer pendingLargeMessageDeliverer = largeMessageDeliverer;
+         if (pendingLargeMessageDeliverer != null) {
+            pendingLargeMessageDeliverer.finish();
          }
       }
       catch (Throwable e) {

@@ -1105,11 +1105,9 @@ public interface ActiveMQServerLogger extends BasicLogger {
       format = Message.Format.MESSAGE_FORMAT)
    void activateSharedStoreSlaveFailed(@Cause Throwable e);
 
-   @LogMessage(level = Logger.Level.WARN)
-   @Message(id = 222190,
-      value = "Disallowing use of vulnerable protocol: {0}. See http://www.oracle.com/technetwork/topics/security/poodlecve-2014-3566-2339408.html for more details.",
-      format = Message.Format.MESSAGE_FORMAT)
-   void disallowedProtocol(String protocol);
+   @LogMessage(level = Logger.Level.INFO)
+   @Message(id = 222190, value = "Deleting old data directory {0} as the max folders is set to 0", format = Message.Format.MESSAGE_FORMAT)
+   void backupDeletingData(String oldPath);
 
    @LogMessage(level = Logger.Level.WARN)
    @Message(id = 222191,
@@ -1210,6 +1208,12 @@ public interface ActiveMQServerLogger extends BasicLogger {
       value = "Destination {1} has an inconsistent and negative address size={0}.",
       format = Message.Format.MESSAGE_FORMAT)
    void negativeAddressSize(long size, String destination);
+
+   @LogMessage(level = Logger.Level.WARN)
+   @Message(id = 222215,
+           value = "Disallowing use of vulnerable protocol: {0}. See http://www.oracle.com/technetwork/topics/security/poodlecve-2014-3566-2339408.html for more details.",
+           format = Message.Format.MESSAGE_FORMAT)
+   void disallowedProtocol(String protocol);
 
    @LogMessage(level = Logger.Level.ERROR)
    @Message(id = 224000, value = "Failure in initialisation", format = Message.Format.MESSAGE_FORMAT)
