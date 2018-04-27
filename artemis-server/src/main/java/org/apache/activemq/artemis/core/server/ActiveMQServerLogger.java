@@ -1570,6 +1570,7 @@ public interface ActiveMQServerLogger extends BasicLogger {
    @Message(id = 224075, value = "Cannot find pageTX id = {0}", format = Message.Format.MESSAGE_FORMAT)
    void journalCannotFindPageTX(Long id);
 
-
-
+   @LogMessage(level = Logger.Level.INFO)
+   @Message(id = 224092, value = "Despite disabled persistence, page files will be persisted.", format = Message.Format.MESSAGE_FORMAT)
+   void pageWillBePersisted();
 }
