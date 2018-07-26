@@ -42,7 +42,6 @@ import java.util.regex.Pattern;
 
 import org.apache.activemq.artemis.api.core.ActiveMQException;
 import org.apache.activemq.artemis.api.core.BroadcastEndpointFactory;
-import org.apache.activemq.artemis.api.core.ChannelBroadcastEndpointFactory;
 import org.apache.activemq.artemis.api.core.DiscoveryGroupConfiguration;
 import org.apache.activemq.artemis.api.core.JGroupsFileBroadcastEndpointFactory;
 import org.apache.activemq.artemis.api.core.Pair;
@@ -61,7 +60,6 @@ import org.apache.activemq.artemis.service.extensions.ServiceUtils;
 import org.apache.activemq.artemis.service.extensions.xa.recovery.XARecoveryConfig;
 import org.apache.activemq.artemis.utils.SensitiveDataCodec;
 import org.jboss.logging.Logger;
-import org.jgroups.JChannel;
 
 /**
  * The resource adapter for ActiveMQ
@@ -1825,8 +1823,7 @@ public class ActiveMQResourceAdapter implements ResourceAdapter, Serializable {
       String jgroupsLocatorClassName = raProperties.getJgroupsChannelLocatorClass();
       if (jgroupsLocatorClassName != null) {
          String jchannelRefName = raProperties.getJgroupsChannelRefName();
-         JChannel jchannel = ActiveMQRaUtils.locateJGroupsChannel(jgroupsLocatorClassName, jchannelRefName);
-         return new ChannelBroadcastEndpointFactory(jchannel, jgroupsChannel);
+         return ActiveMQRaUtils.locateBroadcastEndpointFactory(jgroupsLocatorClassName, jchannelRefName);
       }
 
       String jgroupsFileName = overrideProperties.getJgroupsFile() != null ? overrideProperties.getJgroupsFile() : getJgroupsFile();
