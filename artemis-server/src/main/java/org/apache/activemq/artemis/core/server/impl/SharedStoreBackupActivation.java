@@ -29,6 +29,7 @@ import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.core.server.ActiveMQServerLogger;
 import org.apache.activemq.artemis.core.server.NodeManager;
 import org.apache.activemq.artemis.core.server.QueueFactory;
+import org.apache.activemq.artemis.core.server.cluster.ClusterConnection;
 import org.apache.activemq.artemis.core.server.cluster.ha.ScaleDownPolicy;
 import org.apache.activemq.artemis.core.server.cluster.ha.SharedStoreSlavePolicy;
 import org.apache.activemq.artemis.core.server.group.GroupingHandler;
@@ -114,7 +115,8 @@ public final class SharedStoreBackupActivation extends Activation {
 
             activeMQServer.getNodeManager().releaseBackup();
          }
-         if (sharedStoreSlavePolicy.isAllowAutoFailBack()) {
+
+         if (sharedStoreSlavePolicy.isAllowAutoFailBack() && ActiveMQServerImpl.SERVER_STATE.STOPPING != activeMQServer.getState()) {
             startFailbackChecker();
          }
       } catch (ClosedChannelException | InterruptedException e) {
@@ -182,17 +184,30 @@ public final class SharedStoreBackupActivation extends Activation {
     * To be called by backup trying to fail back the server
     */
    private void startFailbackChecker() {
-      activeMQServer.getScheduledPool().scheduleAtFixedRate(new FailbackChecker(), 1000L, 1000L, TimeUnit.MILLISECONDS);
+      FailbackChecker checker = new FailbackChecker().initialize();
+      if(checker != null){
+         activeMQServer.getScheduledPool().scheduleAtFixedRate(checker, 1000L, 1000L, TimeUnit.MILLISECONDS);
+      } else {
+         //if server is currently stopping, there is no need to prepare failback
+         logger.debug("Failback is ignored because of server shutdown");
+      }
+
    }
 
    private class FailbackChecker implements Runnable {
 
       BackupTopologyListener backupListener;
 
-      FailbackChecker() {
-         TransportConfiguration connector = activeMQServer.getClusterManager().getDefaultConnection(null).getConnector();
-         backupListener = new BackupTopologyListener(activeMQServer.getNodeID().toString(), connector);
-         activeMQServer.getClusterManager().getDefaultConnection(null).addClusterTopologyListener(backupListener);
+      FailbackChecker initialize() {
+         ClusterConnection defaultConnection = activeMQServer.getClusterManager().getDefaultConnection(null);
+         //could be null in case that server is currently stopping
+         if(defaultConnection != null) {
+            TransportConfiguration connector = defaultConnection.getConnector();
+            backupListener = new BackupTopologyListener(activeMQServer.getNodeID().toString(), connector);
+            defaultConnection.addClusterTopologyListener(backupListener);
+            return this;
+         }
+         return null;
       }
 
       private boolean restarting = false;
