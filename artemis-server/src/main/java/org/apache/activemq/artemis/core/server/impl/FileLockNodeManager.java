@@ -49,6 +49,8 @@ public class FileLockNodeManager extends NodeManager {
 
    private static final byte NOT_STARTED = 'N';
 
+   private static final int LOCK_ACCESS_FAILURE_WAIT_TIME = 2000;
+
    private FileLock liveLock;
 
    private FileLock backupLock;
@@ -299,36 +301,57 @@ public class FileLockNodeManager extends NodeManager {
 
    protected FileLock lock(final long lockPosition) throws Exception {
       long start = System.currentTimeMillis();
+      boolean isRecurringFailure = false;
 
       while (!interrupted) {
-         FileLock lock = tryLock(lockPosition);
+         try {
+            FileLock lock = tryLock(lockPosition);
+            isRecurringFailure = false;
 
-         if (lock == null) {
-            try {
-               Thread.sleep(500);
-            } catch (InterruptedException e) {
-               return null;
-            }
+            if (lock == null) {
+               logger.debug("lock is null");
+               try {
+                  Thread.sleep(500);
+               } catch (InterruptedException e) {
+                  return null;
+               }
 
-            if (lockAcquisitionTimeout != -1 && (System.currentTimeMillis() - start) > lockAcquisitionTimeout) {
-               throw new Exception("timed out waiting for lock");
+               if (lockAcquisitionTimeout != -1 && (System.currentTimeMillis() - start) > lockAcquisitionTimeout) {
+                  throw new Exception("timed out waiting for lock");
+               }
+            } else {
+               return lock;
             }
-         } else {
-            return lock;
+         } catch (IOException e) {
+            // IOException during trylock() may be a temporary issue, e.g. NFS volume not being accessible
+            logger.log(isRecurringFailure ? Logger.Level.DEBUG : Logger.Level.WARN,
+                    "Failure when accessing a lock file", e);
+            isRecurringFailure = true;
+            Thread.sleep(LOCK_ACCESS_FAILURE_WAIT_TIME);
          }
       }
 
       // todo this is here because sometimes channel.lock throws a resource deadlock exception but trylock works,
       // need to investigate further and review
-      FileLock lock;
+      FileLock lock = null;
       do {
-         lock = tryLock(lockPosition);
-         if (lock == null) {
-            try {
-               Thread.sleep(500);
-            } catch (InterruptedException e1) {
-               //
+         try {
+            lock = tryLock(lockPosition);
+            isRecurringFailure = false;
+
+            if (lock == null) {
+               try {
+                  Thread.sleep(500);
+               } catch (InterruptedException e1) {
+                  //
+               }
             }
+         } catch (IOException e) {
+            // IOException during trylock() may be a temporary issue, e.g. NFS volume not being accessible
+            logger.log(isRecurringFailure ? Logger.Level.DEBUG : Logger.Level.WARN,
+                    "Failure when accessing a lock file", e);
+            isRecurringFailure = true;
+            Thread.sleep(LOCK_ACCESS_FAILURE_WAIT_TIME);
          }
          if (interrupted) {
             interrupted = false;
