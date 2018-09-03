@@ -72,6 +72,16 @@ public final class NIOSequentialFileFactory extends AbstractSequentialFileFactor
                                    final int bufferTimeout,
                                    final int maxIO,
                                    final boolean logRates,
+                                   final IOCriticalErrorListener listener) {
+      this(journalDir, buffered, bufferSize, bufferTimeout, maxIO, logRates, listener, null);
+   }
+
+   public NIOSequentialFileFactory(final File journalDir,
+                                   final boolean buffered,
+                                   final int bufferSize,
+                                   final int bufferTimeout,
+                                   final int maxIO,
+                                   final boolean logRates,
                                    final IOCriticalErrorListener listener,
                                    final CriticalAnalyzer analyzer) {
       super(journalDir, buffered, bufferSize, bufferTimeout, maxIO, logRates, listener, analyzer);
