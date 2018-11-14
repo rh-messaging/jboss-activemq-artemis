@@ -45,6 +45,7 @@ public class LargeMessageOnShutdownTest extends ActiveMQTestBase {
    private static final SimpleString queueName = new SimpleString("largeMessageShutdownQueue");
    private static ActiveMQServer server;
 
+   @Override
    @Before
    public void setUp() throws Exception {
       super.setUp();
@@ -54,6 +55,7 @@ public class LargeMessageOnShutdownTest extends ActiveMQTestBase {
       server.createQueue(queueName, RoutingType.MULTICAST, queueName, null, true, false);
    }
 
+   @Override
    @After
    public void tearDown() throws Exception {
       super.tearDown();
