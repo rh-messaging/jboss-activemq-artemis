@@ -1190,6 +1190,11 @@ public class ServerConsumerImpl implements ServerConsumer, ReadyListener {
          this.ref = ref;
       }
 
+      @Override
+      public String toString() {
+         return "ServerConsumerImpl$LargeMessageDeliverer[ref=[" + ref + "]]";
+      }
+
       public boolean deliver() throws Exception {
          lockDelivery.readLock().lock();
          try {
