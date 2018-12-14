@@ -185,6 +185,31 @@ public class TemporaryDestinationTest extends JMSTestCase {
    }
 
    @Test
+   public void testTemporaryQueueDeleteRemovesPageStore() throws Exception {
+      Connection conn = null;
+
+      try {
+         conn = createConnection();
+
+         Session producerSession = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+         int base = servers.get(0).getActiveMQServer().getPagingManager().getStoreNames().length;
+
+         TemporaryQueue tempQueue = producerSession.createTemporaryQueue();
+
+         tempQueue.delete();
+
+         ProxyAssertSupport.assertEquals(base, servers.get(0).getActiveMQServer().getPagingManager().getStoreNames().length);
+
+         producerSession.close();
+      } finally {
+         if (conn != null) {
+            conn.close();
+         }
+      }
+   }
+
+   @Test
    public void testTemporaryTopicDeleteWithConsumer() throws Exception {
       Connection conn = null;
 
