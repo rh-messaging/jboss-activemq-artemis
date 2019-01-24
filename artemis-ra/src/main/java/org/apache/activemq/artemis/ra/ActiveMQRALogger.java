@@ -132,4 +132,7 @@ public interface ActiveMQRALogger extends BasicLogger {
    @LogMessage(level = Logger.Level.DEBUG)
    @Message(id = 153001, value = "using different ActiveMQRAConnectionFactory", format = Message.Format.MESSAGE_FORMAT)
    void warnDifferentConnectionfactory();
+
+   @Message(id = 153002, value = "Cannot create a subscriber on the durable subscription since it already has subscriber(s)")
+   IllegalStateException canNotCreatedNonSharedSubscriber();
 }
