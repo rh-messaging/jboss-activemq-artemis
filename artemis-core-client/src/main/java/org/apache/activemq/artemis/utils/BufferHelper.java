@@ -17,7 +17,9 @@
 package org.apache.activemq.artemis.utils;
 
 import org.apache.activemq.artemis.api.core.ActiveMQBuffer;
+import org.apache.activemq.artemis.api.core.ActiveMQInvalidBufferException;
 import org.apache.activemq.artemis.api.core.SimpleString;
+import org.apache.activemq.artemis.logs.ActiveMQUtilBundle;
 
 /**
  * Helper methods to read and write from ActiveMQBuffer.
@@ -154,6 +156,26 @@ public class BufferHelper {
          return null;
       }
    }
+
+   public static byte[] safeReadBytes(final ActiveMQBuffer in) {
+      final int claimedSize = in.readInt();
+
+      if (claimedSize < 0) {
+         throw new ActiveMQInvalidBufferException("Payload size cannot be negative");
+      }
+
+      final int readableBytes = in.readableBytes();
+      // We have to be defensive here and not try to allocate byte buffer straight from information available in the
+      // stream. Or else, an adversary may handcraft the packet causing OOM situation for a running JVM.
+      if (claimedSize > readableBytes) {
+         throw new ActiveMQInvalidBufferException("Attempted to read: " + claimedSize +
+                                          " which exceeds overall readable buffer size of: " + readableBytes);
+      }
+      final byte[] byteBuffer = new byte[claimedSize];
+      in.readBytes(byteBuffer);
+      return byteBuffer;
+   }
+
 
 }
 
