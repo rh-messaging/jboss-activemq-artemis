@@ -519,6 +519,12 @@ public class PagingStoreImpl implements PagingStore {
    @Override
    public boolean checkPageFileExists(final int pageNumber) {
       String fileName = createFileName(pageNumber);
+
+      try {
+         checkFileFactory();
+      } catch (Exception ignored) {
+      }
+
       SequentialFile file = fileFactory.createSequentialFile(fileName);
       return file.exists();
    }
@@ -543,6 +549,12 @@ public class PagingStoreImpl implements PagingStore {
       file.close();
 
       return page;
+   }
+
+   private void checkFileFactory() throws Exception {
+      if (fileFactory == null) {
+         fileFactory = storeFactory.newFileFactory(getStoreName());
+      }
    }
 
    @Override
