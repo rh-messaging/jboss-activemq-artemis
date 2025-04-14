@@ -1736,6 +1736,7 @@ public class JMSServerManagerImpl implements JMSServerManager, ActivateCallback 
                }
             }
          }
+         server.getPagingManager().deletePageStore(address);
       }
    }
 
