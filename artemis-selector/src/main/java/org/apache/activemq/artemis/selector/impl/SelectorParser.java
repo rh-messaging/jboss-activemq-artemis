@@ -23,12 +23,14 @@ import org.apache.activemq.artemis.selector.filter.ComparisonExpression;
 import org.apache.activemq.artemis.selector.filter.FilterException;
 import org.apache.activemq.artemis.selector.hyphenated.HyphenatedParser;
 import org.apache.activemq.artemis.selector.strict.StrictParser;
+import java.util.Map;
+import java.util.Collections;
 
 /**
  */
 public class SelectorParser {
 
-   private static final LRUCache<String, Object> cache = new LRUCache<>(100);
+   private static final Map<String, Object> cache = Collections.synchronizedMap(new LRUCache<>(100));
    private static final String CONVERT_STRING_EXPRESSIONS_PREFIX = "convert_string_expressions:";
    private static final String HYPHENATED_PROPS_PREFIX = "hyphenated_props:";
    private static final String NO_CONVERT_STRING_EXPRESSIONS_PREFIX = "no_convert_string_expressions:";
